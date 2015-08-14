@@ -3,12 +3,15 @@
 
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
+
+using socklen_t = System.UInt32;
 
 internal static partial class Interop
 {
     internal static partial class libc
     {
         [DllImport(Libraries.Libc, SetLastError = true)]
-        internal static extern int socket(int domain, int type, int protocol);
+		public static extern unsafe int bind(int sockfd, sockaddr* addr, socklen_t addrlen);
     }
 }

@@ -3,12 +3,18 @@
 
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
+
+using size_t = System.IntPtr;
 
 internal static partial class Interop
 {
     internal static partial class libc
     {
-        [DllImport(Libraries.Libc, SetLastError = true)]
-        internal static extern int socket(int domain, int type, int protocol);
+		public unsafe struct iovec
+		{
+			public void* iov_base;
+			public size_t iov_len;
+		}
     }
 }

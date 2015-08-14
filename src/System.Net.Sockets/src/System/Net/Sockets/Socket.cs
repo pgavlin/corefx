@@ -24,7 +24,7 @@ namespace System.Net.Sockets
     /// <para>The <see cref='Sockets.Socket'/> class implements the Berkeley sockets
     ///    interface.</para>
     /// </devdoc>
-    public class Socket : IDisposable
+    public partial class Socket : IDisposable
     {
         internal const int DefaultCloseTimeout = -1; // don't change for default, otherwise breaking change
 
@@ -110,19 +110,9 @@ namespace System.Net.Sockets
         {
             s_LoggingEnabled = Logging.On;
             if (s_LoggingEnabled) Logging.Enter(Logging.Sockets, this, "Socket", addressFamily);
-            InitializeSockets();
-            _handle = SafeCloseSocket.CreateWSASocket(
-                    addressFamily,
-                    socketType,
-                    protocolType);
 
-            if (_handle.IsInvalid)
-            {
-                //
-                // failed to create the win32 socket, throw
-                //
-                throw new SocketException();
-            }
+            InitializeSockets();
+            _handle = SocketPal.CreateSocket(addressFamily, socketType, protocolType);
 
             _addressFamily = addressFamily;
             _socketType = socketType;
@@ -142,33 +132,7 @@ namespace System.Net.Sockets
                 throw new ArgumentException(SR.net_sockets_invalid_socketinformation, "socketInformation.ProtocolInformation");
             }
 
-            unsafe
-            {
-                fixed (byte* pinnedBuffer = socketInformation.ProtocolInformation)
-                {
-                    _handle = SafeCloseSocket.CreateWSASocket(pinnedBuffer);
-
-                    Interop.Winsock.WSAPROTOCOL_INFO protocolInfo =
-                        (Interop.Winsock.WSAPROTOCOL_INFO)Marshal.PtrToStructure<Interop.Winsock.WSAPROTOCOL_INFO>((IntPtr)pinnedBuffer);
-
-                    _addressFamily = protocolInfo.iAddressFamily;
-                    _socketType = (SocketType)protocolInfo.iSocketType;
-                    _protocolType = (ProtocolType)protocolInfo.iProtocol;
-                }
-            }
-
-            if (_handle.IsInvalid)
-            {
-                SocketException e = new SocketException();
-                if (e.SocketErrorCode == SocketError.InvalidArgument)
-                {
-                    throw new ArgumentException(SR.net_sockets_invalid_socketinformation, "socketInformation");
-                }
-                else
-                {
-                    throw e;
-                }
-            }
+            _handle = SocketPal.CreateSocket(socketInformation, out _addressFamily, out _socketType, out _protocolType);
 
             if (_addressFamily != AddressFamily.InterNetwork && _addressFamily != AddressFamily.InterNetworkV6)
             {
@@ -202,7 +166,7 @@ namespace System.Net.Sockets
                 SocketError errorCode;
                 try
                 {
-                    errorCode = Interop.Winsock.getsockname(
+                    errorCode = SocketPal.GetSockName(
                         _handle,
                         socketAddress.Buffer,
                         ref socketAddress.InternalSize);
@@ -300,13 +264,10 @@ namespace System.Net.Sockets
                     throw new ObjectDisposedException(this.GetType().FullName);
                 }
 
-                int argp = 0;
+                int argp;
 
                 // This may throw ObjectDisposedException.
-                SocketError errorCode = Interop.Winsock.ioctlsocket(
-                    _handle,
-                    Interop.Winsock.IoctlSocketConstants.FIONREAD,
-                    ref argp);
+                SocketError errorCode = SocketPal.GetAvailable(_handle, out argp);
 
                 GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Available_get() Interop.Winsock.ioctlsocket returns errorCode:" + errorCode);
 
@@ -358,7 +319,7 @@ namespace System.Net.Sockets
                 Internals.SocketAddress socketAddress = IPEndPointExtensions.Serialize(m_RightEndPoint);
 
                 // This may throw ObjectDisposedException.
-                SocketError errorCode = Interop.Winsock.getsockname(
+                SocketError errorCode = SocketPal.GetSockName(
                     _handle,
                     socketAddress.Buffer,
                     ref socketAddress.InternalSize);
@@ -410,7 +371,7 @@ namespace System.Net.Sockets
                     Internals.SocketAddress socketAddress = IPEndPointExtensions.Serialize(m_RightEndPoint);
 
                     // This may throw ObjectDisposedException.
-                    SocketError errorCode = Interop.Winsock.getpeername(
+                    SocketError errorCode = SocketPal.GetPeerName(
                         _handle,
                         socketAddress.Buffer,
                         ref socketAddress.InternalSize);
@@ -926,7 +887,7 @@ namespace System.Net.Sockets
             }
 
             // This may throw ObjectDisposedException.
-            SocketError errorCode = Interop.Winsock.bind(
+            SocketError errorCode = SocketPal.Bind(
                 _handle,
                 socketAddress.Buffer,
                 socketAddress.Size);
@@ -1157,7 +1118,7 @@ namespace System.Net.Sockets
             // the verification is done for Bind
 
             // This may throw ObjectDisposedException.
-            SocketError errorCode = Interop.Winsock.listen(
+            SocketError errorCode = SocketPal.Listen(
                 _handle,
                 backlog);
 
@@ -1226,7 +1187,7 @@ namespace System.Net.Sockets
             Internals.SocketAddress socketAddress = IPEndPointExtensions.Serialize(m_RightEndPoint);
 
             // This may throw ObjectDisposedException.
-            SafeCloseSocket acceptedSocketHandle = SafeCloseSocket.Accept(
+            SafeCloseSocket acceptedSocketHandle = SocketPal.Accept(
                 _handle,
                 socketAddress.Buffer,
                 ref socketAddress.InternalSize);
@@ -1324,53 +1285,17 @@ namespace System.Net.Sockets
             //corruption.
 
             errorCode = SocketError.Success;
-            int count = buffers.Count;
-            WSABuffer[] WSABuffers = new WSABuffer[count];
-            GCHandle[] objectsToPin = null;
+
             int bytesTransferred;
-
-            try
-            {
-                objectsToPin = new GCHandle[count];
-                for (int i = 0; i < count; ++i)
-                {
-                    ArraySegment<byte> buffer = buffers[i];
-                    RangeValidationHelpers.ValidateSegment(buffer);
-                    objectsToPin[i] = GCHandle.Alloc(buffer.Array, GCHandleType.Pinned);
-                    WSABuffers[i].Length = buffer.Count;
-                    WSABuffers[i].Pointer = Marshal.UnsafeAddrOfPinnedArrayElement(buffer.Array, buffer.Offset);
-                }
-
-                // This may throw ObjectDisposedException.
-                errorCode = Interop.Winsock.WSASend_Blocking(
-                    _handle.DangerousGetHandle(),
-                    WSABuffers,
-                    count,
-                    out bytesTransferred,
-                    socketFlags,
-                    SafeNativeOverlapped.Zero,
-                    IntPtr.Zero);
-
-                if ((SocketError)errorCode == SocketError.SocketError)
-                {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
-                }
+            errorCode = SocketPal.Send(_handle, buffers, socketFlags, out bytesTransferred);
 
 #if TRAVE
-                try
-                {
-                    GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Send() SRC:" + Logging.ObjectToString(LocalEndPoint) + " DST:" + Logging.ObjectToString(RemoteEndPoint) + " Interop.Winsock.send returns errorCode:" + errorCode + " bytesTransferred:" + bytesTransferred);
-                }
-                catch (ObjectDisposedException) { }
-#endif
-            }
-            finally
+            try
             {
-                if (objectsToPin != null)
-                    for (int i = 0; i < objectsToPin.Length; ++i)
-                        if (objectsToPin[i].IsAllocated)
-                            objectsToPin[i].Free();
+                GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Send() SRC:" + Logging.ObjectToString(LocalEndPoint) + " DST:" + Logging.ObjectToString(RemoteEndPoint) + " Interop.Winsock.send returns errorCode:" + errorCode + " bytesTransferred:" + bytesTransferred);
             }
+            catch (ObjectDisposedException) { }
+#endif
 
             if (errorCode != SocketError.Success)
             {
@@ -1447,23 +1372,7 @@ namespace System.Net.Sockets
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Send() SRC:" + Logging.ObjectToString(LocalEndPoint) + " DST:" + Logging.ObjectToString(RemoteEndPoint) + " size:" + size);
 
             // This can throw ObjectDisposedException.
-            int bytesTransferred;
-            unsafe
-            {
-                if (buffer.Length == 0)
-                    bytesTransferred = Interop.Winsock.send(_handle.DangerousGetHandle(), null, 0, socketFlags);
-                else
-                {
-                    fixed (byte* pinnedBuffer = buffer)
-                    {
-                        bytesTransferred = Interop.Winsock.send(
-                                        _handle.DangerousGetHandle(),
-                                        pinnedBuffer + offset,
-                                        size,
-                                        socketFlags);
-                    }
-                }
-            }
+            int bytesTransferred = SocketPal.Send(_handle, buffer, offset, size, socketFlags);
 
             //
             // if the native call fails we'll throw a SocketException
@@ -1543,33 +1452,7 @@ namespace System.Net.Sockets
             Internals.SocketAddress socketAddress = CheckCacheRemote(ref endPointSnapshot, false);
 
             // This can throw ObjectDisposedException.
-            int bytesTransferred;
-            unsafe
-            {
-                if (buffer.Length == 0)
-                {
-                    bytesTransferred = Interop.Winsock.sendto(
-                        _handle.DangerousGetHandle(),
-                        null,
-                        0,
-                        socketFlags,
-                        socketAddress.Buffer,
-                        socketAddress.Size);
-                }
-                else
-                {
-                    fixed (byte* pinnedBuffer = buffer)
-                    {
-                        bytesTransferred = Interop.Winsock.sendto(
-                            _handle.DangerousGetHandle(),
-                            pinnedBuffer + offset,
-                            size,
-                            socketFlags,
-                            socketAddress.Buffer,
-                            socketAddress.Size);
-                    }
-                }
-            }
+            int bytesTransferred = SocketPal.SendTo(_handle, buffer, offset, size, socketFlags, socketAddress.Buffer, socketAddress.Size);
 
             //
             // if the native call fails we'll throw a SocketException
@@ -1706,20 +1589,9 @@ namespace System.Net.Sockets
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Receive() SRC:" + Logging.ObjectToString(LocalEndPoint) + " DST:" + Logging.ObjectToString(RemoteEndPoint) + " size:" + size);
 
             // This can throw ObjectDisposedException.
-            int bytesTransferred;
             errorCode = SocketError.Success;
-            unsafe
-            {
-                if (buffer.Length == 0)
-                {
-                    bytesTransferred = Interop.Winsock.recv(_handle.DangerousGetHandle(), null, 0, socketFlags);
-                }
-                else
-                    fixed (byte* pinnedBuffer = buffer)
-                    {
-                        bytesTransferred = Interop.Winsock.recv(_handle.DangerousGetHandle(), pinnedBuffer + offset, size, socketFlags);
-                    }
-            }
+
+            int bytesTransferred = SocketPal.Receive(_handle, buffer, offset, size, socketFlags);
 
             if ((SocketError)bytesTransferred == SocketError.SocketError)
             {
@@ -1807,53 +1679,18 @@ namespace System.Net.Sockets
 
             //make sure we don't let the app mess up the buffer array enough to cause
             //corruption.
-            int count = buffers.Count;
-            WSABuffer[] WSABuffers = new WSABuffer[count];
-            GCHandle[] objectsToPin = null;
-            int bytesTransferred;
             errorCode = SocketError.Success;
 
+            int bytesTransferred;
+            errorCode = SocketPal.Receive(_handle, buffers, ref socketFlags, out bytesTransferred);
+
+#if TRAVE
             try
             {
-                objectsToPin = new GCHandle[count];
-                for (int i = 0; i < count; ++i)
-                {
-                    ArraySegment<byte> buffer = buffers[i];
-                    RangeValidationHelpers.ValidateSegment(buffer);
-                    objectsToPin[i] = GCHandle.Alloc(buffer.Array, GCHandleType.Pinned);
-                    WSABuffers[i].Length = buffer.Count;
-                    WSABuffers[i].Pointer = Marshal.UnsafeAddrOfPinnedArrayElement(buffer.Array, buffer.Offset);
-                }
-
-                // This can throw ObjectDisposedException.
-                errorCode = Interop.Winsock.WSARecv_Blocking(
-                    _handle.DangerousGetHandle(),
-                    WSABuffers,
-                    count,
-                    out bytesTransferred,
-                    ref socketFlags,
-                    SafeNativeOverlapped.Zero,
-                    IntPtr.Zero);
-
-                if ((SocketError)errorCode == SocketError.SocketError)
-                {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
-                }
-#if TRAVE
-                try
-                {
-                    GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Receive() SRC:" + Logging.ObjectToString(LocalEndPoint) + " DST:" + Logging.ObjectToString(RemoteEndPoint) + " Interop.Winsock.send returns errorCode:" + errorCode + " bytesTransferred:" + bytesTransferred);
-                }
-                catch (ObjectDisposedException) { }
+                GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Receive() SRC:" + Logging.ObjectToString(LocalEndPoint) + " DST:" + Logging.ObjectToString(RemoteEndPoint) + " Interop.Winsock.send returns errorCode:" + errorCode + " bytesTransferred:" + bytesTransferred);
+            }
+            catch (ObjectDisposedException) { }
 #endif
-            }
-            finally
-            {
-                if (objectsToPin != null)
-                    for (int i = 0; i < objectsToPin.Length; ++i)
-                        if (objectsToPin[i].IsAllocated)
-                            objectsToPin[i].Free();
-            }
 
             if (errorCode != SocketError.Success)
             {
@@ -1947,36 +1784,16 @@ namespace System.Net.Sockets
             EndPoint endPointSnapshot = remoteEP;
             Internals.SocketAddress socketAddress = SnapshotAndSerialize(ref endPointSnapshot);
 
-            ReceiveMessageOverlappedAsyncResult asyncResult = new ReceiveMessageOverlappedAsyncResult(this, null, null);
-            asyncResult.SetUnmanagedStructures(buffer, offset, size, socketAddress, socketFlags);
-
             // save a copy of the original EndPoint
             Internals.SocketAddress socketAddressOriginal = IPEndPointExtensions.Serialize(endPointSnapshot);
 
             //setup structure
-            int bytesTransfered = 0;
-            SocketError errorCode = SocketError.Success;
 
             SetReceivingPacketInformation();
 
-            try
-            {
-                // This can throw ObjectDisposedException (retrieving the delegate AND resolving the handle).
-                if (WSARecvMsg_Blocking(
-                    _handle.DangerousGetHandle(),
-                    Marshal.UnsafeAddrOfPinnedArrayElement(asyncResult.m_MessageBuffer, 0),
-                    out bytesTransfered,
-                    IntPtr.Zero,
-                    IntPtr.Zero) == SocketError.SocketError)
-                {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
-                }
-            }
-            finally
-            {
-                asyncResult.SyncReleaseUnmanagedStructures();
-            }
-
+            Internals.SocketAddress receiveAddress;
+            int bytesTransferred;
+            SocketError errorCode = SocketPal.ReceiveMessageFrom(this, buffer, offset, size, ref socketFlags, socketAddress, out receiveAddress, out ipPacketInformation, out bytesTransferred);
 
             //
             // if the native call fails we'll throw a SocketException
@@ -1992,12 +1809,11 @@ namespace System.Net.Sockets
                 throw socketException;
             }
 
-
-            if (!socketAddressOriginal.Equals(asyncResult.m_SocketAddress))
+            if (!socketAddressOriginal.Equals(receiveAddress))
             {
                 try
                 {
-                    remoteEP = endPointSnapshot.Create(asyncResult.m_SocketAddress);
+                    remoteEP = endPointSnapshot.Create(receiveAddress);
                 }
                 catch
                 {
@@ -2011,11 +1827,8 @@ namespace System.Net.Sockets
                 }
             }
 
-            socketFlags = asyncResult.m_flags;
-            ipPacketInformation = asyncResult.m_IPPacketInformation;
-
             if (s_LoggingEnabled) Logging.Exit(Logging.Sockets, this, "ReceiveMessageFrom", errorCode);
-            return bytesTransfered;
+            return bytesTransferred;
         }
 
         /// <devdoc>
@@ -2070,17 +1883,7 @@ namespace System.Net.Sockets
             Internals.SocketAddress socketAddressOriginal = IPEndPointExtensions.Serialize(endPointSnapshot);
 
             // This can throw ObjectDisposedException.
-            int bytesTransferred;
-            unsafe
-            {
-                if (buffer.Length == 0)
-                    bytesTransferred = Interop.Winsock.recvfrom(_handle.DangerousGetHandle(), null, 0, socketFlags, socketAddress.Buffer, ref socketAddress.InternalSize);
-                else
-                    fixed (byte* pinnedBuffer = buffer)
-                    {
-                        bytesTransferred = Interop.Winsock.recvfrom(_handle.DangerousGetHandle(), pinnedBuffer + offset, size, socketFlags, socketAddress.Buffer, ref socketAddress.InternalSize);
-                    }
-            }
+            int bytesTransferred = SocketPal.ReceiveFrom(_handle, buffer, offset, size, socketFlags, socketAddress.Buffer, ref socketAddress.InternalSize);
 
             // If the native call fails we'll throw a SocketException.
             // Must do this immediately after the native call so that the SocketException() constructor can pick up the error code.
@@ -2182,16 +1985,7 @@ namespace System.Net.Sockets
             int realOptionLength = 0;
 
             // This can throw ObjectDisposedException.
-            SocketError errorCode = Interop.Winsock.WSAIoctl_Blocking(
-                _handle.DangerousGetHandle(),
-                ioControlCode,
-                optionInValue,
-                optionInValue != null ? optionInValue.Length : 0,
-                optionOutValue,
-                optionOutValue != null ? optionOutValue.Length : 0,
-                out realOptionLength,
-                SafeNativeOverlapped.Zero,
-                IntPtr.Zero);
+            SocketError errorCode = SocketPal.Ioctl(_handle, ioControlCode, optionInValue, optionOutValue, out realOptionLength);
 
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::IOControl() Interop.Winsock.WSAIoctl returns errorCode:" + errorCode);
 
@@ -2238,16 +2032,7 @@ namespace System.Net.Sockets
             int realOptionLength = 0;
 
             // This can throw ObjectDisposedException.
-            SocketError errorCode = Interop.Winsock.WSAIoctl_Blocking_Internal(
-                _handle.DangerousGetHandle(),
-                (uint)ioControlCode,
-                optionInValue,
-                inValueSize,
-                optionOutValue,
-                outValueSize,
-                out realOptionLength,
-                SafeNativeOverlapped.Zero,
-                IntPtr.Zero);
+            SocketError errorCode = SocketPal.IoctlInternal(_handle, ioControlCode, optionInValue, inValueSize, optionOutValue, outValueSize, out realOptionLength);
 
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::IOControl() Interop.Winsock.WSAIoctl returns errorCode:" + errorCode);
 
@@ -2320,12 +2105,7 @@ namespace System.Net.Sockets
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::SetSocketOption(): optionLevel:" + optionLevel.ToString() + " optionName:" + optionName.ToString() + " optionValue:" + optionValue.ToString());
 
             // This can throw ObjectDisposedException.
-            SocketError errorCode = Interop.Winsock.setsockopt(
-                _handle,
-                optionLevel,
-                optionName,
-                optionValue,
-                optionValue != null ? optionValue.Length : 0);
+            SocketError errorCode = SocketPal.SetSockOpt(_handle, optionLevel, optionName, optionValue);
 
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::SetSocketOption() Interop.Winsock.setsockopt returns errorCode:" + errorCode);
 
@@ -2443,15 +2223,13 @@ namespace System.Net.Sockets
             else
             {
                 int optionValue = 0;
-                int optionLength = 4;
 
                 // This can throw ObjectDisposedException.
-                SocketError errorCode = Interop.Winsock.getsockopt(
+                SocketError errorCode = SocketPal.GetSockOpt(
                     _handle,
                     optionLevel,
                     optionName,
-                    out optionValue,
-                    ref optionLength);
+                    out optionValue);
 
                 GlobalLog.Print("Socket#" + Logging.HashString(this) + "::GetSocketOption() Interop.Winsock.getsockopt returns errorCode:" + errorCode);
 
@@ -2486,7 +2264,7 @@ namespace System.Net.Sockets
             int optionLength = optionValue != null ? optionValue.Length : 0;
 
             // This can throw ObjectDisposedException.
-            SocketError errorCode = Interop.Winsock.getsockopt(
+            SocketError errorCode = SocketPal.GetSockOpt(
                 _handle,
                 optionLevel,
                 optionName,
@@ -2524,7 +2302,7 @@ namespace System.Net.Sockets
             int realOptionLength = optionLength;
 
             // This can throw ObjectDisposedException.
-            SocketError errorCode = Interop.Winsock.getsockopt(
+            SocketError errorCode = SocketPal.GetSockOpt(
                 _handle,
                 optionLevel,
                 optionName,
@@ -2568,42 +2346,15 @@ namespace System.Net.Sockets
             {
                 throw new ObjectDisposedException(this.GetType().FullName);
             }
-
-            IntPtr handle = _handle.DangerousGetHandle();
-            IntPtr[] fileDescriptorSet = new IntPtr[2] { (IntPtr)1, handle };
-            var IOwait = new Interop.Winsock.TimeValue();
-
-            //
-            // negative timeout value implies indefinite wait
-            //
-            int socketCount;
-            if (microSeconds != -1)
-            {
-                MicrosecondsToTimeValue((long)(uint)microSeconds, ref IOwait);
-                socketCount =
-                    Interop.Winsock.select(
-                        0,
-                        mode == SelectMode.SelectRead ? fileDescriptorSet : null,
-                        mode == SelectMode.SelectWrite ? fileDescriptorSet : null,
-                        mode == SelectMode.SelectError ? fileDescriptorSet : null,
-                        ref IOwait);
-            }
-            else
-            {
-                socketCount =
-                    Interop.Winsock.select(
-                        0,
-                        mode == SelectMode.SelectRead ? fileDescriptorSet : null,
-                        mode == SelectMode.SelectWrite ? fileDescriptorSet : null,
-                        mode == SelectMode.SelectError ? fileDescriptorSet : null,
-                        IntPtr.Zero);
-            }
-            GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Poll() Interop.Winsock.select returns socketCount:" + socketCount);
+            
+            bool status;
+            SocketError errorCode = SocketPal.Poll(_handle, microSeconds, mode, out status);
+            GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Poll() Interop.Winsock.select returns socketCount:" + (int)errorCode);
 
             //
             // if the native call fails we'll throw a SocketException
             //
-            if ((SocketError)socketCount == SocketError.SocketError)
+            if (errorCode == SocketError.SocketError)
             {
                 //
                 // update our internal state after this socket error and throw
@@ -2613,11 +2364,8 @@ namespace System.Net.Sockets
                 if (s_LoggingEnabled) Logging.Exception(Logging.Sockets, this, "Poll", socketException);
                 throw socketException;
             }
-            if ((int)fileDescriptorSet[0] == 0)
-            {
-                return false;
-            }
-            return fileDescriptorSet[1] == handle;
+
+            return status;
         }
 
         /// <devdoc>
@@ -2643,60 +2391,16 @@ namespace System.Net.Sockets
             {
                 throw new ArgumentOutOfRangeException("checkError", SR.Format(SR.net_sockets_toolarge_select, "checkError", MaxSelect.ToString(NumberFormatInfo.CurrentInfo)));
             }
-            IntPtr[] readfileDescriptorSet = SocketListToFileDescriptorSet(checkRead);
-            IntPtr[] writefileDescriptorSet = SocketListToFileDescriptorSet(checkWrite);
-            IntPtr[] errfileDescriptorSet = SocketListToFileDescriptorSet(checkError);
 
-            // This code used to erroneously pass a non-null timeval structure containing zeroes 
-            // to select() when the caller specified (-1) for the microseconds parameter.  That 
-            // caused select to actually have a *zero* timeout instead of an infinite timeout
-            // turning the operation into a non-blocking poll.
-            //
-            // Now we pass a null timeval struct when microseconds is (-1).
-            // 
-            // Negative microsecond values that weren't exactly (-1) were originally successfully 
-            // converted to a timeval struct containing unsigned non-zero integers.  This code 
-            // retains that behavior so that any app working around the original bug with, 
-            // for example, (-2) specified for microseconds, will continue to get the same behavior.
-
-            int socketCount;
-
-            if (microSeconds != -1)
-            {
-                var IOwait = new Interop.Winsock.TimeValue();
-                MicrosecondsToTimeValue((long)(uint)microSeconds, ref IOwait);
-
-                socketCount =
-                    Interop.Winsock.select(
-                        0, // ignored value
-                        readfileDescriptorSet,
-                        writefileDescriptorSet,
-                        errfileDescriptorSet,
-                        ref IOwait);
-            }
-            else
-            {
-                socketCount =
-                    Interop.Winsock.select(
-                        0, // ignored value
-                        readfileDescriptorSet,
-                        writefileDescriptorSet,
-                        errfileDescriptorSet,
-                        IntPtr.Zero);
-            }
-
-            GlobalLog.Print("Socket::Select() Interop.Winsock.select returns socketCount:" + socketCount);
+            SocketError errorCode = SocketPal.Select(checkRead, checkWrite, checkError, microSeconds);
 
             //
             // if the native call fails we'll throw a SocketException
             //
-            if ((SocketError)socketCount == SocketError.SocketError)
+            if (errorCode == SocketError.SocketError)
             {
                 throw new SocketException();
             }
-            SelectFileDescriptor(checkRead, readfileDescriptorSet);
-            SelectFileDescriptor(checkWrite, writefileDescriptorSet);
-            SelectFileDescriptor(checkError, errfileDescriptorSet);
         }
 
         /*++
@@ -3000,7 +2704,7 @@ namespace System.Net.Sockets
 
         Routine Description:
 
-           EndConnect - Called addressFamilyter receiving callback from BeginConnect,
+           EndConnect - Called after receiving callback from BeginConnect,
             in order to retrive the result of async call
 
         Arguments:
@@ -3154,7 +2858,7 @@ namespace System.Net.Sockets
 
         Routine Description:
 
-           BeginSend - Async implimentation of Send call, mirrored addressFamilyter BeginReceive
+           BeginSend - Async implimentation of Send call, mirrored after BeginReceive
            This routine may go pending at which time,
            but any case the callback Delegate will be called upon completion
 
@@ -3411,7 +3115,7 @@ namespace System.Net.Sockets
 
         Routine Description:
 
-           EndSend -  Called by user code addressFamilyter I/O is done or the user wants to wait.
+           EndSend -  Called by user code after I/O is done or the user wants to wait.
                         until Async completion, needed to retrieve error result from call
 
         Arguments:
@@ -3639,7 +3343,7 @@ namespace System.Net.Sockets
 
         Routine Description:
 
-           EndSendTo -  Called by user code addressFamilyter I/O is done or the user wants to wait.
+           EndSendTo -  Called by user code after I/O is done or the user wants to wait.
                         until Async completion, needed to retrieve error result from call
 
         Arguments:
@@ -4784,7 +4488,7 @@ namespace System.Net.Sockets
 
         Routine Description:
 
-           EndAccept -  Called by user code addressFamilyter I/O is done or the user wants to wait.
+           EndAccept -  Called by user code after I/O is done or the user wants to wait.
                         until Async completion, so it provides End handling for aync Accept calls,
                         and retrieves new Socket object
 
@@ -6229,15 +5933,7 @@ namespace System.Net.Sockets
             if (s_LoggingEnabled) Logging.Enter(Logging.Sockets, this, "Connect", endPointSnapshot);
 
             // This can throw ObjectDisposedException.
-            SocketError errorCode = Interop.Winsock.WSAConnect(
-                _handle.DangerousGetHandle(),
-                socketAddress.Buffer,
-                socketAddress.Size,
-                IntPtr.Zero,
-                IntPtr.Zero,
-                IntPtr.Zero,
-                IntPtr.Zero);
-
+            SocketError errorCode = SocketPal.Connect(_handle, socketAddress.Buffer, socketAddress.Size);
 #if TRAVE
             try
             {
@@ -6799,21 +6495,12 @@ namespace System.Net.Sockets
                 return SocketError.Success;
             }
 
-            int intBlocking = desired ? 0 : -1;
-
             // CONSIDER - can we avoid this call if willBlockInternal is already correct?
+            bool willBlock = false;
             SocketError errorCode;
             try
             {
-                errorCode = Interop.Winsock.ioctlsocket(
-                    _handle,
-                    Interop.Winsock.IoctlSocketConstants.FIONBIO,
-                    ref intBlocking);
-
-                if (errorCode == SocketError.SocketError)
-                {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
-                }
+                errorCode = SocketPal.SetBlocking(_handle, desired, out willBlock);
             }
             catch (ObjectDisposedException)
             {
@@ -6831,7 +6518,7 @@ namespace System.Net.Sockets
                 //
                 // success, update internal state
                 //
-                _willBlockInternal = intBlocking == 0;
+                _willBlockInternal = willBlock;
             }
 
             GlobalLog.Leave("Socket#" + Logging.HashString(this) + "::InternalSetBlocking", "errorCode:" + errorCode.ToString() + " willBlock:" + _willBlock.ToString() + " willBlockInternal:" + _willBlockInternal.ToString());
@@ -6847,73 +6534,6 @@ namespace System.Net.Sockets
             InternalSetBlocking(desired, out current);
         }
 
-        private static IntPtr[] SocketListToFileDescriptorSet(IList socketList)
-        {
-            if (socketList == null || socketList.Count == 0)
-            {
-                return null;
-            }
-            IntPtr[] fileDescriptorSet = new IntPtr[socketList.Count + 1];
-            fileDescriptorSet[0] = (IntPtr)socketList.Count;
-            for (int current = 0; current < socketList.Count; current++)
-            {
-                if (!(socketList[current] is Socket))
-                {
-                    throw new ArgumentException(SR.Format(SR.net_sockets_select, socketList[current].GetType().FullName, typeof(System.Net.Sockets.Socket).FullName), "socketList");
-                }
-                fileDescriptorSet[current + 1] = ((Socket)socketList[current])._handle.DangerousGetHandle();
-            }
-            return fileDescriptorSet;
-        }
-
-        //
-        // Transform the list socketList such that the only sockets left are those
-        // with a file descriptor contained in the array "fileDescriptorArray"
-        //
-        private static void SelectFileDescriptor(IList socketList, IntPtr[] fileDescriptorSet)
-        {
-            // Walk the list in order
-            // Note that the counter is not necessarily incremented at each step;
-            // when the socket is removed, advancing occurs automatically as the
-            // other elements are shifted down.
-            if (socketList == null || socketList.Count == 0)
-            {
-                return;
-            }
-            if ((int)fileDescriptorSet[0] == 0)
-            {
-                // no socket present, will never find any socket, remove them all
-                socketList.Clear();
-                return;
-            }
-            lock (socketList)
-            {
-                for (int currentSocket = 0; currentSocket < socketList.Count; currentSocket++)
-                {
-                    Socket socket = socketList[currentSocket] as Socket;
-                    // Look for the file descriptor in the array
-                    int currentFileDescriptor;
-                    for (currentFileDescriptor = 0; currentFileDescriptor < (int)fileDescriptorSet[0]; currentFileDescriptor++)
-                    {
-                        if (fileDescriptorSet[currentFileDescriptor + 1] == socket._handle.DangerousGetHandle())
-                        {
-                            break;
-                        }
-                    }
-                    if (currentFileDescriptor == (int)fileDescriptorSet[0])
-                    {
-                        // descriptor not found: remove the current socket and start again
-                        socketList.RemoveAt(currentSocket--);
-                    }
-                }
-            }
-        }
-
-        private static void MicrosecondsToTimeValue(long microSeconds, ref Interop.Winsock.TimeValue socketTime)
-        {
-            socketTime.Seconds = (int)(microSeconds / microcnv);
-            socketTime.Microseconds = (int)(microSeconds % microcnv);
-        }
         //Implements ConnectEx - this provides completion port IO and support for
         //disconnect and reconnects
 
@@ -7037,40 +6657,10 @@ namespace System.Net.Sockets
             GlobalLog.Assert(buffers != null, "Socket#{0}::MultipleSend()|buffers == null", Logging.HashString(this));
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::MultipleSend() buffers.Length:" + buffers.Length.ToString());
 
-            WSABuffer[] WSABuffers = new WSABuffer[buffers.Length];
-            GCHandle[] objectsToPin = null;
             int bytesTransferred;
-            SocketError errorCode;
+            SocketError errorCode = SocketPal.Send(_handle, buffers, socketFlags, out bytesTransferred);
 
-            try
-            {
-                objectsToPin = new GCHandle[buffers.Length];
-                for (int i = 0; i < buffers.Length; ++i)
-                {
-                    objectsToPin[i] = GCHandle.Alloc(buffers[i].Buffer, GCHandleType.Pinned);
-                    WSABuffers[i].Length = buffers[i].Size;
-                    WSABuffers[i].Pointer = Marshal.UnsafeAddrOfPinnedArrayElement(buffers[i].Buffer, buffers[i].Offset);
-                }
-
-                // This can throw ObjectDisposedException.
-                errorCode = Interop.Winsock.WSASend_Blocking(
-                    _handle.DangerousGetHandle(),
-                    WSABuffers,
-                    WSABuffers.Length,
-                    out bytesTransferred,
-                    socketFlags,
-                    SafeNativeOverlapped.Zero,
-                    IntPtr.Zero);
-
-                GlobalLog.Print("Socket#" + Logging.HashString(this) + "::MultipleSend() Interop.Winsock.WSASend returns:" + errorCode.ToString() + " size:" + buffers.Length.ToString());
-            }
-            finally
-            {
-                if (objectsToPin != null)
-                    for (int i = 0; i < objectsToPin.Length; ++i)
-                        if (objectsToPin[i].IsAllocated)
-                            objectsToPin[i].Free();
-            }
+            GlobalLog.Print("Socket#" + Logging.HashString(this) + "::MultipleSend() Interop.Winsock.WSASend returns:" + errorCode.ToString() + " size:" + buffers.Length.ToString());
 
             if (errorCode != SocketError.Success)
             {
