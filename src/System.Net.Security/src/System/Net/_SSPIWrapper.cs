@@ -203,7 +203,7 @@ namespace System.Net
 
             int errorCode = SecModule.InitializeSecurityContext(ref credential, ref context, targetName, inFlags, datarep, inputBuffer, outputBuffer, ref outFlags);
 
-            if (Logging.On) Logging.PrintInfo(Logging.Web, SR.Format(SR.net_log_sspi_security_context_input_buffer, "InitializeSecurityContext", (inputBuffer == null ? 0 : inputBuffer.size), outputBuffer.size, (SecurityStatus)errorCode));
+            if (Logging.On) Logging.PrintInfo(Logging.Web, SR.Format(SR.net_log_sspi_security_context_input_buffer, "InitializeSecurityContext", (inputBuffer == null ? 0 : inputBuffer.size), outputBuffer.size, (Interop.SecurityStatus)errorCode));
 
             return errorCode;
         }
@@ -220,7 +220,7 @@ namespace System.Net
 
             int errorCode = SecModule.InitializeSecurityContext(credential, ref context, targetName, inFlags, datarep, inputBuffers, outputBuffer, ref outFlags);
 
-            if (Logging.On) Logging.PrintInfo(Logging.Web, SR.Format(SR.net_log_sspi_security_context_input_buffers, "InitializeSecurityContext", (inputBuffers == null ? 0 : inputBuffers.Length), outputBuffer.size, (SecurityStatus)errorCode));
+            if (Logging.On) Logging.PrintInfo(Logging.Web, SR.Format(SR.net_log_sspi_security_context_input_buffers, "InitializeSecurityContext", (inputBuffers == null ? 0 : inputBuffers.Length), outputBuffer.size, (Interop.SecurityStatus)errorCode));
 
             return errorCode;
         }
@@ -236,7 +236,7 @@ namespace System.Net
 
             int errorCode = SecModule.AcceptSecurityContext(ref credential, ref context, inputBuffer, inFlags, datarep, outputBuffer, ref outFlags);
 
-            if (Logging.On) Logging.PrintInfo(Logging.Web, SR.Format(SR.net_log_sspi_security_context_input_buffer, "AcceptSecurityContext", (inputBuffer == null ? 0 : inputBuffer.size), outputBuffer.size, (SecurityStatus)errorCode));
+            if (Logging.On) Logging.PrintInfo(Logging.Web, SR.Format(SR.net_log_sspi_security_context_input_buffer, "AcceptSecurityContext", (inputBuffer == null ? 0 : inputBuffer.size), outputBuffer.size, (Interop.SecurityStatus)errorCode));
 
             return errorCode;
         }
@@ -252,7 +252,7 @@ namespace System.Net
 
             int errorCode = SecModule.AcceptSecurityContext(credential, ref context, inputBuffers, inFlags, datarep, outputBuffer, ref outFlags);
 
-            if (Logging.On) Logging.PrintInfo(Logging.Web, SR.Format(SR.net_log_sspi_security_context_input_buffers, "AcceptSecurityContext", (inputBuffers == null ? 0 : inputBuffers.Length), outputBuffer.size, (SecurityStatus)errorCode));
+            if (Logging.On) Logging.PrintInfo(Logging.Web, SR.Format(SR.net_log_sspi_security_context_input_buffers, "AcceptSecurityContext", (inputBuffers == null ? 0 : inputBuffers.Length), outputBuffer.size, (Interop.SecurityStatus)errorCode));
 
             return errorCode;
         }
@@ -261,7 +261,7 @@ namespace System.Net
         {
             int errorCode = SecModule.CompleteAuthToken(ref context, inputBuffers);
 
-            if (Logging.On) Logging.PrintInfo(Logging.Web, SR.Format(SR.net_log_operation_returned_something, "CompleteAuthToken()", (SecurityStatus)errorCode));
+            if (Logging.On) Logging.PrintInfo(Logging.Web, SR.Format(SR.net_log_operation_returned_something, "CompleteAuthToken()", (Interop.SecurityStatus)errorCode));
 
             return errorCode;
         }
@@ -348,7 +348,7 @@ namespace System.Net
                             errorCode = SecModule.VerifySignature(context, sdcInOut, sequenceNumber);
                             break;
 
-                        default: throw ExceptionHelper.MethodNotImplementedException;
+                        default: throw NotImplemented.ByDesignWithMessage(SR.net_MethodNotImplementedException);
                     }
 
                     // Marshalling back returned sizes / data.
@@ -621,27 +621,27 @@ namespace System.Net
             {
                 return "An exception when invoking Win32 API";
             }
-            switch ((SecurityStatus)errorCode)
+            switch ((Interop.SecurityStatus)errorCode)
             {
-                case SecurityStatus.InvalidHandle:
+                case Interop.SecurityStatus.InvalidHandle:
                     return "Invalid handle";
-                case SecurityStatus.InvalidToken:
+                case Interop.SecurityStatus.InvalidToken:
                     return "Invalid token";
-                case SecurityStatus.ContinueNeeded:
+                case Interop.SecurityStatus.ContinueNeeded:
                     return "Continue needed";
-                case SecurityStatus.IncompleteMessage:
+                case Interop.SecurityStatus.IncompleteMessage:
                     return "Message incomplete";
-                case SecurityStatus.WrongPrincipal:
+                case Interop.SecurityStatus.WrongPrincipal:
                     return "Wrong principal";
-                case SecurityStatus.TargetUnknown:
+                case Interop.SecurityStatus.TargetUnknown:
                     return "Target unknown";
-                case SecurityStatus.PackageNotFound:
+                case Interop.SecurityStatus.PackageNotFound:
                     return "Package not found";
-                case SecurityStatus.BufferNotEnough:
+                case Interop.SecurityStatus.BufferNotEnough:
                     return "Buffer not enough";
-                case SecurityStatus.MessageAltered:
+                case Interop.SecurityStatus.MessageAltered:
                     return "Message altered";
-                case SecurityStatus.UntrustedRoot:
+                case Interop.SecurityStatus.UntrustedRoot:
                     return "Untrusted root";
                 default:
                     return "0x" + errorCode.ToString("x", NumberFormatInfo.InvariantInfo);

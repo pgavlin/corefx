@@ -131,7 +131,7 @@ namespace System.Net.Security
 
         protected override bool ReleaseHandle()
         {
-            return Interop.SspiHelper.SspiFreeAuthIdentity(handle) == SecurityStatus.OK;
+            return Interop.SspiHelper.SspiFreeAuthIdentity(handle) == Interop.SecurityStatus.OK;
         }
     }
 
@@ -198,7 +198,7 @@ namespace System.Net.Security
             byte* buffer,
             SafeHandle refHandle)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
 
             // We don't want to be interrupted by thread abort exceptions or unexpected out-of-memory errors failing to jit
@@ -257,7 +257,7 @@ namespace System.Net.Security
             Interop.ContextAttribute contextAttribute,
             byte[] buffer)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
 
             // We don't want to be interrupted by thread abort exceptions or unexpected out-of-memory errors failing 
@@ -973,7 +973,7 @@ namespace System.Net.Security
                                                   ref Interop.ContextFlags attributes,
                                                   SafeFreeContextBuffer handleTemplate)
         {
-            int errorCode = (int)SecurityStatus.InvalidHandle;
+            int errorCode = (int)Interop.SecurityStatus.InvalidHandle;
             bool b1 = false;
             bool b2 = false;
 
@@ -1266,7 +1266,7 @@ namespace System.Net.Security
                                                   ref Interop.ContextFlags outFlags,
                                                   SafeFreeContextBuffer handleTemplate)
         {
-            int errorCode = (int)SecurityStatus.InvalidHandle;
+            int errorCode = (int)Interop.SecurityStatus.InvalidHandle;
             bool b1 = false;
             bool b2 = false;
 
@@ -1370,7 +1370,7 @@ namespace System.Net.Security
             GlobalLog.Assert(inSecBuffers != null, "SafeDeleteContext::CompleteAuthToken()|inSecBuffers == null");
             Interop.SecurityBufferDescriptor inSecurityBufferDescriptor = new Interop.SecurityBufferDescriptor(inSecBuffers.Length);
 
-            int errorCode = (int)SecurityStatus.InvalidHandle;
+            int errorCode = (int)Interop.SecurityStatus.InvalidHandle;
 
             // these are pinned user byte arrays passed along with SecurityBuffers
             GCHandle[] pinnedInBytes = null;
@@ -1513,6 +1513,11 @@ namespace System.Net.Security
         {
             return Interop.SafeNetHandles.LocalFree(handle) == IntPtr.Zero;
         }
+
+        public override bool IsInvalid
+        {
+            get { return handle == new IntPtr(0) || handle == new IntPtr(-1); }
+        }
     }
 
     // Based on SafeFreeContextBuffer
@@ -1523,6 +1528,11 @@ namespace System.Net.Security
         public override int Size
         {
             get { return size; }
+        }
+
+        public override bool IsInvalid
+        {
+            get { return handle == new IntPtr(0) || handle == new IntPtr(-1); }
         }
 
         internal unsafe void Set(IntPtr value)
@@ -1542,7 +1552,7 @@ namespace System.Net.Security
 
         private unsafe static int QueryContextChannelBinding_SECURITY(SafeDeleteContext phContext, Interop.ContextAttribute contextAttribute, Bindings* buffer, SafeFreeContextBufferChannelBinding refHandle)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
 
             // SCHANNEL only supports SECPKG_ATTR_ENDPOINT_BINDINGS and SECPKG_ATTR_UNIQUE_BINDINGS which

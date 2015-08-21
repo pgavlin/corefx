@@ -107,7 +107,7 @@ namespace System.Net
 
         public int EncryptMessage(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
 
             try
@@ -137,7 +137,7 @@ namespace System.Net
 
         public unsafe int DecryptMessage(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
             try
             {
@@ -166,12 +166,12 @@ namespace System.Net
 
         public int MakeSignature(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            throw ExceptionHelper.MethodNotSupportedException;
+            throw NotImplemented.ByDesignWithMessage(SR.net_MethodNotImplementedException);
         }
 
         public int VerifySignature(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            throw ExceptionHelper.MethodNotSupportedException;
+            throw NotImplemented.ByDesignWithMessage(SR.net_MethodNotImplementedException);
         }
 
         public unsafe int QueryContextChannelBinding(SafeDeleteContext phContext, Interop.ContextAttribute attribute, out SafeFreeContextBufferChannelBinding refHandle)
@@ -290,7 +290,7 @@ namespace System.Net
 
         public int EncryptMessage(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
 
             try
@@ -320,7 +320,7 @@ namespace System.Net
 
         public unsafe int DecryptMessage(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
             uint qop = 0;
 
@@ -360,7 +360,7 @@ namespace System.Net
 
         public int MakeSignature(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
 
             try
@@ -391,7 +391,7 @@ namespace System.Net
 
         public unsafe int VerifySignature(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
 
             uint qop = 0;
@@ -455,7 +455,7 @@ namespace System.Net
 
         public int SetContextAttributes(SafeDeleteContext context, Interop.ContextAttribute attribute, byte[] buffer)
         {
-            throw ExceptionHelper.MethodNotSupportedException;
+            throw NotImplemented.ByDesignWithMessage(SR.net_MethodNotImplementedException);
         }
 
         public int QuerySecurityContextToken(SafeDeleteContext phContext, out SafeCloseHandle phToken)
@@ -470,7 +470,7 @@ namespace System.Net
 
         private static int GetSecurityContextToken(SafeDeleteContext phContext, out SafeCloseHandle safeHandle)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
             safeHandle = null;
 

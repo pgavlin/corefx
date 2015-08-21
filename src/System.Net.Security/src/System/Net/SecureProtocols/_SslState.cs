@@ -60,7 +60,7 @@ namespace System.Net.Security
 
         private bool _HandshakeCompleted;
         private bool _CertValidationFailed;
-        private SecurityStatus _SecurityStatus;
+        private Interop.SecurityStatus _SecurityStatus;
         private Exception _Exception;
 
         enum CachedSessionStatus : byte
@@ -279,7 +279,7 @@ namespace System.Net.Security
             }
         }
         //
-        internal SecurityStatus LastSecurityStatus
+        internal Interop.SecurityStatus LastSecurityStatus
         {
             get { return _SecurityStatus; }
         }
@@ -548,7 +548,7 @@ namespace System.Net.Security
         //
         //
         //
-        internal SecurityStatus EncryptData(byte[] buffer, int offset, int count, ref byte[] outBuffer, out int outSize)
+        internal Interop.SecurityStatus EncryptData(byte[] buffer, int offset, int count, ref byte[] outBuffer, out int outSize)
         {
             CheckThrow(true);
             return Context.Encrypt(buffer, offset, count, ref outBuffer, out outSize);
@@ -556,14 +556,14 @@ namespace System.Net.Security
         //
         //
         //
-        internal SecurityStatus DecryptData(byte[] buffer, ref int offset, ref int count)
+        internal Interop.SecurityStatus DecryptData(byte[] buffer, ref int offset, ref int count)
         {
             CheckThrow(true);
             return PrivateDecryptData(buffer, ref offset, ref count);
         }
         //
         //
-        private SecurityStatus PrivateDecryptData(byte[] buffer, ref int offset, ref int count)
+        private Interop.SecurityStatus PrivateDecryptData(byte[] buffer, ref int offset, ref int count)
         {
             return Context.Decrypt(buffer, ref offset, ref count);
         }
@@ -986,9 +986,9 @@ namespace System.Net.Security
             if (_PendingReHandshake)
             {
                 int offset = 0;
-                SecurityStatus status = PrivateDecryptData(buffer, ref offset, ref count);
+                Interop.SecurityStatus status = PrivateDecryptData(buffer, ref offset, ref count);
 
-                if (status == SecurityStatus.OK)
+                if (status == Interop.SecurityStatus.OK)
                 {
                     Exception e = EnqueueOldKeyDecryptedData(buffer, offset, count);
                     if (e != null)
@@ -1001,7 +1001,7 @@ namespace System.Net.Security
                     StartReceiveBlob(buffer, asyncRequest);
                     return;
                 }
-                else if (status != SecurityStatus.Renegotiate)
+                else if (status != Interop.SecurityStatus.Renegotiate)
                 {
                     // fail re-handshake
                     ProtocolToken message = new ProtocolToken(null, status);
@@ -1099,7 +1099,7 @@ namespace System.Net.Security
             }
             catch (Exception exception)
             {
-                if (!NclUtilities.IsFatal(exception))
+                if (!ExceptionCheck.IsFatal(exception))
                 {
                     GlobalLog.Assert("SslState::WriteCallback", "Exception while decoding context. type:" + exception.GetType().ToString() + " message:" + exception.Message);
                 }

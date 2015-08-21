@@ -473,7 +473,7 @@ namespace System.Net.Security
         private BufferOffsetSize[] EncryptBuffers(BufferOffsetSize[] buffers, byte[] lastHandshakePayload)
         {
             List<BufferOffsetSize> arrayList = null;
-            SecurityStatus status = SecurityStatus.OK;
+            Interop.SecurityStatus status = Interop.SecurityStatus.OK;
 
             foreach (BufferOffsetSize buffer in buffers)
             {
@@ -483,7 +483,7 @@ namespace System.Net.Security
                 int outSize;
 
                 status = _SslState.EncryptData(buffer.Buffer, buffer.Offset, chunkBytes, ref outBuffer, out outSize);
-                if (status != SecurityStatus.OK)
+                if (status != Interop.SecurityStatus.OK)
                     break;
 
                 if (chunkBytes != buffer.Size || arrayList != null)
@@ -508,7 +508,7 @@ namespace System.Net.Security
                         chunkBytes = Math.Min(buffer.Size, _SslState.MaxDataSize);
                         outBuffer = null;
                         status = _SslState.EncryptData(buffer.Buffer, buffer.Offset, chunkBytes, ref outBuffer, out outSize);
-                        if (status != SecurityStatus.OK)
+                        if (status != Interop.SecurityStatus.OK)
                             break;
                         arrayList.Add(new BufferOffsetSize(outBuffer, 0, outSize, false));
                     }
@@ -519,11 +519,11 @@ namespace System.Net.Security
                     buffer.Offset = 0;
                     buffer.Size = outSize;
                 }
-                if (status != SecurityStatus.OK)
+                if (status != Interop.SecurityStatus.OK)
                     break;
             }
 
-            if (status != SecurityStatus.OK)
+            if (status != Interop.SecurityStatus.OK)
             {
                 //CONSIDER: should we support re-handshake status?
                 ProtocolToken message = new ProtocolToken(null, status);
@@ -587,8 +587,8 @@ namespace System.Net.Security
 
                     int chunkBytes = Math.Min(count, _SslState.MaxDataSize);
                     int encryptedBytes;
-                    SecurityStatus errorCode = _SslState.EncryptData(buffer, offset, chunkBytes, ref outBuffer, out encryptedBytes);
-                    if (errorCode != SecurityStatus.OK)
+                    Interop.SecurityStatus errorCode = _SslState.EncryptData(buffer, offset, chunkBytes, ref outBuffer, out encryptedBytes);
+                    if (errorCode != Interop.SecurityStatus.OK)
                     {
                         //CONSIDER: should we support re-handshake status?
                         ProtocolToken message = new ProtocolToken(null, errorCode);
@@ -824,9 +824,9 @@ namespace System.Net.Security
             //Decrypt into internal buffer, change "readBytes" to count now _Decrypted Bytes_
             int data_offset = 0;
 
-            SecurityStatus errorCode = _SslState.DecryptData(InternalBuffer, ref data_offset, ref readBytes);
+            Interop.SecurityStatus errorCode = _SslState.DecryptData(InternalBuffer, ref data_offset, ref readBytes);
 
-            if (errorCode != SecurityStatus.OK)
+            if (errorCode != Interop.SecurityStatus.OK)
             {
                 byte[] extraBuffer = null;
                 if (readBytes != 0)
@@ -873,7 +873,7 @@ namespace System.Net.Security
         //
         // - SEC_I_RENEGOTIATE
         //
-        private int ProcessReadErrorCode(SecurityStatus errorCode, byte[] buffer, int offset, int count, AsyncProtocolRequest asyncRequest, byte[] extraBuffer)
+        private int ProcessReadErrorCode(Interop.SecurityStatus errorCode, byte[] buffer, int offset, int count, AsyncProtocolRequest asyncRequest, byte[] extraBuffer)
         {
             // ERROR - examine what kind
             ProtocolToken message = new ProtocolToken(null, errorCode);

@@ -921,9 +921,9 @@ namespace System.Net.Security
         {
             GlobalLog.Enter("SecureChannel#" + Logging.HashString(this) + "::NextMessage");
             byte[] nextmsg = null;
-            SecurityStatus errorCode = GenerateToken(incoming, offset, count, ref nextmsg);
+            Interop.SecurityStatus errorCode = GenerateToken(incoming, offset, count, ref nextmsg);
 
-            if (!m_ServerMode && errorCode == SecurityStatus.CredentialsNeeded)
+            if (!m_ServerMode && errorCode == Interop.SecurityStatus.CredentialsNeeded)
             {
                 GlobalLog.Print("SecureChannel#" + Logging.HashString(this) + "::NextMessage() returned SecurityStatus.CredentialsNeeded");
                 SetRefreshCredentialNeeded();
@@ -950,7 +950,7 @@ namespace System.Net.Security
                 errorCode - an SSPI error code
 
         --*/
-        private SecurityStatus GenerateToken(byte[] input, int offset, int count, ref byte[] output)
+        private Interop.SecurityStatus GenerateToken(byte[] input, int offset, int count, ref byte[] output)
         {
 #if TRAVE
             GlobalLog.Enter("SecureChannel#" + Logging.HashString(this) + "::GenerateToken, m_RefreshCredentialNeeded = " + m_RefreshCredentialNeeded);
@@ -1091,7 +1091,7 @@ namespace System.Net.Security
 #if TRAVE
             GlobalLog.Leave("SecureChannel#" + Logging.HashString(this) + "::GenerateToken()", MapSecurityStatus((uint)errorCode));
 #endif
-            return (SecurityStatus)errorCode;
+            return (Interop.SecurityStatus)errorCode;
         }
 
         /*++
@@ -1117,7 +1117,7 @@ namespace System.Net.Security
                 }
                 catch (Exception e)
                 {
-                    if (!NclUtilities.IsFatal(e))
+                    if (!ExceptionCheck.IsFatal(e))
                     {
                         GlobalLog.Assert(false, "SecureChannel#" + Logging.HashString(this) + "::ProcessHandshakeSuccess", "StreamSizes out of range.");
                     }
@@ -1143,7 +1143,7 @@ namespace System.Net.Security
         --*/
 
 
-        internal SecurityStatus Encrypt(byte[] buffer, int offset, int size, ref byte[] output, out int resultSize)
+        internal Interop.SecurityStatus Encrypt(byte[] buffer, int offset, int size, ref byte[] output, out int resultSize)
         {
             GlobalLog.Enter("SecureChannel#" + Logging.HashString(this) + "::Encrypt");
             GlobalLog.Print("SecureChannel#" + Logging.HashString(this) + "::Encrypt() - offset: " + offset.ToString() + " size: " + size.ToString() + " buffersize: " + buffer.Length.ToString());
@@ -1177,7 +1177,7 @@ namespace System.Net.Security
             }
             catch (Exception e)
             {
-                if (!NclUtilities.IsFatal(e))
+                if (!ExceptionCheck.IsFatal(e))
                 {
                     GlobalLog.Assert(false, "SecureChannel#" + Logging.HashString(this) + "::Encrypt", "Arguments out of range.");
                 }
@@ -1198,7 +1198,7 @@ namespace System.Net.Security
             if (errorCode != 0)
             {
                 GlobalLog.Leave("SecureChannel#" + Logging.HashString(this) + "::Encrypt ERROR", errorCode.ToString("x"));
-                return (SecurityStatus)errorCode;
+                return (Interop.SecurityStatus)errorCode;
             }
             else
             {
@@ -1206,11 +1206,11 @@ namespace System.Net.Security
                 // The full buffer may not be used
                 resultSize = securityBuffer[0].size + securityBuffer[1].size + securityBuffer[2].size;
                 GlobalLog.Leave("SecureChannel#" + Logging.HashString(this) + "::Encrypt OK", "data size:" + resultSize.ToString());
-                return SecurityStatus.OK;
+                return Interop.SecurityStatus.OK;
             }
         }
 
-        internal SecurityStatus Decrypt(byte[] payload, ref int offset, ref int count)
+        internal Interop.SecurityStatus Decrypt(byte[] payload, ref int offset, ref int count)
         {
             GlobalLog.Print("SecureChannel#" + Logging.HashString(this) + "::Decrypt() - offset: " + offset.ToString() + " size: " + count.ToString() + " buffersize: " + payload.Length.ToString());
 
@@ -1232,15 +1232,15 @@ namespace System.Net.Security
             decspc[2] = new Interop.SecurityBuffer(null, Interop.BufferType.Empty);
             decspc[3] = new Interop.SecurityBuffer(null, Interop.BufferType.Empty);
 
-            SecurityStatus errorCode = (SecurityStatus)SSPIWrapper.DecryptMessage(GlobalSSPI.SSPISecureChannel, m_SecurityContext, decspc, 0);
+            Interop.SecurityStatus errorCode = (Interop.SecurityStatus)SSPIWrapper.DecryptMessage(GlobalSSPI.SSPISecureChannel, m_SecurityContext, decspc, 0);
 
             count = 0;
             for (int i = 0; i < decspc.Length; i++)
             {
                 // Sucessfully decoded data and placed it at the following position in the buffer.
-                if ((errorCode == SecurityStatus.OK && decspc[i].type == Interop.BufferType.Data)
+                if ((errorCode == Interop.SecurityStatus.OK && decspc[i].type == Interop.BufferType.Data)
                     // or we failed to decode the data, here is the encoded data
-                    || (errorCode != SecurityStatus.OK && decspc[i].type == Interop.BufferType.Extra))
+                    || (errorCode != Interop.SecurityStatus.OK && decspc[i].type == Interop.BufferType.Extra))
                 {
                     offset = decspc[i].offset;
                     count = decspc[i].size;
@@ -1868,7 +1868,7 @@ namespace System.Net.Security
 
     class ProtocolToken
     {
-        internal SecurityStatus Status;
+        internal Interop.SecurityStatus Status;
         internal byte[] Payload;
         internal int Size;
 
@@ -1876,7 +1876,7 @@ namespace System.Net.Security
         {
             get
             {
-                return ((Status != SecurityStatus.OK) && (Status != SecurityStatus.ContinueNeeded));
+                return ((Status != Interop.SecurityStatus.OK) && (Status != Interop.SecurityStatus.ContinueNeeded));
             }
         }
 
@@ -1884,7 +1884,7 @@ namespace System.Net.Security
         {
             get
             {
-                return (Status == SecurityStatus.OK);
+                return (Status == Interop.SecurityStatus.OK);
             }
         }
 
@@ -1892,7 +1892,7 @@ namespace System.Net.Security
         {
             get
             {
-                return (Status == SecurityStatus.Renegotiate);
+                return (Status == Interop.SecurityStatus.Renegotiate);
             }
         }
 
@@ -1900,11 +1900,11 @@ namespace System.Net.Security
         {
             get
             {
-                return (Status == SecurityStatus.ContextExpired);
+                return (Status == Interop.SecurityStatus.ContextExpired);
             }
         }
 
-        internal ProtocolToken(byte[] data, SecurityStatus errorCode)
+        internal ProtocolToken(byte[] data, Interop.SecurityStatus errorCode)
         {
             Status = errorCode;
             Payload = data;
