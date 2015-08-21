@@ -12,23 +12,41 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' " />
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' " />
   <ItemGroup>
-    <Compile Include="TestConfiguration.cs" />
     <Compile Include="ClientAsyncAuthenticateTest.cs" />
     <Compile Include="ClientDefaultEncryptionTest.cs" />
+    <Compile Include="DummyTcpServer.cs" />
     <Compile Include="ParameterValidationTest.cs" />
     <Compile Include="ServerAllowNoEncryptionTest.cs" />
     <Compile Include="ServerNoEncryptionTest.cs" />
     <Compile Include="ServerRequireEncryptionTest.cs" />
+    <Compile Include="StreamAPMExtensions.cs" />
+    <Compile Include="SslStreamAPMExtensions.cs" />
+    <Compile Include="TestConfiguration.cs" />
     <Compile Include="TransportContextTest.cs" />
+    
+    <!-- Common test files -->
+    <Compile Include="$(CommonTestPath)\System.Net\TestLogging.cs">
+      <Link>Common\System.Net\TestLogging.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonTestPath)\System.Net\VerboseTestLogging.cs">
+      <Link>Common\System.Net\VerboseTestLogging.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonTestPath)\System.Net\EventSourceTestLogging.cs">
+      <Link>Common\System.Net\EventSourceTestLogging.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonTestPath)\System.Net\TaskAPMExtensions.cs">
+      <Link>Common\System.Net\TaskAPMExtensions.cs</Link>
+    </Compile>
+
   </ItemGroup>
 
-<!-- TODO: Remove after the packages are not using System.Private.Networking. -->
+  <!-- TODO: Remove after the packages are not using System.Private.Networking. -->
   <ItemGroup>
     <ProjectReference Include="..\..\..\System.Net.NameResolution\src\System.Net.NameResolution.csproj">
       <Project>{1714448C-211E-48C1-8B7E-4EE667D336A1}</Project>
       <Name>System.Net.NameResolution</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\..\src\System.Net.Sockets.csproj">
+    <ProjectReference Include="..\..\..\System.Net.Sockets\src\System.Net.Sockets.csproj">
       <Project>{43311AFB-D7C4-4E5A-B1DE-855407F90D1B}</Project>
       <Name>System.Net.Sockets</Name>
     </ProjectReference>

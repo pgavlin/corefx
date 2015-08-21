@@ -1,30 +1,24 @@
-﻿namespace NCLTest.Security
-{
-    using CoreFXTestLibrary;
-    using NCLTest.Common;
-    using System;
-    using System.Net;
-    using System.Security.Cryptography.X509Certificates;
-    using System.Net.Security;
-    using System.Net.Sockets;
-    using System.Security.Authentication;
+﻿using System.Net.Sockets;
+using System.Net.Test.Common;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 
-    [TestClass]
+using Xunit;
+using Xunit.Abstractions;
+
+namespace System.Net.Security.Tests
+{
     public class ServerAllowNoEncryptionTest
     {
+        private readonly ITestOutputHelper _log;
         private DummyTcpServer serverAllowNoEncryption;
 
-        [TestInitialize]
-        public void StartInternalServer()
+        public ServerAllowNoEncryptionTest()
         {
+            _log = TestLogging.GetInstance();
+
             serverAllowNoEncryption = new DummyTcpServer(
                 new IPEndPoint(IPAddress.Loopback, 401), EncryptionPolicy.AllowNoEncryption);
-        }
-
-        [TestCleanup]
-        public void StopInternalServer()
-        {
-            serverAllowNoEncryption.Dispose();
         }
 
         // The following method is invoked by the RemoteCertificateValidationDelegate.
@@ -37,7 +31,7 @@
             return true;  // allow everything
         }
 
-        [TestMethod]
+        [Fact]
         public void ServerAllowNoEncryption_ClientRequireEncryption_ConnectWithEncryption()
         {
             SslStream sslStream;
@@ -48,16 +42,16 @@
 
             sslStream = new SslStream(client.GetStream(), false, AllowAnyServerCertificate, null, EncryptionPolicy.RequireEncryption);
             sslStream.AuthenticateAsClient("localhost", null, TestConfiguration.DefaultSslProtocols, false);
-            Logger.LogInformation("Client({0}) authenticated to server({1}) with encryption cipher: {2} {3}-bit strength",
+            _log.WriteLine("Client({0}) authenticated to server({1}) with encryption cipher: {2} {3}-bit strength",
                 client.Client.LocalEndPoint, client.Client.RemoteEndPoint, 
                 sslStream.CipherAlgorithm, sslStream.CipherStrength);
-            Assert.AreNotEqual(CipherAlgorithmType.Null, sslStream.CipherAlgorithm, "Cipher algorithm should not be NULL");
-            Assert.IsTrue(sslStream.CipherStrength > 0, "Cipher strength should be greater than 0");
+            Assert.NotEqual(CipherAlgorithmType.Null, sslStream.CipherAlgorithm);
+            Assert.True(sslStream.CipherStrength > 0);
             sslStream.Dispose();
             client.Dispose();
         }
 
-        [TestMethod]
+        [Fact]
         public void ServerAllowNoEncryption_ClientAllowNoEncryption_ConnectWithEncryption()
         {
             SslStream sslStream;
@@ -68,35 +62,32 @@
 
             sslStream = new SslStream(client.GetStream(), false, AllowAnyServerCertificate, null, EncryptionPolicy.AllowNoEncryption);
             sslStream.AuthenticateAsClient("localhost", null, TestConfiguration.DefaultSslProtocols, false);
-            Logger.LogInformation("Client({0}) authenticated to server({1}) with encryption cipher: {2} {3}-bit strength",
+            _log.WriteLine("Client({0}) authenticated to server({1}) with encryption cipher: {2} {3}-bit strength",
                 client.Client.LocalEndPoint, client.Client.RemoteEndPoint,
                 sslStream.CipherAlgorithm, sslStream.CipherStrength);
-            Assert.AreNotEqual(CipherAlgorithmType.Null, sslStream.CipherAlgorithm, "Cipher algorithm should not be NULL");
-            Assert.IsTrue(sslStream.CipherStrength > 0, "Cipher strength should be greater than 0");
+            Assert.NotEqual(CipherAlgorithmType.Null, sslStream.CipherAlgorithm);
+            Assert.True(sslStream.CipherStrength > 0, "Cipher strength should be greater than 0");
             sslStream.Dispose();
             client.Dispose();
         }
 
-        [TestMethod]
+        [Fact]
         public void ServerAllowNoEncryption_ClientNoEncryption_ConnectWithNoEncryption()
         {
-            SslStream sslStream;
-            TcpClient client;
-
-            using (client = new TcpClient())
+            using (var client = new TcpClient())
             {
                 client.Connect(serverAllowNoEncryption.RemoteEndPoint);
 
-                using (sslStream = new SslStream(client.GetStream(), false, AllowAnyServerCertificate, null, EncryptionPolicy.NoEncryption))
+                using (var sslStream = new SslStream(client.GetStream(), false, AllowAnyServerCertificate, null, EncryptionPolicy.NoEncryption))
                 {
                     sslStream.AuthenticateAsClient("localhost", null, TestConfiguration.DefaultSslProtocols, false);
-                    Logger.LogInformation("Client({0}) authenticated to server({1}) with encryption cipher: {2} {3}-bit strength",
+                    _log.WriteLine("Client({0}) authenticated to server({1}) with encryption cipher: {2} {3}-bit strength",
                         client.Client.LocalEndPoint, client.Client.RemoteEndPoint,
                         sslStream.CipherAlgorithm, sslStream.CipherStrength);
 
                     CipherAlgorithmType expected = CipherAlgorithmType.Null;
-                    Assert.AreEqual(expected, sslStream.CipherAlgorithm, "Cipher algorithm should  be NULL");
-                    Assert.AreEqual(0, sslStream.CipherStrength, "Cipher strength should be equal to 0");
+                    Assert.Equal(expected, sslStream.CipherAlgorithm);
+                    Assert.Equal(0, sslStream.CipherStrength);
                 }
             }
         }

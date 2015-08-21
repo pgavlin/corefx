@@ -1,29 +1,18 @@
-﻿namespace NCLTest.Security
-{
-    using CoreFXTestLibrary;
-    using NCLTest.Common;
-    using System;
-    using System.Net;
-    using System.Net.Security;
-    using System.Net.Sockets;
-    using System.Security.Cryptography.X509Certificates;
+﻿using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 
-    [TestClass]
+using Xunit;
+
+namespace System.Net.Security.Tests
+{ 
     public class ParameterValidationTest
     {
         private DummyTcpServer remoteServer;
 
-        [TestInitialize]
-        public void StartInternalServer()
+        public ParameterValidationTest()
         {
             remoteServer = new DummyTcpServer(
                 new IPEndPoint(IPAddress.Loopback, 600), EncryptionPolicy.RequireEncryption);
-        }
-
-        [TestCleanup]
-        public void StopInternalServer()
-        {
-            remoteServer.Dispose();
         }
 
         // The following method is invoked by the RemoteCertificateValidationDelegate.
@@ -36,24 +25,16 @@
             return true;  // allow everything
         }
 
-        [TestMethod]
-        [ExpectedException(typeof(System.ArgumentException))]
+        [Fact]
         public void SslStreamConstructor_BadEncryptionPolicy_ThrowException()
         {
-            SslStream sslStream;
-            TcpClient client;
+            using (var client = new TcpClient())
+            { 
+                client.Connect(remoteServer.RemoteEndPoint);
 
-            client = new TcpClient();
-            client.Connect(remoteServer.RemoteEndPoint);
-
-            try
-            {
-                sslStream = new SslStream(client.GetStream(), false, AllowAnyServerCertificate, null, (EncryptionPolicy)100);
-                Assert.Fail("SslStream constructor should have thrown exception");
-            }
-            finally
-            {
-                client.Dispose();
+                Assert.Throws<ArgumentException>( () => {
+                    SslStream sslStream = new SslStream(client.GetStream(), false, AllowAnyServerCertificate, null, (EncryptionPolicy)100);
+                });
             }
         }
     }

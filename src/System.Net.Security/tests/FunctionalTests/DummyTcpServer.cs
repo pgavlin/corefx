@@ -1,15 +1,13 @@
-﻿namespace NCLTest.Common
-{
-    using CoreFXTestLibrary;
-    using System;
-    using System.Net;
-    using System.IO;
-    using System.Net.Sockets;
-    using System.Net.Security;
-    using System.Security.Cryptography.X509Certificates;
-    using System.Security.Authentication;
+﻿using System.IO;
+using System.Net.Sockets;
+using System.Net.Test.Common;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 
+using Xunit;
 
+namespace System.Net.Security.Tests
+{ 
     // Callback method that is called when the server receives data from a connected client.  
     // The callback method should return a byte array and the number of bytes to send from that array.
     public delegate void DummyTcpServerReceiveCallback(byte[] bufferReceived, int bytesReceived, Stream stream);
@@ -19,6 +17,7 @@
     // specified by a callback method.
     public class DummyTcpServer : IDisposable
     {
+        private VerboseTestLogging _log;
         private TcpListener listener;
         private bool useSsl;
         private SslProtocols sslProtocols = SslProtocols.Tls12 | SslProtocols.Tls11 | SslProtocols.Tls;
@@ -30,21 +29,25 @@
         {
             listener = new TcpListener(endPoint);
             listener.Start(5);
-            Logger.LogInformation("Server {0} listening", endPoint.Address.ToString());
+            _log.WriteLine("Server {0} listening", endPoint.Address.ToString());
             listener.BeginAcceptTcpClient(OnAccept, null);
         }
 
-        public DummyTcpServer(IPEndPoint endPoint)
+        public DummyTcpServer(IPEndPoint endPoint) : this(endPoint, null)
         {
-            this.remoteEndPoint = endPoint;
-            StartListener(endPoint);
         }
 
-        public DummyTcpServer(IPEndPoint endPoint, EncryptionPolicy sslEncryptionPolicy)
+        public DummyTcpServer(IPEndPoint endPoint, EncryptionPolicy? sslEncryptionPolicy)
         {
-            this.remoteEndPoint = endPoint;
-            this.useSsl = true;
-            this.sslEncryptionPolicy = sslEncryptionPolicy;
+            _log = VerboseTestLogging.GetInstance();
+
+            if (sslEncryptionPolicy != null)
+            {
+                this.remoteEndPoint = endPoint;
+                this.useSsl = true;
+                this.sslEncryptionPolicy = (EncryptionPolicy)sslEncryptionPolicy;
+            }
+
             StartListener(endPoint);
         }
 
@@ -90,7 +93,7 @@
             try
             {
                 sslStream.EndAuthenticateAsServer(result);
-                Logger.LogInformation("Server({0}) authenticated to client({1}) with encryption cipher: {2} {3}-bit strength",
+                _log.WriteLine("Server({0}) authenticated to client({1}) with encryption cipher: {2} {3}-bit strength",
                     state.TcpClient.Client.LocalEndPoint, state.TcpClient.Client.RemoteEndPoint, 
                     sslStream.CipherAlgorithm, sslStream.CipherStrength);
 
@@ -99,7 +102,7 @@
             }
             catch (AuthenticationException authEx)
             {
-                Logger.LogInformation(
+                _log.WriteLine(
                     "Server({0}) disconnecting from client({1}) during authentication.  No shared SSL/TLS algorithm. ({2})",
                     state.TcpClient.Client.LocalEndPoint, 
                     state.TcpClient.Client.RemoteEndPoint,
@@ -107,7 +110,7 @@
             }
             catch (Exception ex)
             {
-                Logger.LogInformation("Server({0}) disconnecting from client({1}) during authentication.  Exception: {2}",
+                _log.WriteLine("Server({0}) disconnecting from client({1}) during authentication.  Exception: {2}",
                     state.TcpClient.Client.LocalEndPoint, state.TcpClient.Client.RemoteEndPoint, ex.Message);
             }
             finally
@@ -140,7 +143,7 @@
                 if (useSsl)
                 {
                     state = new ClientState(client, sslEncryptionPolicy);
-                    Logger.LogInformation("Server: starting SSL authentication.");
+                    _log.WriteLine("Server: starting SSL authentication.");
 
 
                     SslStream sslStream = null;
@@ -150,21 +153,21 @@
                     // ProjectK X509Certificate2 doesn't load PFX files with or w/o a password
                     // The certificate MUST be installed in the CurrentUser\My store prior to running the test.
 
-                    Logger.LogInformation("Server: attempting to open X509Certificate from store.");
-                    using (X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
+                    _log.WriteLine("Server: attempting to open X509Certificate from store.");
+                    using (var store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
                     {
                         store.Open(OpenFlags.ReadOnly);
                         var query = store.Certificates.Find(X509FindType.FindByThumbprint, "4AE557270C6C61ED8EC4CF62D2F92955533AC1C8", false);
                         certificate = query[0];
                     }
 
-                    Assert.IsNotNull(certificate, "Cannot load server key-pair certificate.");
+                    Assert.NotNull(certificate);
 
                     try
                     {
                         sslStream = (SslStream)state.Stream;
 
-                        Logger.LogInformation("Server: attempting to open SslStream.");
+                        _log.WriteLine("Server: attempting to open SslStream.");
 
                         // TODO: Workaround for bug: "ProjectK X509Certificate2 doesn't load PFX files or binary buffers with or w/o a password"
                         //certificate = new X509Certificate2("DummyTcpServer.pfx");
@@ -173,7 +176,7 @@
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogInformation("Server: Exception: {0}", ex);
+                        _log.WriteLine("Server: Exception: {0}", ex);
 
                         state.Dispose(); // close connection to client
                     }

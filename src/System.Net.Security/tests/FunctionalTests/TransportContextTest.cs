@@ -1,32 +1,21 @@
-﻿namespace NCLTest.Security
-{
-    using CoreFXTestLibrary;
-    using NCLTest.Common;
-    using System;
-    using System.Net;
-    using System.Net.Security;
-    using System.Net.Sockets;
-    using System.Runtime.InteropServices;
-    using System.Security.Authentication;
-    using System.Security.Authentication.ExtendedProtection;
-    using System.Security.Cryptography.X509Certificates;
+﻿using System.Net.Sockets;
+using System.Runtime.InteropServices;
+using System.Security.Authentication;
+using System.Security.Authentication.ExtendedProtection;
+using System.Security.Cryptography.X509Certificates;
 
-    [TestClass]
+using Xunit;
+
+namespace System.Net.Security.Tests
+{
     public class TransportContextTest
     {
         private DummyTcpServer testServer;
 
-        [TestInitialize]
-        public void StartInternalServer()
+        public TransportContextTest()
         {
             testServer = new DummyTcpServer(
                 new IPEndPoint(IPAddress.Loopback, 400), EncryptionPolicy.RequireEncryption);
-        }
-
-        [TestCleanup]
-        public void StopInternalServer()
-        {
-            testServer.Dispose();
         }
 
         // The following method is invoked by the RemoteCertificateValidationDelegate.
@@ -39,7 +28,7 @@
             return true;  // allow everything
         }
 
-        [TestMethod]
+        [Fact]
         public void TransportContext_ConnectToServerWithSsl_GetExpectedChannelBindings()
         {
             TcpClient client = null;
@@ -82,27 +71,20 @@
             CheckChannelBinding(cbt2);
             CheckChannelBinding(cbt3);
 
-            Assert.IsTrue(cbt1 != null, "ChannelBindingKind.Endpoint token data should be returned from SCHANNEL.");
-            Assert.IsTrue(cbt2 != null, "ChannelBindingKind.Unique token data should be returned from SCHANNEL.");
-            Assert.IsTrue(cbt3 == null, "ChannelBindingKind.Unknown token data should not be returned from SCHANNEL since it does not map to a defined context attribute.");
+            Assert.True(cbt1 != null, "ChannelBindingKind.Endpoint token data should be returned from SCHANNEL.");
+            Assert.True(cbt2 != null, "ChannelBindingKind.Unique token data should be returned from SCHANNEL.");
+            Assert.True(cbt3 == null, "ChannelBindingKind.Unknown token data should not be returned from SCHANNEL since it does not map to a defined context attribute.");
         }
 
         public void CheckChannelBinding(ChannelBinding channelBinding)
         {
-            try
+            if (channelBinding != null)
             {
-                if (channelBinding != null)
-                {
-                    Assert.IsTrue(!channelBinding.IsInvalid, "Channel binding token should be marked as a valid SafeHandle.");
-                    Assert.IsTrue(channelBinding.Size > 0, "Number of bytes in a valid channel binding token should be greater than zero.");
-                    var bytes = new byte[channelBinding.Size];
-                    Marshal.Copy(channelBinding.DangerousGetHandle(), bytes, 0, channelBinding.Size);
-                    Assert.AreEqual(channelBinding.Size, bytes.Length);
-                }
-            }
-            catch (Exception ex)
-            {
-                Assert.Fail(ex.Message);
+                Assert.True(!channelBinding.IsInvalid, "Channel binding token should be marked as a valid SafeHandle.");
+                Assert.True(channelBinding.Size > 0, "Number of bytes in a valid channel binding token should be greater than zero.");
+                var bytes = new byte[channelBinding.Size];
+                Marshal.Copy(channelBinding.DangerousGetHandle(), bytes, 0, channelBinding.Size);
+                Assert.Equal(channelBinding.Size, bytes.Length);
             }
         }
     }
