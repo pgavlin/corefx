@@ -136,7 +136,8 @@
       <Link>Interop\Windows\System.Net.Security\Interop.Security.Manual.cs</Link>
     </Compile>
     
-    <Compile Include="$(CommonPath)\Interop\Windows\SChannel\Interop.SchProtocols.cs">
+    <!--TODO: use the Primitives SchProtocols names. -->
+    <Compile Include="$(CommonPath)\Interop\Windows\SChannel\Interop.SchProtocols.TODO.cs">
       <Link>Interop\Windows\SChannel\Interop.SchProtocols.cs</Link>
     </Compile>
     <Compile Include="$(CommonPath)\Interop\Windows\SChannel\Interop.SecurityStatus.cs">
