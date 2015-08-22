@@ -149,17 +149,25 @@ namespace System.Net.Security.Tests
                     SslStream sslStream = null;
                     X509Certificate2 certificate;
 
+
+#if false
                     // TODO: Workaround for bug: "ProjectK X509Certificate2 doesn't load PFX files or binary buffers with or w/o a password"
                     // ProjectK X509Certificate2 doesn't load PFX files with or w/o a password
                     // The certificate MUST be installed in the CurrentUser\My store prior to running the test.
 
                     _log.WriteLine("Server: attempting to open X509Certificate from store.");
+
                     using (var store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
                     {
                         store.Open(OpenFlags.ReadOnly);
                         var query = store.Certificates.Find(X509FindType.FindByThumbprint, "4AE557270C6C61ED8EC4CF62D2F92955533AC1C8", false);
+                        Assert.True(query.Count > 0, "Please install DummyTcpServer.pfx to your personal store. (No password is required - leave blank.)");
                         certificate = query[0];
                     }
+#else
+                    certificate = new X509Certificate2("DummyTcpServer.pfx");
+#endif
+
 
                     Assert.NotNull(certificate);
 
