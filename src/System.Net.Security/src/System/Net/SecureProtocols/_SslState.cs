@@ -94,22 +94,8 @@ namespace System.Net.Security
         private int _LockReadState;
         private object _QueuedReadStateRequest;
 
-        // This is a perf trick ONLY for HTTPS TlsStream.
-        // CONSIDER: Always buffer the last handshake payload and then flush it on a subsequent write (in worst case on read/flush/close)
-        // However internal TlsStream class will want to post a read sooner then a write.
-        // We *know* that a write will happen immediatelly after the handshake so we will delay flushing the last payload until then.
-        private bool _ForceBufferingLastHandshakePayload;
-        private byte[] _LastPayload;
-
         private readonly EncryptionPolicy _EncryptionPolicy;
 
-        //
-        // This .ctor is only for internal TlsStream class, used only from client side ssl and it also has some special requirements.
-        //
-        internal SslState(Stream innerStream, bool isHTTP, EncryptionPolicy encryptionPolicy) : this(innerStream, null, null, encryptionPolicy)
-        {
-            _ForceBufferingLastHandshakePayload = isHTTP;
-        }
         //
         //  The public Client and Server classes enforce the parameters rules  before
         //  calling into this .ctor.
@@ -470,17 +456,7 @@ namespace System.Net.Security
                 return Context.MaxDataSize;
             }
         }
-        internal byte[] LastPayload
-        {
-            get
-            {
-                return _LastPayload;
-            }
-        }
-        internal void LastPayloadConsumed()
-        {
-            _LastPayload = null;
-        }
+
         //
         private Exception SetException(Exception e)
         {
@@ -828,34 +804,25 @@ namespace System.Net.Security
                     _Framing = DetectFraming(message.Payload, message.Payload.Length);
                 }
 
-                // Even if we are comleted, there could be a blob for sending.
-                // ONLY for TlsStream we want to delay it if the underlined stream is a NetworkStream that is subject to Nagle algorithm
-                // CONSIDER: Always buffer the last handshake payload and then flush it on a subsequent write (in worst case on read/flush/close)
-                if (message.Done && _ForceBufferingLastHandshakePayload && InnerStream.GetType() == typeof(NetworkStream) && !_PendingReHandshake)
+                if (asyncRequest == null)
                 {
-                    _LastPayload = message.Payload;
+                    InnerStream.Write(message.Payload, 0, message.Size);
                 }
                 else
                 {
-                    if (asyncRequest == null)
+                    asyncRequest.AsyncState = message;
+                    IAsyncResult ar = InnerStreamAPM.BeginWrite(message.Payload, 0, message.Size, _WriteCallback, asyncRequest);
+                    if (!ar.CompletedSynchronously)
                     {
-                        InnerStream.Write(message.Payload, 0, message.Size);
-                    }
-                    else
-                    {
-                        asyncRequest.AsyncState = message;
-                        IAsyncResult ar = InnerStreamAPM.BeginWrite(message.Payload, 0, message.Size, _WriteCallback, asyncRequest);
-                        if (!ar.CompletedSynchronously)
-                        {
 #if DEBUG
-                            asyncRequest._DebugAsyncChain = ar;
+                        asyncRequest._DebugAsyncChain = ar;
 #endif
-                            return;
-                        }
-                        InnerStreamAPM.EndWrite(ar);
+                        return;
                     }
+                    InnerStreamAPM.EndWrite(ar);
                 }
             }
+
             CheckCompletionBeforeNextReceive(message, asyncRequest);
         }
         //

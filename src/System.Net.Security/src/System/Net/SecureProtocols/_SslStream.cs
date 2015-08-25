@@ -35,8 +35,6 @@ namespace System.Net.Security
     internal class _SslStream
     {
         private static AsyncCallback _WriteCallback = new AsyncCallback(WriteCallback);
-        private static AsyncCallback _MulitpleWriteCallback = new AsyncCallback(MulitpleWriteCallback);
-        private static AsyncProtocolCallback _ResumeAsyncWriteCallback = new AsyncProtocolCallback(ResumeAsyncWriteCallback);
         private static AsyncProtocolCallback _ResumeAsyncReadCallback = new AsyncProtocolCallback(ResumeAsyncReadCallback);
         private static AsyncProtocolCallback _ReadHeaderCallback = new AsyncProtocolCallback(ReadHeaderCallback);
         private static AsyncProtocolCallback _ReadFrameCallback = new AsyncProtocolCallback(ReadFrameCallback);
@@ -120,103 +118,6 @@ namespace System.Net.Security
         }
         //
         //
-        internal void Write(BufferOffsetSize[] buffers)
-        {
-            ProcessWrite(buffers, null);
-        }
-        //
-        //
-        internal IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback asyncCallback, object asyncState)
-        {
-            BufferAsyncResult bufferResult = new BufferAsyncResult(this, buffer, offset, count, asyncState, asyncCallback);
-            AsyncProtocolRequest asyncRequest = new AsyncProtocolRequest(bufferResult);
-            ProcessRead(buffer, offset, count, asyncRequest);
-            return bufferResult;
-        }
-        //
-        //
-        internal int EndRead(IAsyncResult asyncResult)
-        {
-            if (asyncResult == null)
-            {
-                throw new ArgumentNullException("asyncResult");
-            }
-
-            BufferAsyncResult bufferResult = asyncResult as BufferAsyncResult;
-            if (bufferResult == null)
-            {
-                throw new ArgumentException(SR.Format(SR.net_io_async_result, asyncResult.GetType().FullName), "asyncResult");
-            }
-
-            if (Interlocked.Exchange(ref _NestedRead, 0) == 0)
-            {
-                throw new InvalidOperationException(SR.Format(SR.net_io_invalidendcall, "EndRead"));
-            }
-
-            // No "artificial" timeouts implemented so far, InnerStream controls timeout.
-            bufferResult.InternalWaitForCompletion();
-
-            if (bufferResult.Result is Exception)
-            {
-                if (bufferResult.Result is IOException)
-                {
-                    throw (Exception)bufferResult.Result;
-                }
-                throw new IOException(SR.net_io_read, (Exception)bufferResult.Result);
-            }
-            return (int)bufferResult.Result;
-        }
-        //
-        //
-        internal IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback asyncCallback, object asyncState)
-        {
-            LazyAsyncResult lazyResult = new LazyAsyncResult(this, asyncState, asyncCallback);
-            AsyncProtocolRequest asyncRequest = new AsyncProtocolRequest(lazyResult);
-            ProcessWrite(buffer, offset, count, asyncRequest);
-            return lazyResult;
-        }
-        //
-        //  Assumes that InnerStream type == typeof(NetworkStream)
-        //
-        internal IAsyncResult BeginWrite(BufferOffsetSize[] buffers, AsyncCallback asyncCallback, object asyncState)
-        {
-            LazyAsyncResult lazyResult = new LazyAsyncResult(this, asyncState, asyncCallback);
-            SplitWriteAsyncProtocolRequest asyncRequest = new SplitWriteAsyncProtocolRequest(lazyResult);
-            ProcessWrite(buffers, asyncRequest);
-            return lazyResult;
-        }
-        //
-        //
-        internal void EndWrite(IAsyncResult asyncResult)
-        {
-            if (asyncResult == null)
-            {
-                throw new ArgumentNullException("asyncResult");
-            }
-
-            LazyAsyncResult lazyResult = asyncResult as LazyAsyncResult;
-            if (lazyResult == null)
-            {
-                throw new ArgumentException(SR.Format(SR.net_io_async_result, asyncResult.GetType().FullName), "asyncResult");
-            }
-
-            if (Interlocked.Exchange(ref _NestedWrite, 0) == 0)
-            {
-                throw new InvalidOperationException(SR.Format(SR.net_io_invalidendcall, "EndWrite"));
-            }
-
-            // No "artificial" timeouts implemented so far, InnerStream controls timeout.
-            lazyResult.InternalWaitForCompletion();
-
-            if (lazyResult.Result is Exception)
-            {
-                if (lazyResult.Result is IOException)
-                {
-                    throw (Exception)lazyResult.Result;
-                }
-                throw new IOException(SR.net_io_write, (Exception)lazyResult.Result);
-            }
-        }
         //
         // Internal implemenation
         //
@@ -325,65 +226,8 @@ namespace System.Net.Security
         //
         // Combined sync/async write method. For sync case asyncRequest==null
         //
-        private void ProcessWrite(BufferOffsetSize[] buffers, SplitWriteAsyncProtocolRequest asyncRequest)
-        {
-            foreach (BufferOffsetSize buffer in buffers)
-            {
-                ValidateParameters(buffer.Buffer, buffer.Offset, buffer.Size);
-            }
-
-            if (Interlocked.Exchange(ref _NestedWrite, 1) == 1)
-            {
-                throw new NotSupportedException(SR.Format(SR.net_io_invalidnestedcall, (asyncRequest != null ? "BeginWrite" : "Write"), "write"));
-            }
-
-            bool failed = false;
-            try
-            {
-                Interop.SplitWritesState splitWrite = new Interop.SplitWritesState(buffers);
-                if (asyncRequest != null)
-                    asyncRequest.SetNextRequest(splitWrite, _ResumeAsyncWriteCallback);
-
-                StartWriting(splitWrite, asyncRequest);
-            }
-            catch (Exception e)
-            {
-                _SslState.FinishWrite();
-
-                failed = true;
-                if (e is IOException)
-                {
-                    throw;
-                }
-                throw new IOException(SR.net_io_write, e);
-            }
-            finally
-            {
-                if (asyncRequest == null || failed)
-                {
-                    _NestedWrite = 0;
-                }
-            }
-        }
-        //
-        // Combined sync/async write method. For sync case asyncRequest==null
-        //
         private void ProcessWrite(byte[] buffer, int offset, int count, AsyncProtocolRequest asyncRequest)
         {
-            if (_SslState.LastPayload != null)
-            {
-                //
-                // !!! LastPayload Only used in TlsStream  for HTTP and it needs re-work for a general case !!!
-                //
-                BufferOffsetSize[] buffers = new BufferOffsetSize[1];
-                buffers[0] = new BufferOffsetSize(buffer, offset, count, false);
-                if (asyncRequest != null)
-                    ProcessWrite(buffers, new SplitWriteAsyncProtocolRequest(asyncRequest.UserAsyncResult));
-                else
-                    ProcessWrite(buffers, null);
-                return;
-            }
-
             ValidateParameters(buffer, offset, count);
 
             if (Interlocked.Exchange(ref _NestedWrite, 1) == 1)
@@ -415,133 +259,7 @@ namespace System.Net.Security
                 }
             }
         }
-        //
-        // This method assumes that InnerStream type == typeof(NetwokrStream)
-        // It will produce a set of buffers for one MultipleWrite call
-        //
-        private void StartWriting(Interop.SplitWritesState splitWrite, SplitWriteAsyncProtocolRequest asyncRequest)
-        {
-            while (!splitWrite.IsDone)
-            {
-                // request a write IO slot
-                if (_SslState.CheckEnqueueWrite(asyncRequest))
-                {
-                    // operation is async and has been queued, return.
-                    return;
-                }
 
-                byte[] lastHandshakePayload = null;
-                if (_SslState.LastPayload != null)
-                {
-                    //
-                    // !!! LastPayload Only used in TlsStream for HTTP and it needs re-work for a general case !!!
-                    //
-                    lastHandshakePayload = _SslState.LastPayload;
-                    _SslState.LastPayloadConsumed();
-                }
-
-                BufferOffsetSize[] buffers = splitWrite.GetNextBuffers();
-                buffers = EncryptBuffers(buffers, lastHandshakePayload);
-
-                if (asyncRequest != null)
-                {
-                    // prepare for the next request
-                    IAsyncResult ar = ((NetworkStream)(_SslState.InnerStream)).BeginMultipleWrite(buffers, _MulitpleWriteCallback, asyncRequest);
-                    if (!ar.CompletedSynchronously)
-                        return;
-
-                    ((NetworkStream)(_SslState.InnerStream)).EndMultipleWrite(ar);
-                }
-                else
-                {
-                    ((NetworkStream)(_SslState.InnerStream)).MultipleWrite(buffers);
-                }
-
-                // release write IO slot
-                _SslState.FinishWrite();
-            }
-
-            if (asyncRequest != null)
-                asyncRequest.CompleteUser();
-        }
-
-        //
-        // Performs encryption of an array of buffers, proceeds buffer by buffer, if the individual
-        // buffer size exceeds a SSL limit of SecureChannel.MaxDataSize,the buffers are then split into smaller ones.
-        // Returns the same array that is encrypted or a new array of encrypted buffers.
-        //
-        private BufferOffsetSize[] EncryptBuffers(BufferOffsetSize[] buffers, byte[] lastHandshakePayload)
-        {
-            List<BufferOffsetSize> arrayList = null;
-            Interop.SecurityStatus status = Interop.SecurityStatus.OK;
-
-            foreach (BufferOffsetSize buffer in buffers)
-            {
-                int chunkBytes = Math.Min(buffer.Size, _SslState.MaxDataSize);
-
-                byte[] outBuffer = null;
-                int outSize;
-
-                status = _SslState.EncryptData(buffer.Buffer, buffer.Offset, chunkBytes, ref outBuffer, out outSize);
-                if (status != Interop.SecurityStatus.OK)
-                    break;
-
-                if (chunkBytes != buffer.Size || arrayList != null)
-                {
-                    if (arrayList == null)
-                    {
-                        arrayList = new List<BufferOffsetSize>(buffers.Length * (buffer.Size / chunkBytes + 1));
-                        if (lastHandshakePayload != null)
-                            arrayList.Add(new BufferOffsetSize(lastHandshakePayload, false));
-
-                        foreach (BufferOffsetSize oldBuffer in buffers)
-                        {
-                            if (oldBuffer == buffer)
-                                break;
-                            arrayList.Add(oldBuffer);
-                        }
-                    }
-                    arrayList.Add(new BufferOffsetSize(outBuffer, 0, outSize, false));
-                    while ((buffer.Size -= chunkBytes) != 0)
-                    {
-                        buffer.Offset += chunkBytes;
-                        chunkBytes = Math.Min(buffer.Size, _SslState.MaxDataSize);
-                        outBuffer = null;
-                        status = _SslState.EncryptData(buffer.Buffer, buffer.Offset, chunkBytes, ref outBuffer, out outSize);
-                        if (status != Interop.SecurityStatus.OK)
-                            break;
-                        arrayList.Add(new BufferOffsetSize(outBuffer, 0, outSize, false));
-                    }
-                }
-                else
-                {
-                    buffer.Buffer = outBuffer;
-                    buffer.Offset = 0;
-                    buffer.Size = outSize;
-                }
-                if (status != Interop.SecurityStatus.OK)
-                    break;
-            }
-
-            if (status != Interop.SecurityStatus.OK)
-            {
-                //CONSIDER: should we support re-handshake status?
-                ProtocolToken message = new ProtocolToken(null, status);
-                throw new IOException(SR.net_io_encrypt, message.GetException());
-            }
-
-            if (arrayList != null)
-                buffers = arrayList.ToArray();
-            else if (lastHandshakePayload != null)
-            {
-                BufferOffsetSize[] result = new BufferOffsetSize[buffers.Length + 1];
-                Array.Copy(buffers, 0, result, 1, buffers.Length);
-                result[0] = new BufferOffsetSize(lastHandshakePayload, false);
-                buffers = result;
-            }
-
-            return buffers;
-        }
         //
         private void StartWriting(byte[] buffer, int offset, int count, AsyncProtocolRequest asyncRequest)
         {
@@ -935,38 +653,6 @@ namespace System.Net.Security
                 asyncRequest.CompleteWithError(e);
             }
         }
-        //
-        // Assuming InnerStream type == typeof(NetworkStream)
-        //
-        private static void MulitpleWriteCallback(IAsyncResult transportResult)
-        {
-            if (transportResult.CompletedSynchronously)
-            {
-                return;
-            }
-
-            GlobalLog.Assert(transportResult.AsyncState is AsyncProtocolRequest, "SslStream::MulitpleWriteCallback|State type is wrong, expected AsyncProtocolRequest.");
-
-            SplitWriteAsyncProtocolRequest asyncRequest = (SplitWriteAsyncProtocolRequest)transportResult.AsyncState;
-
-            _SslStream sslStream = (_SslStream)asyncRequest.AsyncObject;
-            try
-            {
-                ((NetworkStream)(sslStream._SslState.InnerStream)).EndMultipleWrite(transportResult);
-                sslStream._SslState.FinishWrite();
-                sslStream.StartWriting(asyncRequest.SplitWritesState, asyncRequest);
-            }
-            catch (Exception e)
-            {
-                if (asyncRequest.IsUserCompleted)
-                {
-                    // This will throw on a worker thread.
-                    throw;
-                }
-                sslStream._SslState.FinishWrite();
-                asyncRequest.CompleteWithError(e);
-            }
-        }
 
         //
         // This is used in a rare situation when async Read is resumed from completed handshake
@@ -989,30 +675,6 @@ namespace System.Net.Security
             }
         }
 
-        //
-        // This is used in a rare situation when async Write is resumed from completed handshake
-        //
-        private static void ResumeAsyncWriteCallback(AsyncProtocolRequest asyncRequest)
-        {
-            try
-            {
-                SplitWriteAsyncProtocolRequest splitWriteRequest = asyncRequest as SplitWriteAsyncProtocolRequest;
-                if (splitWriteRequest != null)
-                    ((_SslStream)asyncRequest.AsyncObject).StartWriting(splitWriteRequest.SplitWritesState, splitWriteRequest);
-                else
-                    ((_SslStream)asyncRequest.AsyncObject).StartWriting(asyncRequest.Buffer, asyncRequest.Offset, asyncRequest.Count, asyncRequest);
-            }
-            catch (Exception e)
-            {
-                if (asyncRequest.IsUserCompleted)
-                {
-                    // This will throw on a worker thread.
-                    throw;
-                }
-                ((_SslStream)asyncRequest.AsyncObject)._SslState.FinishWrite();
-                asyncRequest.CompleteWithError(e);
-            }
-        }
         //
         //
         private static void ReadHeaderCallback(AsyncProtocolRequest asyncRequest)

@@ -43,7 +43,6 @@
     <Compile Include="Shims\X509CertificateExtensions.cs" />
     <Compile Include="Shims\GCExtensions.cs" />
     <Compile Include="Shims\AppDomain.cs" />
-    <Compile Include="Shims\NetworkStreamExtensions.cs" />
 
     <!-- Logging -->
     <Compile Include="$(CommonPath)\System\Net\Shims\TraceSource.cs">
@@ -118,9 +117,6 @@
 
     <Compile Include="$(CommonPath)\System\IO\StreamAsyncHelper.cs">
       <Link>Common\System\IO\StreamAsyncHelper.cs</Link>
-    </Compile>
-    <Compile Include="$(CommonPath)\System\IO\TaskHelpers.cs">
-      <Link>Common\System\IO\TaskHelpers.cs</Link>
     </Compile>
     <Compile Include="$(CommonPath)\System\IO\__Error.cs">
       <Link>Common\System\IO\__Error.cs</Link>
