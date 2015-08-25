@@ -163,14 +163,14 @@ namespace System.Net.Security.Tests
             _log.WriteLine("Server: " + serverSslProtocols + "; Client: " + clientSslProtocols);
             
             IPEndPoint endPoint = new IPEndPoint(IPAddress.IPv6Loopback, 0);
+
             using (var server = new DummyTcpServer(endPoint, encryptionPolicy))
+            using (var client = new TcpClient(AddressFamily.InterNetworkV6))
             {
                 server.SslProtocols = serverSslProtocols;
-                using (var client = new TcpClient(AddressFamily.InterNetworkV6))
+                client.Connect(server.RemoteEndPoint);
+                using (SslStream sslStream = new SslStream(client.GetStream(), false, AllowAnyServerCertificate, null))
                 {
-                    client.Connect(server.RemoteEndPoint);
-
-                    SslStream sslStream = new SslStream(client.GetStream(), false, AllowAnyServerCertificate, null);
 
                     IAsyncResult async = sslStream.BeginAuthenticateAsClient("localhost", null, clientSslProtocols, false, null, null);
                     Assert.True(async.AsyncWaitHandle.WaitOne(10000), "Timed Out");
@@ -181,8 +181,6 @@ namespace System.Net.Security.Tests
                         sslStream.CipherAlgorithm, sslStream.CipherStrength);
                     Assert.True(sslStream.CipherAlgorithm != CipherAlgorithmType.Null, "Cipher algorithm should not be NULL");
                     Assert.True(sslStream.CipherStrength > 0, "Cipher strength should be greater than 0");
-                                        
-                    sslStream.Dispose();
                 }
             }
         }

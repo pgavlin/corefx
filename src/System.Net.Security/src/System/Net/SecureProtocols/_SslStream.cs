@@ -35,6 +35,7 @@ namespace System.Net.Security
     internal class _SslStream
     {
         private static AsyncCallback _WriteCallback = new AsyncCallback(WriteCallback);
+        private static AsyncProtocolCallback _ResumeAsyncWriteCallback = new AsyncProtocolCallback(ResumeAsyncWriteCallback);
         private static AsyncProtocolCallback _ResumeAsyncReadCallback = new AsyncProtocolCallback(ResumeAsyncReadCallback);
         private static AsyncProtocolCallback _ReadHeaderCallback = new AsyncProtocolCallback(ReadHeaderCallback);
         private static AsyncProtocolCallback _ReadFrameCallback = new AsyncProtocolCallback(ReadFrameCallback);
@@ -676,6 +677,31 @@ namespace System.Net.Security
         }
 
         //
+        // This is used in a rare situation when async Write is resumed from completed handshake
+        //
+        private static void ResumeAsyncWriteCallback(AsyncProtocolRequest asyncRequest)
+        {
+            try
+            {
+                    ((_SslStream)asyncRequest.AsyncObject).StartWriting(
+                        asyncRequest.Buffer, 
+                        asyncRequest.Offset, 
+                        asyncRequest.Count, 
+                        asyncRequest);
+            }
+            catch (Exception e)
+            {
+                if (asyncRequest.IsUserCompleted)
+                {
+                    // This will throw on a worker thread.
+                    throw;
+                }
+                ((_SslStream)asyncRequest.AsyncObject)._SslState.FinishWrite();
+                asyncRequest.CompleteWithError(e);
+            }
+        }
+
+        //
         //
         private static void ReadHeaderCallback(AsyncProtocolRequest asyncRequest)
         {
@@ -725,21 +751,5 @@ namespace System.Net.Security
                 asyncRequest.CompleteWithError(e);
             }
         }
-
-        private class SplitWriteAsyncProtocolRequest : AsyncProtocolRequest
-        {
-            internal Interop.SplitWritesState SplitWritesState;  // If one buffer is no enough (such as for multiple writes)
-
-            internal SplitWriteAsyncProtocolRequest(LazyAsyncResult userAsyncResult) : base(userAsyncResult)
-            {
-            }
-
-            internal void SetNextRequest(Interop.SplitWritesState splitWritesState, AsyncProtocolCallback callback)
-            {
-                SplitWritesState = splitWritesState;
-                SetNextRequest(null, 0, 0, callback);
-            }
-        }
-        //
     }
 }

@@ -10,14 +10,6 @@ namespace System.Net.Security.Tests
 {
     public class TransportContextTest
     {
-        private DummyTcpServer testServer;
-
-        public TransportContextTest()
-        {
-            testServer = new DummyTcpServer(
-                new IPEndPoint(IPAddress.Loopback, 400), EncryptionPolicy.RequireEncryption);
-        }
-
         // The following method is invoked by the RemoteCertificateValidationDelegate.
         public bool AllowAnyServerCertificate(
               object sender,
@@ -31,32 +23,18 @@ namespace System.Net.Security.Tests
         [Fact]
         public void TransportContext_ConnectToServerWithSsl_GetExpectedChannelBindings()
         {
-            TcpClient client = null;
-            NetworkStream stream = null;
-            SslStream sslStream = null;
-            TransportContext context = null;
-
-            try 
-	        {
-                client = new TcpClient();
+            using (var testServer = new DummyTcpServer(
+                new IPEndPoint(IPAddress.Loopback, 0), EncryptionPolicy.RequireEncryption))
+            using (var client = new TcpClient())
+            {
                 client.Connect(testServer.RemoteEndPoint);
 
-                stream = client.GetStream();
-                sslStream = new SslStream(client.GetStream(), false, AllowAnyServerCertificate, null, EncryptionPolicy.RequireEncryption);
-                sslStream.AuthenticateAsClient("localhost", null, SslProtocols.Tls, false);
+                using (var sslStream = new SslStream(client.GetStream(), false, AllowAnyServerCertificate, null, EncryptionPolicy.RequireEncryption))
+                {
+                    sslStream.AuthenticateAsClient("localhost", null, SslProtocols.Tls, false);
 
-                context = sslStream.TransportContext;
-                CheckTransportContext(context);
-	        }
-            finally
-            {
-                if (sslStream != null)
-                {
-                    sslStream.Dispose();
-                }
-                if (client != null)
-                {
-                    client.Dispose();
+                    TransportContext context = sslStream.TransportContext;
+                    CheckTransportContext(context);
                 }
             }
         }
