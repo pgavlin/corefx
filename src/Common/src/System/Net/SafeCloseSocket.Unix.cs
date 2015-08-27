@@ -15,6 +15,14 @@ namespace System.Net.Sockets
     internal sealed partial class SafeCloseSocket : SafeHandleMinusOneIsInvalid
 #endif
     {
+        public SocketAsyncContext AsyncContext
+        {
+            get
+            {
+                return _innerSocket.AsyncContext;
+            }
+        }
+
 		public int FileDescriptor
 		{
 			get
@@ -32,6 +40,7 @@ namespace System.Net.Sockets
             }
         }
 
+        // TODO: move these to Common
         public static SocketError GetLastSocketError()
         {
             return GetSocketErrorForErrorCode(Interop.Sys.GetLastError());
@@ -225,6 +234,11 @@ namespace System.Net.Sockets
             }
         }
 
+        public unsafe static SafeCloseSocket CreateSocket(int fileDescriptor)
+        {
+            return CreateSocket(InnerSafeCloseSocket.CreateSocket(fileDescriptor));
+        }
+
 		public unsafe static SafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
 		{
 			return CreateSocket(InnerSafeCloseSocket.CreateSocket(addressFamily, socketType, protocolType));
@@ -248,6 +262,20 @@ namespace System.Net.Sockets
 
         internal sealed partial class InnerSafeCloseSocket : SafeHandleMinusOneIsInvalid
         {
+            private SocketAsyncContext _asyncContext;
+
+            public SocketAsyncContext AsyncContext
+            {
+                get
+                {
+                    if (Volatile.Read(ref _asyncContext) == null)
+                    {
+                        Interlocked.CompareExchange(ref _asyncContext, new SocketAsyncContext((int)handle, SocketAsyncEngine.Instance), null);
+                    }
+                    return _asyncContext;
+                }
+            }
+
             private unsafe SocketError InnerReleaseHandle()
             {
 				int errorCode;
@@ -259,7 +287,7 @@ namespace System.Net.Sockets
                 {
                     GlobalLog.Print("SafeCloseSocket::ReleaseHandle(handle:" + handle.ToString("x") + ") Following 'blockable' branch.");
 
-					errorCode = Interop.libc.close((int)handle);
+					errorCode = Interop.Sys.Close((int)handle);
 					if (errorCode == -1)
 					{
 						errorCode = (int)Interop.Sys.GetLastError();
@@ -274,27 +302,31 @@ namespace System.Net.Sockets
                     // If it's not EWOULDBLOCK, there's no more recourse - we either succeeded or failed.
 					if (errorCode != (int)Interop.Error.EWOULDBLOCK)
                     {
+                        if (errorCode == 0)
+                        {
+                            _asyncContext.Close();
+                        }
 						return GetSocketErrorForErrorCode((Interop.Error)errorCode);
                     }
 
                     // The socket must be non-blocking with a linger timeout set.
                     // We have to set the socket to blocking.
-					int flags = Interop.libc.fcntl((int)handle, Interop.libc.FcntlCommands.F_GETFL);
-					if (flags != -1)
-					{
-						errorCode = Interop.libc.fcntl((int)handle, Interop.libc.FcntlCommands.F_SETFL, flags & ~Interop.libc.O_NONBLOCK);
-						if (errorCode == 0)
-						{
-							// The socket successfully made blocking; retry the close().
-							errorCode = Interop.libc.close((int)handle);
+                    errorCode = Interop.Sys.Fcntl.SetIsNonBlocking((int)handle, 0);
+                    if (errorCode == 0)
+                    {
+                        // The socket successfully made blocking; retry the close().
+                        errorCode = Interop.Sys.Close((int)handle);
 
-							GlobalLog.Print("SafeCloseSocket::ReleaseHandle(handle:" + handle.ToString("x") + ") close()#2:" + errorCode.ToString());
+                        GlobalLog.Print("SafeCloseSocket::ReleaseHandle(handle:" + handle.ToString("x") + ") close()#2:" + errorCode.ToString());
 #if DEBUG
-							_closeSocketHandle = handle;
-							_closeSocketResult = GetSocketErrorForErrorCode((Interop.Error)errorCode);
+                        _closeSocketHandle = handle;
+                        _closeSocketResult = GetSocketErrorForErrorCode((Interop.Error)errorCode);
 #endif
-							return GetSocketErrorForErrorCode((Interop.Error)errorCode);
-						}
+                        if (errorCode == 0)
+                        {
+                            _asyncContext.Close();
+                        }
+                        return GetSocketErrorForErrorCode((Interop.Error)errorCode);
 					}
 
                     // The socket could not be made blocking; fall through to the regular abortive close.
@@ -322,14 +354,25 @@ namespace System.Net.Sockets
                     return GetSocketErrorForErrorCode((Interop.Error)errorCode);
                 }
 
-                errorCode = Interop.libc.close((int)handle);
+                errorCode = Interop.Sys.Close((int)handle);
 #if DEBUG
                 _closeSocketHandle = handle;
                 _closeSocketResult = GetSocketErrorForErrorCode((Interop.Error)errorCode);
 #endif
                 GlobalLog.Print("SafeCloseSocket::ReleaseHandle(handle:" + handle.ToString("x") + ") close#3():" + (errorCode == -1 ? (int)Interop.Sys.GetLastError() : errorCode).ToString());
 
+                if (errorCode == 0)
+                {
+                    _asyncContext.Close();
+                }
                 return GetSocketErrorForErrorCode((Interop.Error)errorCode);
+            }
+
+            public static InnerSafeCloseSocket CreateSocket(int fileDescriptor)
+            {
+                var res = new InnerSafeCloseSocket();
+                res.SetHandle((IntPtr)fileDescriptor);
+                return res;
             }
 
 			public static InnerSafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)

@@ -1382,7 +1382,7 @@ namespace System.Net.Sockets
                 //
                 // update our internal state after this socket error and throw
                 //
-                errorCode = (SocketError)Marshal.GetLastWin32Error();
+                errorCode = SocketPal.GetLastSocketError();
                 UpdateStatusAfterSocketError(errorCode);
                 if (s_LoggingEnabled)
                 {
@@ -1598,7 +1598,7 @@ namespace System.Net.Sockets
                 //
                 // update our internal state after this socket error and throw
                 //
-                errorCode = (SocketError)Marshal.GetLastWin32Error();
+                errorCode = SocketPal.GetLastSocketError();
                 UpdateStatusAfterSocketError(errorCode);
                 if (s_LoggingEnabled)
                 {
@@ -1793,7 +1793,7 @@ namespace System.Net.Sockets
 
             Internals.SocketAddress receiveAddress;
             int bytesTransferred;
-            SocketError errorCode = SocketPal.ReceiveMessageFrom(this, buffer, offset, size, ref socketFlags, socketAddress, out receiveAddress, out ipPacketInformation, out bytesTransferred);
+            SocketError errorCode = SocketPal.ReceiveMessageFrom(this, _handle, buffer, offset, size, ref socketFlags, socketAddress, out receiveAddress, out ipPacketInformation, out bytesTransferred);
 
             //
             // if the native call fails we'll throw a SocketException
@@ -2625,7 +2625,7 @@ namespace System.Net.Sockets
             // This can throw ObjectDisposedException (handle, and retrieving the delegate).
             if (!DisconnectEx(_handle, asyncResult.OverlappedHandle, (int)(reuseSocket ? TransmitFileOptions.ReuseSocket : 0), 0))
             {
-                errorCode = (SocketError)Marshal.GetLastWin32Error();
+                errorCode = SocketPal.GetLastSocketError();
             }
 
             if (errorCode == SocketError.Success)
@@ -2677,7 +2677,7 @@ namespace System.Net.Sockets
             // This can throw ObjectDisposedException (handle, and retrieving the delegate).
             if (!DisconnectEx_Blocking(_handle.DangerousGetHandle(), IntPtr.Zero, (int)(reuseSocket ? TransmitFileOptions.ReuseSocket : 0), 0))
             {
-                errorCode = (SocketError)Marshal.GetLastWin32Error();
+                errorCode = SocketPal.GetLastSocketError();
             }
 
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Disconnect() Interop.Winsock.DisConnectEx returns:" + errorCode.ToString());
@@ -2963,30 +2963,13 @@ namespace System.Net.Sockets
             SocketError errorCode = SocketError.SocketError;
             try
             {
-                // Set up asyncResult for overlapped WSASend.
-                // This call will use completion ports.
-                asyncResult.SetUnmanagedStructures(buffer, offset, size, null, false /*don't pin null remoteEP*/);
-
                 //
                 // Get the Send going.
                 //
                 GlobalLog.Print("BeginSend: asyncResult:" + Logging.HashString(asyncResult) + " size:" + size.ToString());
-                int bytesTransferred;
 
-                // This can throw ObjectDisposedException.
-                errorCode = Interop.Winsock.WSASend(
-                    _handle,
-                    ref asyncResult.m_SingleBuffer,
-                    1, // only ever 1 buffer being sent
-                    out bytesTransferred,
-                    socketFlags,
-                    asyncResult.OverlappedHandle,
-                    IntPtr.Zero);
+                errorCode = SocketPal.SendAsync(_handle, buffer, offset, size, socketFlags, asyncResult);
 
-                if (errorCode != SocketError.Success)
-                {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
-                }
                 GlobalLog.Print("Socket#" + Logging.HashString(this) + "::BeginSend() Interop.Winsock.WSASend returns:" + errorCode.ToString() + " size:" + size.ToString() + " returning AsyncResult:" + Logging.HashString(asyncResult));
             }
             finally
@@ -3071,27 +3054,10 @@ namespace System.Net.Sockets
             SocketError errorCode = SocketError.SocketError;
             try
             {
-                // Set up asyncResult for overlapped WSASend.
-                // This call will use completion ports.
-                asyncResult.SetUnmanagedStructures(buffers);
-
                 GlobalLog.Print("BeginSend: asyncResult:" + Logging.HashString(asyncResult));
 
-                // This can throw ObjectDisposedException.
-                int bytesTransferred;
-                errorCode = Interop.Winsock.WSASend(
-                    _handle,
-                    asyncResult.m_WSABuffers,
-                    asyncResult.m_WSABuffers.Length,
-                    out bytesTransferred,
-                    socketFlags,
-                    asyncResult.OverlappedHandle,
-                    IntPtr.Zero);
+                errorCode = SocketPal.SendAsync(_handle, buffers, socketFlags, asyncResult);
 
-                if (errorCode != SocketError.Success)
-                {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
-                }
                 GlobalLog.Print("Socket#" + Logging.HashString(this) + "::BeginSend() Interop.Winsock.WSASend returns:" + errorCode.ToString() + " returning AsyncResult:" + Logging.HashString(asyncResult));
             }
             finally
@@ -3306,7 +3272,7 @@ namespace System.Net.Sockets
 
                 if (errorCode != SocketError.Success)
                 {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
+                    errorCode = SocketPal.GetLastSocketError();
                 }
                 GlobalLog.Print("Socket#" + Logging.HashString(this) + "::DoBeginSendTo() Interop.Winsock.WSASend returns:" + errorCode.ToString() + " size:" + size + " returning AsyncResult:" + Logging.HashString(asyncResult));
             }
@@ -3529,27 +3495,9 @@ namespace System.Net.Sockets
             SocketError errorCode = SocketError.SocketError;
             try
             {
-                // Set up asyncResult for overlapped WSARecv.
-                // This call will use completion ports.
-                asyncResult.SetUnmanagedStructures(buffer, offset, size, null, false /* don't pin null RemoteEP*/);
+                errorCode = SocketPal.ReceiveAsync(_handle, buffer, offset, size, socketFlags, asyncResult);
 
-                // This can throw ObjectDisposedException.
-                int bytesTransferred;
-                errorCode = Interop.Winsock.WSARecv(
-                    _handle,
-                    ref asyncResult.m_SingleBuffer,
-                    1,
-                    out bytesTransferred,
-                    ref socketFlags,
-                    asyncResult.OverlappedHandle,
-                    IntPtr.Zero);
-
-                if (errorCode != SocketError.Success)
-                {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
-                    GlobalLog.Assert(errorCode != SocketError.Success, "Socket#{0}::DoBeginReceive()|GetLastWin32Error() returned zero.", Logging.HashString(this));
-                }
-                GlobalLog.Print("Socket#" + Logging.HashString(this) + "::BeginReceive() Interop.Winsock.WSARecv returns:" + errorCode.ToString() + " bytesTransferred:" + bytesTransferred.ToString() + " returning AsyncResult:" + Logging.HashString(asyncResult));
+                GlobalLog.Print("Socket#" + Logging.HashString(this) + "::BeginReceive() Interop.Winsock.WSARecv returns:" + errorCode.ToString() + " returning AsyncResult:" + Logging.HashString(asyncResult));
             }
             finally
             {
@@ -3645,26 +3593,8 @@ namespace System.Net.Sockets
             SocketError errorCode = SocketError.SocketError;
             try
             {
-                // Set up asyncResult for overlapped WSASend.
-                // This call will use completion ports.
-                asyncResult.SetUnmanagedStructures(buffers);
+                errorCode = SocketPal.ReceiveAsync(_handle, buffers, socketFlags, asyncResult);
 
-                // This can throw ObjectDisposedException.
-                int bytesTransferred;
-                errorCode = Interop.Winsock.WSARecv(
-                    _handle,
-                    asyncResult.m_WSABuffers,
-                    asyncResult.m_WSABuffers.Length,
-                    out bytesTransferred,
-                    ref socketFlags,
-                    asyncResult.OverlappedHandle,
-                    IntPtr.Zero);
-
-                if (errorCode != SocketError.Success)
-                {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
-                    GlobalLog.Assert(errorCode != SocketError.Success, "Socket#{0}::DoBeginReceive()|GetLastWin32Error() returned zero.", Logging.HashString(this));
-                }
                 GlobalLog.Print("Socket#" + Logging.HashString(this) + "::DoBeginReceive() Interop.Winsock.WSARecv returns:" + errorCode.ToString() + " returning AsyncResult:" + Logging.HashString(asyncResult));
             }
             finally
@@ -3876,7 +3806,7 @@ namespace System.Net.Sockets
 
                 if (errorCode != SocketError.Success)
                 {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
+                    errorCode = SocketPal.GetLastSocketError();
 
                     // I have guarantees from Brad Williamson that WSARecvMsg() will never return WSAEMSGSIZE directly, since a completion
                     // is queued in this case.  We wouldn't be able to handle this easily because of assumptions OverlappedAsyncResult
@@ -4155,7 +4085,7 @@ namespace System.Net.Sockets
 
                 if (errorCode != SocketError.Success)
                 {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
+                    errorCode = SocketPal.GetLastSocketError();
                 }
                 GlobalLog.Print("Socket#" + Logging.HashString(this) + "::DoBeginReceiveFrom() Interop.Winsock.WSARecvFrom returns:" + errorCode.ToString() + " size:" + size.ToString() + " returning AsyncResult:" + Logging.HashString(asyncResult));
             }
@@ -4422,50 +4352,14 @@ namespace System.Net.Sockets
                 throw new InvalidOperationException(SR.net_sockets_mustlisten);
             }
 
-            // if a acceptSocket isn't specified, then we need to create it.
-            if (acceptSocket == null)
-            {
-                acceptSocket = new Socket(_addressFamily, _socketType, _protocolType);
-            }
-            else
-            {
-                if (acceptSocket.m_RightEndPoint != null)
-                {
-                    throw new InvalidOperationException(SR.Format(SR.net_sockets_namedmustnotbebound, "acceptSocket"));
-                }
-            }
-            asyncResult.AcceptSocket = acceptSocket;
+            SafeCloseSocket acceptHandle;
+            asyncResult.AcceptSocket = GetOrCreateAcceptSocket(acceptSocket, out acceptHandle);
 
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::DoBeginAccept() AcceptSocket:" + Logging.HashString(acceptSocket));
 
-            //the buffer needs to contain the requested data plus room for two sockaddrs and 16 bytes
-            //of associated data for each.
-            int addressBufferSize = m_RightEndPoint.Serialize().Size + 16;
-            byte[] buffer = new byte[receiveSize + ((addressBufferSize) * 2)];
+            int socketAddressSize = m_RightEndPoint.Serialize().Size;
+            SocketError errorCode = SocketPal.AcceptAsync(_handle, acceptHandle, socketAddressSize, asyncResult);
 
-            //
-            // Set up asyncResult for overlapped AcceptEx.
-            // This call will use
-            // completion ports on WinNT
-            //
-
-            asyncResult.SetUnmanagedStructures(buffer, addressBufferSize);
-
-            // This can throw ObjectDisposedException.
-            int bytesTransferred;
-            SocketError errorCode = SocketError.Success;
-            if (!AcceptEx(
-                _handle,
-                acceptSocket._handle,
-                Marshal.UnsafeAddrOfPinnedArrayElement(asyncResult.Buffer, 0),
-                receiveSize,
-                addressBufferSize,
-                addressBufferSize,
-                out bytesTransferred,
-                asyncResult.OverlappedHandle))
-            {
-                errorCode = (SocketError)Marshal.GetLastWin32Error();
-            }
             errorCode = asyncResult.CheckAsyncCallOverlappedResult(errorCode);
 
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::DoBeginAccept() Interop.Winsock.AcceptEx returns:" + errorCode.ToString() + Logging.HashString(asyncResult));
@@ -4679,12 +4573,7 @@ namespace System.Net.Sockets
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Shutdown() how:" + how.ToString());
 
             // This can throw ObjectDisposedException.
-            SocketError errorCode = Interop.Winsock.shutdown(_handle, (int)how);
-
-            //
-            // if the native call fails we'll throw a SocketException
-            //
-            errorCode = errorCode != SocketError.SocketError ? SocketError.Success : (SocketError)Marshal.GetLastWin32Error();
+            SocketError errorCode = SocketPal.Shutdown(_handle, how);
 
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Shutdown() Interop.Winsock.shutdown returns errorCode:" + errorCode);
 
@@ -4783,7 +4672,7 @@ namespace System.Net.Sockets
                         out bytesTransferred,
                         e.m_PtrNativeOverlapped))
                 {
-                    socketError = (SocketError)Marshal.GetLastWin32Error();
+                    socketError = SocketPal.GetLastSocketError();
                 }
             }
             catch (Exception ex)
@@ -4913,7 +4802,7 @@ namespace System.Net.Sockets
                             out bytesTransferred,
                             e.m_PtrNativeOverlapped))
                     {
-                        socketError = (SocketError)Marshal.GetLastWin32Error();
+                        socketError = SocketPal.GetLastSocketError();
                     }
                 }
                 catch (Exception ex)
@@ -5039,7 +4928,7 @@ namespace System.Net.Sockets
                         (int)(e.DisconnectReuseSocket ? TransmitFileOptions.ReuseSocket : 0),
                         0))
                 {
-                    socketError = (SocketError)Marshal.GetLastWin32Error();
+                    socketError = SocketPal.GetLastSocketError();
                 }
             }
             catch (Exception ex)
@@ -5134,7 +5023,7 @@ namespace System.Net.Sockets
             // Must get Win32 error for specific error code.
             if (socketError != SocketError.Success)
             {
-                socketError = (SocketError)Marshal.GetLastWin32Error();
+                socketError = SocketPal.GetLastSocketError();
             }
 
             // Handle completion when completion port is not posted.
@@ -5243,7 +5132,7 @@ namespace System.Net.Sockets
             // Must get Win32 error for specific error code.
             if (socketError != SocketError.Success)
             {
-                socketError = (SocketError)Marshal.GetLastWin32Error();
+                socketError = SocketPal.GetLastSocketError();
             }
 
             // Handle completion when completion port is not posted.
@@ -5333,7 +5222,7 @@ namespace System.Net.Sockets
             // Must get Win32 error for specific error code.
             if (socketError != SocketError.Success)
             {
-                socketError = (SocketError)Marshal.GetLastWin32Error();
+                socketError = SocketPal.GetLastSocketError();
             }
 
             // Handle completion when completion port is not posted.
@@ -5420,7 +5309,7 @@ namespace System.Net.Sockets
             // Must get Win32 error for specific error code.
             if (socketError != SocketError.Success)
             {
-                socketError = (SocketError)Marshal.GetLastWin32Error();
+                socketError = SocketPal.GetLastSocketError();
             }
 
             // Handle completion when completion port is not posted.
@@ -5503,7 +5392,7 @@ namespace System.Net.Sockets
 
                 if (!result)
                 {
-                    socketError = (SocketError)Marshal.GetLastWin32Error();
+                    socketError = SocketPal.GetLastSocketError();
                 }
                 else
                 {
@@ -5614,7 +5503,7 @@ namespace System.Net.Sockets
             // Must get Win32 error for specific error code.
             if (socketError != SocketError.Success)
             {
-                socketError = (SocketError)Marshal.GetLastWin32Error();
+                socketError = SocketPal.GetLastSocketError();
             }
 
             // Handle completion when completion port is not posted.
@@ -5731,7 +5620,7 @@ namespace System.Net.Sockets
             return disconnectEx_Blocking(socketHandle, overlapped, flags, reserved);
         }
 
-        private bool ConnectEx(SafeCloseSocket socketHandle,
+        internal bool ConnectEx(SafeCloseSocket socketHandle,
                                IntPtr socketAddress,
                                int socketAddressSize,
                                IntPtr buffer,
@@ -6034,12 +5923,9 @@ namespace System.Net.Sockets
                     // Go to blocking mode.  We know no WSAEventSelect is pending because of the lock and UnsetAsyncEventSelect() above.
                     if (!_willBlock || !_willBlockInternal)
                     {
-                        int nonBlockCmd = 0;
-                        errorCode = Interop.Winsock.ioctlsocket(
-                            _handle,
-                            Interop.Winsock.IoctlSocketConstants.FIONBIO,
-                            ref nonBlockCmd);
-                        GlobalLog.Print("SafeCloseSocket::Dispose(handle:" + _handle.DangerousGetHandle().ToString("x") + ") ioctlsocket(FIONBIO):" + (errorCode == SocketError.SocketError ? (SocketError)Marshal.GetLastWin32Error() : errorCode).ToString());
+                        bool willBlock;
+                        errorCode = SocketPal.SetBlocking(_handle, false, out willBlock);
+                        GlobalLog.Print("SafeCloseSocket::Dispose(handle:" + _handle.DangerousGetHandle().ToString("x") + ") ioctlsocket(FIONBIO):" + (errorCode == SocketError.SocketError ? SocketPal.GetLastSocketError() : errorCode).ToString());
                     }
 
                     if (timeout < 0)
@@ -6051,17 +5937,16 @@ namespace System.Net.Sockets
                     else
                     {
                         // Since our timeout is in ms and linger is in seconds, implement our own sortof linger here.
-                        errorCode = Interop.Winsock.shutdown(_handle, (int)SocketShutdown.Send);
-                        GlobalLog.Print("SafeCloseSocket::Dispose(handle:" + _handle.DangerousGetHandle().ToString("x") + ") shutdown():" + (errorCode == SocketError.SocketError ? (SocketError)Marshal.GetLastWin32Error() : errorCode).ToString());
+                        errorCode = SocketPal.Shutdown(_handle, SocketShutdown.Send);
+                        GlobalLog.Print("SafeCloseSocket::Dispose(handle:" + _handle.DangerousGetHandle().ToString("x") + ") shutdown():" + (errorCode == SocketError.SocketError ? SocketPal.GetLastSocketError() : errorCode).ToString());
 
                         // This should give us a timeout in milliseconds.
-                        errorCode = Interop.Winsock.setsockopt(
+                        errorCode = SocketPal.SetSockOpt(
                             _handle,
                             SocketOptionLevel.Socket,
                             SocketOptionName.ReceiveTimeout,
-                            ref timeout,
-                            sizeof(int));
-                        GlobalLog.Print("SafeCloseSocket::Dispose(handle:" + _handle.DangerousGetHandle().ToString("x") + ") setsockopt():" + (errorCode == SocketError.SocketError ? (SocketError)Marshal.GetLastWin32Error() : errorCode).ToString());
+                            timeout);
+                        GlobalLog.Print("SafeCloseSocket::Dispose(handle:" + _handle.DangerousGetHandle().ToString("x") + ") setsockopt():" + (errorCode == SocketError.SocketError ? SocketPal.GetLastSocketError() : errorCode).ToString());
 
                         if (errorCode != SocketError.Success)
                         {
@@ -6069,10 +5954,7 @@ namespace System.Net.Sockets
                         }
                         else
                         {
-                            unsafe
-                            {
-                                errorCode = (SocketError)Interop.Winsock.recv(_handle.DangerousGetHandle(), null, 0, SocketFlags.None);
-                            }
+                            errorCode = (SocketError)SocketPal.Receive(_handle, null, 0, 0, SocketFlags.None);
                             GlobalLog.Print("SafeCloseSocket::Dispose(handle:" + _handle.DangerousGetHandle().ToString("x") + ") recv():" + errorCode.ToString());
 
                             if (errorCode != (SocketError)0)
@@ -6084,11 +5966,8 @@ namespace System.Net.Sockets
                             {
                                 // We got a FIN or data.  Use ioctlsocket to find out which.
                                 int dataAvailable = 0;
-                                errorCode = Interop.Winsock.ioctlsocket(
-                                    _handle,
-                                    Interop.Winsock.IoctlSocketConstants.FIONREAD,
-                                    ref dataAvailable);
-                                GlobalLog.Print("SafeCloseSocket::Dispose(handle:" + _handle.DangerousGetHandle().ToString("x") + ") ioctlsocket(FIONREAD):" + (errorCode == SocketError.SocketError ? (SocketError)Marshal.GetLastWin32Error() : errorCode).ToString());
+                                errorCode = SocketPal.GetAvailable(_handle, out dataAvailable);
+                                GlobalLog.Print("SafeCloseSocket::Dispose(handle:" + _handle.DangerousGetHandle().ToString("x") + ") ioctlsocket(FIONREAD):" + (errorCode == SocketError.SocketError ? SocketPal.GetLastSocketError() : errorCode).ToString());
 
                                 if (errorCode != SocketError.Success || dataAvailable != 0)
                                 {
@@ -6139,7 +6018,7 @@ namespace System.Net.Sockets
 
             try
             {
-                Interop.Winsock.shutdown(_handle, (int)how);
+                SocketPal.Shutdown(_handle, how);
             }
             catch (ObjectDisposedException) { }
         }
@@ -6570,9 +6449,6 @@ namespace System.Net.Sockets
                 asyncResult.StartPostingAsyncOp(false);
             }
 
-            // This will pin socketAddress buffer
-            asyncResult.SetUnmanagedStructures(socketAddress.Buffer);
-
             //we should fix this in Whidbey.
             EndPoint oldEndPoint = m_RightEndPoint;
             if (m_RightEndPoint == null)
@@ -6580,23 +6456,10 @@ namespace System.Net.Sockets
                 m_RightEndPoint = endPointSnapshot;
             }
 
-            SocketError errorCode = SocketError.Success;
-
-            int ignoreBytesSent;
-
+            SocketError errorCode;
             try
             {
-                if (!ConnectEx(
-                    _handle,
-                    Marshal.UnsafeAddrOfPinnedArrayElement(socketAddress.Buffer, 0),
-                    socketAddress.Size,
-                    IntPtr.Zero,
-                    0,
-                    out ignoreBytesSent,
-                    asyncResult.OverlappedHandle))
-                {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
-                }
+                errorCode = SocketPal.ConnectAsync(this, _handle, socketAddress.Buffer, socketAddress.Size, asyncResult);
             }
             catch
             {
@@ -6891,7 +6754,7 @@ namespace System.Net.Sockets
 
                 if (errorCode != SocketError.Success)
                 {
-                    errorCode = (SocketError)Marshal.GetLastWin32Error();
+                    errorCode = SocketPal.GetLastSocketError();
                 }
                 GlobalLog.Print("Socket#" + Logging.HashString(this) + "::BeginMultipleSend() Interop.Winsock.WSASend returns:" + errorCode.ToString() + " size:" + buffers.Length.ToString() + " returning AsyncResult:" + Logging.HashString(asyncResult));
             }
@@ -6971,7 +6834,7 @@ namespace System.Net.Sockets
         // CreateAcceptSocket - pulls unmanaged results and assembles them
         //   into a new Socket object
         //
-        private Socket CreateAcceptSocket(SafeCloseSocket fd, EndPoint remoteEP)
+        internal Socket CreateAcceptSocket(SafeCloseSocket fd, EndPoint remoteEP)
         {
             //
             // Internal state of the socket is inherited from listener
@@ -8730,7 +8593,7 @@ namespace System.Net.Sockets
 
                         if (socketError == SocketError.SocketError)
                         {
-                            socketError = (SocketError)Marshal.GetLastWin32Error();
+                            socketError = SocketPal.GetLastSocketError();
                         }
                     }
                     catch (ObjectDisposedException)
@@ -8773,7 +8636,7 @@ namespace System.Net.Sockets
                             0);
                         if (socketError == SocketError.SocketError)
                         {
-                            socketError = (SocketError)Marshal.GetLastWin32Error();
+                            socketError = SocketPal.GetLastSocketError();
                         }
                     }
                     catch (ObjectDisposedException)
@@ -9001,7 +8864,7 @@ namespace System.Net.Sockets
                                     out numBytes,
                                     false,
                                     out socketFlags);
-                                socketError = (SocketError)Marshal.GetLastWin32Error();
+                                socketError = SocketPal.GetLastSocketError();
                             }
                             catch
                             {

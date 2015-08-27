@@ -3,15 +3,16 @@
 
 using System;
 using System.Runtime.InteropServices;
-using System.Text;
 
 internal static partial class Interop
 {
     internal static partial class libc
     {
-        public const int FIONREAD = 0x541b;
+        public const int SHUT_RD = 0;
+        public const int SHUT_WR = 1;
+        public const int SHUT_RDWR = 2;
 
         [DllImport(Libraries.Libc, SetLastError = true)]
-        public static extern unsafe int ioctl(int d, UIntPtr request, void* argp);
+        public static extern int shutdown(int sockfd, int how);
     }
 }

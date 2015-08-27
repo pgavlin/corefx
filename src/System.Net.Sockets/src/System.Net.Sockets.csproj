@@ -210,7 +210,12 @@
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetsWindows)' == 'true' ">
+    <Compile Include="System\Net\Sockets\_AcceptOverlappedAsyncResult.Windows.cs" />
+    <Compile Include="System\Net\Sockets\_BaseOverlappedAsyncResult.Windows.cs" />
+    <Compile Include="System\Net\Sockets\_ConnectOverlappedAsyncResult.Windows.cs" />
+    <Compile Include="System\Net\Sockets\_OverlappedAsyncResult.Windows.cs" />
     <Compile Include="System\Net\Sockets\Socket.Windows.cs" />
+    <Compile Include="System\Net\Sockets\SocketPal.Windows.cs" />
 
     <Compile Include="$(CommonPath)\System\Net\SafeCloseSocket.Windows.cs">
       <Link>Common\System\Net\SafeCloseSocket.Windows.cs</Link>
@@ -228,7 +233,14 @@
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetsUnix)' == 'true' ">
+    <Compile Include="System\Net\Sockets\_AcceptOverlappedAsyncResult.Unix.cs" />
+    <Compile Include="System\Net\Sockets\_BaseOverlappedAsyncResult.Unix.cs" />
+    <Compile Include="System\Net\Sockets\_ConnectOverlappedAsyncResult.Unix.cs" />
     <Compile Include="System\Net\Sockets\Socket.Unix.cs" />
+    <Compile Include="System\Net\Sockets\SocketPal.Unix.cs" />
+
+    <!-- TODO: remove this -->
+    <Compile Include="System\Net\Sockets\_OverlappedAsyncResult.Windows.cs" />
 
     <!-- TODO: remove this -->
     <Compile Include="RefactoringShims\InteropShim.cs">
@@ -269,14 +281,8 @@
     <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.bind.cs">
       <Link>Interop\Unix\libc\Interop.bind.cs</Link>
     </Compile>
-    <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.close.cs">
-      <Link>Interop\Unix\libc\Interop.close.cs</Link>
-    </Compile>
     <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.connect.cs">
       <Link>Interop\Unix\libc\Interop.connect.cs</Link>
-    </Compile>
-    <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.fcntl.cs">
-      <Link>Interop\Unix\libc\Interop.fcntl.cs</Link>
     </Compile>
     <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.fd_set.cs">
       <Link>Interop\Unix\libc\Interop.fd_set.cs</Link>
@@ -329,20 +335,42 @@
     <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.setsockopt.cs">
       <Link>Interop\Unix\libc\Interop.setsockopt.cs</Link>
     </Compile>
+    <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.shutdown.cs">
+      <Link>Interop\Unix\libc\Interop.shutdown.cs</Link>
+    </Compile>
     <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.socket.cs">
       <Link>Interop\Unix\libc\Interop.socket.cs</Link>
     </Compile>
     <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.timeval.cs">
       <Link>Interop\Unix\libc\Interop.timeval.cs</Link>
     </Compile>
+
+    <Compile Include="$(CommonPath)\Interop\Unix\System.Native\Interop.Close.cs">
+      <Link>Interop\Unix\System.Native\Interop.Close.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\Interop\Unix\System.Native\Interop.Fcntl.cs">
+      <Link>Interop\Unix\System.Native\Interop.Fcntl.cs</Link>
+    </Compile>
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetsLinux)' == 'true' ">
+    <Compile Include="System\Net\Sockets\SocketAsyncContext.cs" />
+    <Compile Include="System\Net\Sockets\SocketAsyncEngine.cs" />
+
     <Compile Include="$(CommonPath)\Interop\Linux\Interop.Libraries.cs">
       <Link>Interop\Linux\Interop.Libraries.cs</Link>
     </Compile>
-    <Compile Include="$(CommonPath)\Interop\Linux\libc\Interop.FcntlCommands.cs">
-      <Link>Interop\Linux\libc\Interop.FcntlCommands.cs</Link>
+    <Compile Include="$(CommonPath)\Interop\Linux\libc\Interop.epoll_create1.cs">
+      <Link>Interop\Linux\libc\Interop.epoll_create1.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\Interop\Linux\libc\Interop.epoll_ctl.cs">
+      <Link>Interop\Linux\libc\Interop.epoll_ctl.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\Interop\Linux\libc\Interop.epoll_event.cs">
+      <Link>Interop\Linux\libc\Interop.epoll_event.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\Interop\Linux\libc\Interop.epoll_wait.cs">
+      <Link>Interop\Linux\libc\Interop.epoll_wait.cs</Link>
     </Compile>
 
     <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.addrinfo.cs">
