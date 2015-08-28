@@ -94,8 +94,6 @@ namespace System.Net.Security
 
         private bool UserCertValidtaionCallbackWrapper(string hostName, X509Certificate2 certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
-            Debug.Assert(certificate is X509Certificate2);
-
             m_RemoteCertificateOrBytes = certificate == null ? null : certificate.RawData;
             if (_userCertificateValidationCallback == null)
             {
