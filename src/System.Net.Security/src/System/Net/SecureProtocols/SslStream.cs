@@ -25,6 +25,7 @@ using System.Threading.Tasks;
 using System.Security.Authentication;
 using System.Security.Authentication.ExtendedProtection;
 using System.Security.Cryptography.X509Certificates;
+using System.Diagnostics;
 
 namespace System.Net.Security
 {
@@ -47,8 +48,8 @@ namespace System.Net.Security
     public delegate X509Certificate LocalCertificateSelectionCallback(object sender, string targetHost, X509CertificateCollection localCertificates, X509Certificate remoteCertificate, string[] acceptableIssuers);
 
     // Internal versions of the above delegates
-    internal delegate bool RemoteCertValidationCallback(string host, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors);
-    internal delegate X509Certificate LocalCertSelectionCallback(string targetHost, X509CertificateCollection localCertificates, X509Certificate remoteCertificate, string[] acceptableIssuers);
+    internal delegate bool RemoteCertValidationCallback(string host, X509Certificate2 certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors);
+    internal delegate X509Certificate LocalCertSelectionCallback(string targetHost, X509CertificateCollection localCertificates, X509Certificate2 remoteCertificate, string[] acceptableIssuers);
     //
     //
     //
@@ -86,14 +87,16 @@ namespace System.Net.Security
 
             _userCertificateValidationCallback = userCertificateValidationCallback;
             _userCertificateSelectionCallback = userCertificateSelectionCallback;
-            RemoteCertValidationCallback _userCertValidationCallbackWrapper = new RemoteCertValidationCallback(userCertValidationCallbackWrapper);
+            RemoteCertValidationCallback _userCertValidationCallbackWrapper = new RemoteCertValidationCallback(UserCertValidtaionCallbackWrapper);
             LocalCertSelectionCallback _userCertSelectionCallbackWrapper = userCertificateSelectionCallback == null ? null : new LocalCertSelectionCallback(userCertSelectionCallbackWrapper);
             _SslState = new SslState(innerStream, _userCertValidationCallbackWrapper, _userCertSelectionCallbackWrapper, encryptionPolicy);
         }
 
-        private bool userCertValidationCallbackWrapper(string hostName, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
+        private bool UserCertValidtaionCallbackWrapper(string hostName, X509Certificate2 certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
-            m_RemoteCertificateOrBytes = certificate == null ? null : certificate.GetRawCertData();
+            Debug.Assert(certificate is X509Certificate2);
+
+            m_RemoteCertificateOrBytes = certificate == null ? null : certificate.RawData;
             if (_userCertificateValidationCallback == null)
             {
                 if (!_SslState.RemoteCertRequired)

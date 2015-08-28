@@ -1293,7 +1293,7 @@ namespace System.Net.Security
                         chain.ChainPolicy.ExtraStore.AddRange(remoteCertificateStore);
 
                     if (!chain.Build(remoteCertificateEx)       // Build failed on handle or on policy
-                        && chain.GetChainContext() == IntPtr.Zero)   // Build failed to generate a valid handle
+                        && chain.SafeHandle.DangerousGetHandle() == IntPtr.Zero)   // Build failed to generate a valid handle
                     {
                         throw new CryptographicException(Marshal.GetLastWin32Error());
                     }
@@ -1316,7 +1316,7 @@ namespace System.Net.Security
                                 eppStruct.pwszServerName = namePtr;
                                 cppStruct.dwFlags |= (int)(Interop.IgnoreCertProblem.none & ~Interop.IgnoreCertProblem.invalid_name);
 
-                                SafeFreeCertChain chainContext = new SafeFreeCertChain(chain.GetChainContext());
+                                SafeFreeCertChain chainContext = new SafeFreeCertChain(chain.SafeHandle.DangerousGetHandle());
                                 status = Interop.CertificateChainPolicy.Verify(chainContext, ref cppStruct);
                                 if ((Interop.CertificateProblem)status == Interop.CertificateProblem.CertCN_NO_MATCH)
                                     sslPolicyErrors |= SslPolicyErrors.RemoteCertificateNameMismatch;

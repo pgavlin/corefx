@@ -379,8 +379,6 @@ namespace System.Net.Security
     internal sealed class SafeFreeCertContext : SafeHandleZeroOrMinusOneIsInvalid
     {
 #endif
-        private const string CRYPT32 = "crypt32.dll";
-        private const string ADVAPI32 = "advapi32.dll";
 
         internal SafeFreeCertContext() : base(true) { }
 

@@ -851,7 +851,7 @@ internal static partial class Interop
         private uint[] GetChainErrors(string hostName, X509Chain chain, ref bool fatalError)
         {
             fatalError = false;
-            SafeFreeCertChain chainContext = new SafeFreeCertChain(chain.GetChainContext());
+            SafeFreeCertChain chainContext = new SafeFreeCertChain(chain.SafeHandle.DangerousGetHandle());
             List<uint> certificateProblems = new List<uint>();
             unsafe
             {

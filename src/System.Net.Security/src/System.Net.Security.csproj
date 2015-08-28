@@ -41,8 +41,6 @@
 
     <!-- TODO: Shims -->
     <Compile Include="Shims\X509CertificateExtensions.cs" />
-    <Compile Include="Shims\GCExtensions.cs" />
-    <Compile Include="Shims\AppDomain.cs" />
 
     <!-- Logging -->
     <Compile Include="$(CommonPath)\System\Net\Shims\TraceSource.cs">
