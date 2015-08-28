@@ -3,15 +3,6 @@
 
 namespace System.Security.Cryptography.X509Certificates
 {
-    internal static class X509CertificateExtensions
-    {
-        // Returns the SHA1 hash value for the X.509v3 certificate as a hexadecimal string.
-        internal static string GetCertHashString(this X509Certificate cert)
-        {
-            return BitConverter.ToString(cert.GetCertHash()).Replace("-", String.Empty);
-        }
-    }
-
     internal static class X509StoreExtensions
     {
         // Placeholder for the X509Store(IntPtr) ctor.

@@ -337,18 +337,15 @@ namespace System.Net.Security
                 string certHash = null;
 
                 // Protecting from X509Certificate2 derived classes
-                if (t != typeof(X509Certificate2) && t != typeof(X509Certificate))
+                if (t != typeof(X509Certificate2))
                 {
                     if (certificate.Handle != IntPtr.Zero)
                     {
                         certEx = new X509Certificate2(certificate.Handle);
-                        certHash = certEx.GetCertHashString();
                     }
                 }
-                else
-                {
-                    certHash = certificate.GetCertHashString();
-                }
+
+                certHash = certEx.Thumbprint;
 
                 if (certEx != null)
                 {
