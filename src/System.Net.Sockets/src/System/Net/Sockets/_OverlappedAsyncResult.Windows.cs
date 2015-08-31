@@ -16,13 +16,6 @@ namespace System.Net.Sockets
     //
     internal partial class OverlappedAsyncResult : BaseOverlappedAsyncResult
     {
-        //
-        // internal class members
-        //
-
-        private Internals.SocketAddress _socketAddress;
-        private Internals.SocketAddress _socketAddressOriginal; // needed for partial BeginReceiveFrom/EndReceiveFrom completion
-
         // These two are used only as alternatives
         internal WSABuffer m_SingleBuffer;
         internal WSABuffer[] m_WSABuffers;
@@ -40,26 +33,6 @@ namespace System.Net.Sockets
         internal IntPtr GetSocketAddressSizePtr()
         {
             return Marshal.UnsafeAddrOfPinnedArrayElement(_socketAddress.Buffer, _socketAddress.GetAddressSizeOffset());
-        }
-        //
-        internal Internals.SocketAddress SocketAddress
-        {
-            get
-            {
-                return _socketAddress;
-            }
-        }
-        //
-        internal Internals.SocketAddress SocketAddressOriginal
-        {
-            get
-            {
-                return _socketAddressOriginal;
-            }
-            set
-            {
-                _socketAddressOriginal = value;
-            }
         }
 
         //

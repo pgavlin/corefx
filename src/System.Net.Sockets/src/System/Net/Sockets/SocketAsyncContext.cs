@@ -9,6 +9,10 @@ using System.Threading;
 
 namespace System.Net.Sockets
 {
+    // TODO
+    // - ReceiveMessageFrom
+    // - *Async APIs
+
     sealed class SocketAsyncContext
     {
         private abstract class AsyncOperation
@@ -34,20 +38,22 @@ namespace System.Net.Sockets
 
         private sealed class TransferOperation : AsyncOperation
         {
-            public Action<int, SocketError> Callback;
+            public Action<int, byte[], int, SocketError> Callback;
             public byte[] Buffer;
             public IList<ArraySegment<byte>> Buffers;
             public int BufferIndex;
             public int Offset;
             public int Count;
             public int Flags;
+            public byte[] SocketAddress;
+            public int SocketAddressLen;
             public int BytesTransferred;
 
             public override void Complete()
             {
                 Debug.Assert(Callback != null);
 
-                Callback(BytesTransferred, ErrorCode);
+                Callback(BytesTransferred, SocketAddress, SocketAddressLen, ErrorCode);
             }
         }
 
@@ -82,15 +88,21 @@ namespace System.Net.Sockets
             }
         }
 
+        enum State
+        {
+            Stopped = -1,
+            Clear = 0,
+            Set = 1,
+        }
+
         struct Queue<TOperation>
             where TOperation : AsyncOperation
         {
             private AsyncOperation _tail;
 
-            private readonly static AsyncOperation _stopped = new SentinelAsyncOperation();
-
-            public bool IsStopped { get { return _tail == _stopped; } }
-            public bool IsEmpty { get { return IsStopped || _tail == null; } }
+            public State State { get; set; }
+            public bool IsStopped { get { return State == State.Stopped; } }
+            public bool IsEmpty { get { return _tail == null; } }
 
             public TOperation Head
             {
@@ -101,41 +113,49 @@ namespace System.Net.Sockets
                 }
             }
 
-            public bool Enqueue(TOperation operation)
+            public TOperation Tail
+            {
+                get
+                {
+                    Debug.Assert(!IsStopped);
+                    return (TOperation)_tail;
+                }
+            }
+
+            public void Enqueue(TOperation operation)
             {
                 Debug.Assert(!IsStopped);
 
-                bool wasEmpty = _tail == null;
-                if (!wasEmpty)
+                if (!IsEmpty)
                 {
                     operation.Next = _tail.Next;
                     _tail.Next = operation;
                 }
 
                 _tail = operation;
-                return wasEmpty;
             }
 
-            public bool Dequeue()
+            public void Dequeue()
             {
                 Debug.Assert(!IsStopped);
-                Debug.Assert(_tail != null);
+                Debug.Assert(!IsEmpty);
 
                 AsyncOperation head = _tail.Next;
-                if (head != _tail)
+                if (head == _tail)
+                {
+                    _tail = null;
+                }
+                else
                 {
                     _tail.Next = head.Next;
-                    return false;
                 }
-
-                _tail = null;
-                return true;
             }
 
             public Queue<TOperation> Stop()
             {
                 Queue<TOperation> result = this;
-                _tail = _stopped;
+                _tail = null;
+                State = State.Stopped;
                 return result;
             }
         }
@@ -154,6 +174,16 @@ namespace System.Net.Sockets
         {
             _fileDescriptor = fileDescriptor;
             _engine = engine;
+
+            var events = Interop.libc.EPOLLIN | Interop.libc.EPOLLOUT | Interop.libc.EPOLLRDHUP | Interop.libc.EPOLLET;
+
+            Interop.Error errorCode;
+            if (!_engine.TryRegister(this, _fileDescriptor, events, 0, ref _handle, out errorCode))
+            {
+                throw new Exception(string.Format("SocketAsyncContext: {0}", errorCode));
+            }
+
+            _registeredEvents = events;
         }
 
         public void Close()
@@ -166,61 +196,41 @@ namespace System.Net.Sockets
             }
         }
 
-        private bool TryBeginOperation<TOperation>(ref Queue<TOperation> queue, uint mask, TOperation operation)
+        private bool TryBeginOperation<TOperation>(ref Queue<TOperation> queue, TOperation operation, out bool isStopped)
             where TOperation : AsyncOperation
         {
-            Interop.Error errorCode;
             lock (_queueLock)
             {
-                if (queue.IsStopped)
+                switch (queue.State)
                 {
-                    return false;
+                    case State.Stopped:
+                        isStopped = true;
+                        return false;
+
+                    case State.Clear:
+                        break;
+
+                    case State.Set:
+                        isStopped = false;
+                        queue.State = State.Clear;
+                        return false;
                 }
 
-                if (!queue.Enqueue(operation))
-                {
-                    return true;
-                }
-
-                Debug.Assert((_registeredEvents & ~mask) == 0);
-
-                uint events = _registeredEvents | mask;
-                if (_engine.TryRegister(this, _fileDescriptor, events, _registeredEvents, ref _handle, out errorCode))
-                {
-                    _registeredEvents = events;
-                    return true;
-                }
+                queue.Enqueue(operation);
+                isStopped = false;
+                return true;
             }
-
-            // TODO: throw an appropiate exception
-            throw new Exception(string.Format("TryBeginOperation: {0}", errorCode));
         }
 
-        private void EndOperation<TOperation>(ref Queue<TOperation> queue, uint mask)
+        private void EndOperation<TOperation>(ref Queue<TOperation> queue)
             where TOperation : AsyncOperation
         {
-            Interop.Error errorCode;
             lock (_queueLock)
             {
                 Debug.Assert(!queue.IsStopped);
 
-                if (!queue.Dequeue())
-                {
-                    return;
-                }
-
-                Debug.Assert((_registeredEvents & mask) == mask);
-
-                uint events = _registeredEvents & ~mask;
-                if (_engine.TryUnregister(ref _handle, _fileDescriptor, events, out errorCode))
-                {
-                    _registeredEvents = events;
-                    return;
-                }
+                queue.Dequeue();
             }
-
-            // TODO: throw an appropiate exception
-            throw new Exception(string.Format("TryEndOperation: {0}", errorCode));
         }
 
         public bool AcceptAsync(byte[] socketAddress, int socketAddressLen, Action<int, byte[], int, SocketError> callback)
@@ -240,9 +250,22 @@ namespace System.Net.Sockets
                 SocketAddress = socketAddress,
                 SocketAddressLen = socketAddressLen
             };
-            if (!TryBeginOperation(ref _acceptOrConnectQueue, Interop.libc.EPOLLIN, operation))
+
+            bool isStopped;
+            while (!TryBeginOperation(ref _acceptOrConnectQueue, operation, out isStopped))
             {
-                // TODO: handle failure to begin operation
+                if (isStopped)
+                {
+                    // TODO: is this error reasonable for a closed socket? Check with Winsock.
+                    callback(-1, socketAddress, socketAddressLen, SocketError.Shutdown);
+                    return false;
+                }
+
+                if (TryCompleteAccept(_fileDescriptor, operation))
+                {
+                    QueueCompletion(operation);
+                    break;
+                }
             }
             return true;
         }
@@ -299,10 +322,22 @@ namespace System.Net.Sockets
                 SocketAddress = socketAddress,
                 SocketAddressLen = socketAddressLen
             };
-            if (!TryBeginOperation(ref _acceptOrConnectQueue, Interop.libc.EPOLLOUT, operation))
+
+            bool isStopped;
+            while (!TryBeginOperation(ref _acceptOrConnectQueue, operation, out isStopped))
             {
-                
-                // TODO: handle failure to begin operation
+                if (isStopped)
+                {
+                    // TODO: is this error code reasonable for a closed socket? Check with Winsock.
+                    callback(SocketError.Shutdown);
+                    return false;
+                }
+
+                if (TryCompleteConnect(_fileDescriptor, operation))
+                {
+                    QueueCompletion(operation);
+                    break;
+                }
             }
             return true;
         }
@@ -419,13 +454,13 @@ namespace System.Net.Sockets
             return received;
         }
 
-        public bool ReceiveAsync(byte[] buffer, int offset, int count, int flags, Action<int, SocketError> callback)
+        public bool ReceiveAsync(byte[] buffer, int offset, int count, int flags, Action<int, byte[], int, SocketError> callback)
         {
             int bytesReceived;
             SocketError errorCode;
             if (TryCompleteReceive(_fileDescriptor, buffer, offset, count, flags, out bytesReceived, out errorCode))
             {
-                callback(bytesReceived, errorCode);
+                callback(bytesReceived, null, 0, errorCode);
                 return false;
             }
 
@@ -437,20 +472,33 @@ namespace System.Net.Sockets
                 Flags = flags,
                 BytesTransferred = bytesReceived
             };
-            if (!TryBeginOperation(ref _receiveQueue, Interop.libc.EPOLLIN | Interop.libc.EPOLLRDHUP, operation))
+
+            bool isStopped;
+            while (!TryBeginOperation(ref _receiveQueue, operation, out isStopped))
             {
-                // TODO: handle failure to begin operation
+                if (isStopped)
+                {
+                    // TODO: is this error code reasonable for a closed socket? Check with Winsock.
+                    callback(0, null, 0, SocketError.Shutdown);
+                    return false;
+                }
+
+                if (TryCompleteReceive(_fileDescriptor, operation))
+                {
+                    QueueCompletion(operation);
+                    break;
+                }
             }
             return true;
         }
 
-        public bool ReceiveAsync(IList<ArraySegment<byte>> buffers, int flags, Action<int, SocketError> callback)
+        public bool ReceiveAsync(IList<ArraySegment<byte>> buffers, int flags, Action<int, byte[], int, SocketError> callback)
         {
             int bytesReceived;
             SocketError errorCode;
             if (TryCompleteReceive(_fileDescriptor, buffers, flags, out bytesReceived, out errorCode))
             {
-                callback(bytesReceived, errorCode);
+                callback(bytesReceived, null, 0, errorCode);
                 return false;
             }
 
@@ -460,9 +508,22 @@ namespace System.Net.Sockets
                 Flags = flags,
                 BytesTransferred = bytesReceived
             };
-            if (!TryBeginOperation(ref _receiveQueue, Interop.libc.EPOLLIN | Interop.libc.EPOLLRDHUP, operation))
+
+            bool isStopped;
+            while (!TryBeginOperation(ref _receiveQueue, operation, out isStopped))
             {
-                // TODO: handle failure to begin operation
+                if (isStopped)
+                {
+                    // TODO: is this error code reasonable for a closed socket? Check with Winsock.
+                    callback(0, null, 0, SocketError.Shutdown);
+                    return false;
+                }
+
+                if (TryCompleteReceive(_fileDescriptor, operation))
+                {
+                    QueueCompletion(operation);
+                    break;
+                }
             }
             return true;
         }
@@ -491,6 +552,11 @@ namespace System.Net.Sockets
                 bytesReceived = 0;
                 errorCode = SafeCloseSocket.GetLastSocketError();
                 return true;
+            }
+            if (available == 0)
+            {
+                // Always request at least one byte.
+                available = 1;
             }
 
             int received;
@@ -524,12 +590,92 @@ namespace System.Net.Sockets
             return false;
         }
 
+        public bool ReceiveFromAsync(byte[] buffer, int offset, int count, int flags, byte[] peerAddress, int peerAddressLen, Action<int, byte[], int, SocketError> callback)
+        {
+            int bytesReceived;
+            SocketError errorCode;
+            if (TryCompleteReceiveFrom(_fileDescriptor, buffer, offset, count, flags, peerAddress, ref peerAddressLen, out bytesReceived, out errorCode))
+            {
+                callback(bytesReceived, peerAddress, peerAddressLen, errorCode);
+                return false;
+            }
+
+            var operation = new TransferOperation {
+                Callback = callback,
+                Buffer = buffer,
+                Offset = offset,
+                Count = count,
+                Flags = flags,
+                SocketAddress = peerAddress,
+                SocketAddressLen = peerAddressLen,
+                BytesTransferred = bytesReceived
+            };
+
+            bool isStopped;
+            while (!TryBeginOperation(ref _receiveQueue, operation, out isStopped))
+            {
+                if (isStopped)
+                {
+                    // TODO: is this error code reasonable for a closed socket? Check with Winsock.
+                    callback(0, null, 0, SocketError.Shutdown);
+                    return false;
+                }
+
+                if (TryCompleteReceiveFrom(_fileDescriptor, operation))
+                {
+                    QueueCompletion(operation);
+                    break;
+                }
+            }
+            return true;
+        }
+
+        private static bool TryCompleteReceiveFrom(int fileDescriptor, TransferOperation operation)
+        {
+            return TryCompleteReceiveFrom(fileDescriptor, operation.Buffer, operation.Offset, operation.Count, operation.Flags, operation.SocketAddress, ref operation.SocketAddressLen, out operation.BytesTransferred, out operation.ErrorCode);
+        }
+
+        private static unsafe bool TryCompleteReceiveFrom(int fileDescriptor, byte[] buffer, int offset, int count, int flags, byte[] socketAddress, ref int socketAddressLen, out int bytesReceived, out SocketError errorCode)
+        {
+            Debug.Assert(buffer != null);
+
+            uint sockAddrLen = (uint)socketAddressLen;
+
+            int received;
+            fixed (byte* b = buffer)
+            fixed (byte* rawSocketAddress = socketAddress)
+            {
+                var sockAddr = (Interop.libc.sockaddr*)rawSocketAddress;
+                received = (int)Interop.libc.recvfrom(fileDescriptor, &b[offset], (IntPtr)count, flags, sockAddr, &sockAddrLen);
+            }
+
+            if (received != -1)
+            {
+                bytesReceived = received;
+                socketAddressLen = (int)sockAddrLen;
+                errorCode = SocketError.Success;
+                return true;
+            }
+
+            bytesReceived = 0;
+            
+            Interop.Error errno = Interop.Sys.GetLastError();
+            if (errno != Interop.Error.EAGAIN && errno != Interop.Error.EWOULDBLOCK)
+            {
+                errorCode = SafeCloseSocket.GetSocketErrorForErrorCode(errno);
+                return true;
+            }
+
+            errorCode = SocketError.Success;
+            return false;
+        }
+
         private static unsafe int Send(int fd, int flags, byte[] buffer, ref int offset, ref int count, out Interop.Error errno)
         {
-            int startOffset = offset, sent;
+            int sent;
             fixed (byte* b = buffer)
             {
-                sent = (int)Interop.libc.send(fd, &b[startOffset], (IntPtr)count, flags);
+                sent = (int)Interop.libc.send(fd, &b[offset], (IntPtr)count, flags);
             }
             errno = Interop.Sys.GetLastError();
 
@@ -618,13 +764,13 @@ namespace System.Net.Sockets
             return sent;
         }
 
-        public bool SendAsync(byte[] buffer, int offset, int count, int flags, Action<int, SocketError> callback)
+        public bool SendAsync(byte[] buffer, int offset, int count, int flags, Action<int, byte[], int, SocketError> callback)
         {
             int bytesSent = 0;
             SocketError errorCode;
             if (TryCompleteSend(_fileDescriptor, buffer, ref offset, ref count, flags, ref bytesSent, out errorCode))
             {
-                callback(bytesSent, errorCode);
+                callback(bytesSent, null, 0, errorCode);
                 return false;
             }
 
@@ -636,14 +782,27 @@ namespace System.Net.Sockets
                 Flags = flags,
                 BytesTransferred = bytesSent
             };
-            if (!TryBeginOperation(ref _sendQueue, Interop.libc.EPOLLOUT, operation))
+
+            bool isStopped;
+            while (!TryBeginOperation(ref _sendQueue, operation, out isStopped))
             {
-                // TODO: handle failure to begin operation
+                if (isStopped)
+                {
+                    // TODO: is this error code reasonable for a closed socket? Check with Winsock.
+                    callback(0, null, 0, SocketError.Shutdown);
+                    return false;
+                }
+
+                if (TryCompleteSend(_fileDescriptor, operation))
+                {
+                    QueueCompletion(operation);
+                    break;
+                }
             }
             return true;
         }
 
-        public bool SendAsync(IList<ArraySegment<byte>> buffers, int flags, Action<int, SocketError> callback)
+        public bool SendAsync(IList<ArraySegment<byte>> buffers, int flags, Action<int, byte[], int, SocketError> callback)
         {
             int bufferIndex = 0;
             int offset = 0;
@@ -651,7 +810,7 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteSend(_fileDescriptor, buffers, ref bufferIndex, ref offset, flags, ref bytesSent, out errorCode))
             {
-                callback(bytesSent, errorCode);
+                callback(bytesSent, null, 0, errorCode);
                 return false;
             }
 
@@ -663,9 +822,22 @@ namespace System.Net.Sockets
                 Flags = flags,
                 BytesTransferred = bytesSent
             };
-            if (!TryBeginOperation(ref _sendQueue, Interop.libc.EPOLLOUT, operation))
+
+            bool isStopped;
+            while (!TryBeginOperation(ref _sendQueue, operation, out isStopped))
             {
-                // TODO: handle failure to begin operation
+                if (isStopped)
+                {
+                    // TODO: is this error code reasonable for a closed socket? Check with Winsock.
+                    callback(0, null, 0, SocketError.Shutdown);
+                    return false;
+                }
+
+                if (TryCompleteSend(_fileDescriptor, operation))
+                {
+                    QueueCompletion(operation);
+                    break;
+                }
             }
             return true;
         }
@@ -689,40 +861,129 @@ namespace System.Net.Sockets
 
         private static bool TryCompleteSend(int fileDescriptor, byte[] buffer, IList<ArraySegment<byte>> buffers, ref int bufferIndex, ref int offset, ref int count, int flags, ref int bytesSent, out SocketError errorCode)
         {
-            int sent;
-            Interop.Error errno;
-            if (buffer != null)
+            for (;;)
             {
-                sent = Send(fileDescriptor, flags, buffer, ref offset, ref count, out errno);
-            }
-            else
-            {
-                Debug.Assert(buffers != null);
-                sent = Send(fileDescriptor, flags, buffers, ref bufferIndex, ref offset, out errno);
-            }
-
-            if (sent == -1)
-            {
-                if (errno != Interop.Error.EAGAIN && errno != Interop.Error.EWOULDBLOCK)
+                int sent;
+                Interop.Error errno;
+                if (buffer != null)
                 {
-                    errorCode = SafeCloseSocket.GetSocketErrorForErrorCode(errno);
+                    sent = Send(fileDescriptor, flags, buffer, ref offset, ref count, out errno);
+                }
+                else
+                {
+                    Debug.Assert(buffers != null);
+                    sent = Send(fileDescriptor, flags, buffers, ref bufferIndex, ref offset, out errno);
+                }
+
+                if (sent == -1)
+                {
+                    if (errno != Interop.Error.EAGAIN && errno != Interop.Error.EWOULDBLOCK)
+                    {
+                        errorCode = SafeCloseSocket.GetSocketErrorForErrorCode(errno);
+                        return true;
+                    }
+
+                    errorCode = SocketError.Success;
+                    return false;
+                }
+
+                bytesSent += sent;
+
+                bool isComplete = sent == 0 ||
+                    (buffer != null && count == 0) ||
+                    (buffers != null && bufferIndex == buffers.Count);
+                if (isComplete)
+                {
+                    errorCode = SocketError.Success;
                     return true;
                 }
             }
+        }
 
-            bytesSent += sent;
+        public bool SendToAsync(byte[] buffer, int offset, int count, int flags, byte[] peerAddress, int peerAddressLen, Action<int, byte[], int, SocketError> callback)
+        {
+            // TODO: audit behavior w.r.t. sending a complete buffer against WSASendTo
 
-            bool isComplete = sent == 0 ||
-                (buffer != null && count == 0) ||
-                (buffers != null && bufferIndex == buffers.Count);
-            if (isComplete)
+            int bytesSent = 0;
+            SocketError errorCode;
+            if (TryCompleteSendTo(_fileDescriptor, buffer, ref offset, ref count, flags, peerAddress, peerAddressLen, ref bytesSent, out errorCode))
             {
-                errorCode = SocketError.Success;
-                return true;
+                callback(bytesSent, peerAddress, peerAddressLen, errorCode);
+                return false;
             }
 
-            errorCode = SocketError.Success;
-            return false;
+            var operation = new TransferOperation {
+                Callback = callback,
+                Buffer = buffer,
+                Offset = offset,
+                Count = count,
+                Flags = flags,
+                SocketAddress = peerAddress,
+                SocketAddressLen = peerAddressLen,
+                BytesTransferred = bytesSent
+            };
+
+            bool isStopped;
+            while (!TryBeginOperation(ref _sendQueue, operation, out isStopped))
+            {
+                if (isStopped)
+                {
+                    // TODO: is this error code reasonable for a closed socket? Check with Winsock.
+                    callback(0, null, 0, SocketError.Shutdown);
+                    return false;
+                }
+
+                if (TryCompleteSendTo(_fileDescriptor, operation))
+                {
+                    QueueCompletion(operation);
+                    break;
+                }
+            }
+            return true;
+        }
+
+        private static bool TryCompleteSendTo(int fileDescriptor, TransferOperation operation)
+        {
+            return TryCompleteSendTo(fileDescriptor, operation.Buffer, ref operation.Offset, ref operation.Count, operation.Flags, operation.SocketAddress, operation.SocketAddressLen, ref operation.BytesTransferred, out operation.ErrorCode);
+        }
+
+        private static unsafe bool TryCompleteSendTo(int fileDescriptor, byte[] buffer, ref int offset, ref int count, int flags, byte[] socketAddress, int socketAddressLen, ref int bytesSent, out SocketError errorCode)
+        {
+            Debug.Assert(buffer != null);
+
+            for (;;)
+            {
+                int sent;
+                fixed (byte* b = buffer)
+                fixed (byte* rawSocketAddress = socketAddress)
+                {
+                    var sockAddr = (Interop.libc.sockaddr*)rawSocketAddress;
+                    sent = (int)Interop.libc.sendto(fileDescriptor, &b[offset], (IntPtr)count, flags, sockAddr, (uint)socketAddressLen);
+                }
+
+                if (sent == -1)
+                {
+                    Interop.Error errno = Interop.Sys.GetLastError();
+                    if (errno != Interop.Error.EAGAIN && errno != Interop.Error.EWOULDBLOCK)
+                    {
+                        errorCode = SafeCloseSocket.GetSocketErrorForErrorCode(errno);
+                        return true;
+                    }
+
+                    errorCode = SocketError.Success;
+                    return false;
+                }
+
+                bytesSent += sent;
+                offset += sent;
+                count -= sent;
+
+                if (sent == 0 || count == 0)
+                {
+                    errorCode = SocketError.Success;
+                    return true;
+                }
+            }
         }
 
         private static void QueueCompletion(AsyncOperation operation)
@@ -747,6 +1008,8 @@ namespace System.Net.Sockets
 
                     // TODO: error handling
                 }
+
+                // TODO: rethink ordering of HUP/RDHUP w.r.t. IN/OUT.
 
                 if ((events & Interop.libc.EPOLLHUP) != 0)
                 {
@@ -852,49 +1115,100 @@ namespace System.Net.Sockets
 
                         _registeredEvents = evts;
                     }
+
+                    // Don't process received data if we saw a RDHUP.
+                    events &= ~Interop.libc.EPOLLIN;
                 }
+
+                // TODO: optimize locking and completions:
+                // - Dequeues (and therefore locking) for multiple contiguous operations can be combined
+                // - Contiguous completions can happen in a single thread
 
                 if ((events & Interop.libc.EPOLLIN) != 0)
                 {
-                    if (!_acceptOrConnectQueue.IsEmpty)
+                    AcceptOrConnectOperation acceptTail;
+                    TransferOperation receiveTail;
+                    lock (_queueLock)
                     {
-                        var op = (AcceptOperation)_acceptOrConnectQueue.Head;
-                        if (TryCompleteAccept(_fileDescriptor, op))
-                        {
-                            EndOperation(ref _acceptOrConnectQueue, Interop.libc.EPOLLIN);
-                            QueueCompletion(op);
-                        }
+                        acceptTail = _acceptOrConnectQueue.Tail;
+                        _acceptOrConnectQueue.State = State.Set;
+
+                        receiveTail = _receiveQueue.Tail;
+                        _receiveQueue.State = State.Set;
                     }
-                    else if (!_receiveQueue.IsEmpty)
+
+                    if (acceptTail != null)
                     {
-                        TransferOperation op = _receiveQueue.Head;
-                        if (TryCompleteReceive(_fileDescriptor, op))
+                        AcceptOperation op;
+                        do
                         {
-                            EndOperation(ref _receiveQueue, Interop.libc.EPOLLIN | Interop.libc.EPOLLRDHUP);
-                            QueueCompletion(op);
-                        }
+                            op = (AcceptOperation)_acceptOrConnectQueue.Head;
+                            if (TryCompleteAccept(_fileDescriptor, op))
+                            {
+                                EndOperation(ref _acceptOrConnectQueue);
+                                QueueCompletion(op);
+                            }
+                            break;
+                        } while (op != acceptTail);
+                    }
+
+                    if (receiveTail != null)
+                    {
+                        TransferOperation op;
+                        do
+                        {
+                            op = _receiveQueue.Head;
+                            if (TryCompleteReceive(_fileDescriptor, op))
+                            {
+                                EndOperation(ref _receiveQueue);
+                                QueueCompletion(op);
+                            }
+                            break;
+                        } while (op != receiveTail);
                     }
                 }
 
                 if ((events & Interop.libc.EPOLLOUT) != 0)
                 {
-                    if (!_acceptOrConnectQueue.IsEmpty)
+                    AcceptOrConnectOperation connectTail;
+                    TransferOperation sendTail;
+                    lock (_queueLock)
                     {
-                        var op = (ConnectOperation)_acceptOrConnectQueue.Head;
-                        if (TryCompleteConnect(_fileDescriptor, op))
-                        {
-                            EndOperation(ref _acceptOrConnectQueue, Interop.libc.EPOLLOUT);
-                            QueueCompletion(op);
-                        }
+                        connectTail = _acceptOrConnectQueue.Tail;
+                        _acceptOrConnectQueue.State = State.Set;
+
+                        sendTail = _sendQueue.Tail;
+                        _sendQueue.State = State.Set;
                     }
-                    else if (!_sendQueue.IsEmpty)
+
+                    if (connectTail != null)
                     {
-                        TransferOperation op = _sendQueue.Head;
-                        if (TryCompleteSend(_fileDescriptor, op))
+                        ConnectOperation op;
+                        do
                         {
-                            EndOperation(ref _sendQueue, Interop.libc.EPOLLOUT);
-                            QueueCompletion(op);
-                        }
+                            op = (ConnectOperation)_acceptOrConnectQueue.Head;
+                            if (TryCompleteConnect(_fileDescriptor, op))
+                            {
+                                EndOperation(ref _acceptOrConnectQueue);
+                                QueueCompletion(op);
+                            }
+                            break;
+                        } while (op != connectTail);
+                    }
+
+                    if (sendTail != null)
+                    {
+                        TransferOperation op;
+                        do
+                        {
+                            op = _sendQueue.Head;
+                            if (TryCompleteSend(_fileDescriptor, op))
+                            {
+                                EndOperation(ref _sendQueue);
+                                QueueCompletion(op);
+                            }
+                            break;
+                        } while (op != sendTail);
                     }
                 }
             }

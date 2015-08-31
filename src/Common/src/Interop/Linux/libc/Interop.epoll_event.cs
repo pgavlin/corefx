@@ -13,6 +13,7 @@ internal static partial class Interop
         public const uint EPOLLERR = 0x008;
         public const uint EPOLLHUP = 0x010;
         public const uint EPOLLRDHUP = 0x2000;
+        public const uint EPOLLET = 0x80000000;
 
         public const int EPOLL_CTL_ADD = 1;
         public const int EPOLL_CTL_DEL = 2;

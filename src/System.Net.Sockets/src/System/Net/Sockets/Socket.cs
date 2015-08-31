@@ -3249,31 +3249,13 @@ namespace System.Net.Sockets
             SocketError errorCode = SocketError.SocketError;
             try
             {
-                // Set up asyncResult for overlapped WSASendTo.
-                // This call will use completion ports.
-                asyncResult.SetUnmanagedStructures(buffer, offset, size, socketAddress, false /* don't pin RemoteEP*/);
-
                 if (m_RightEndPoint == null)
                 {
                     m_RightEndPoint = endPointSnapshot;
                 }
 
-                int bytesTransferred;
-                errorCode = Interop.Winsock.WSASendTo(
-                    _handle,
-                    ref asyncResult.m_SingleBuffer,
-                    1, // only ever 1 buffer being sent
-                    out bytesTransferred,
-                    socketFlags,
-                    asyncResult.GetSocketAddressPtr(),
-                    asyncResult.SocketAddress.Size,
-                    asyncResult.OverlappedHandle,
-                    IntPtr.Zero);
+                errorCode = SocketPal.SendToAsync(_handle, buffer, offset, size, socketFlags, socketAddress, asyncResult);
 
-                if (errorCode != SocketError.Success)
-                {
-                    errorCode = SocketPal.GetLastSocketError();
-                }
                 GlobalLog.Print("Socket#" + Logging.HashString(this) + "::DoBeginSendTo() Interop.Winsock.WSASend returns:" + errorCode.ToString() + " size:" + size + " returning AsyncResult:" + Logging.HashString(asyncResult));
             }
             catch (ObjectDisposedException)
@@ -4059,10 +4041,6 @@ namespace System.Net.Sockets
             SocketError errorCode = SocketError.SocketError;
             try
             {
-                // Set up asyncResult for overlapped WSARecvFrom.
-                // This call will use completion ports on WinNT and Overlapped IO on Win9x.
-                asyncResult.SetUnmanagedStructures(buffer, offset, size, socketAddress, true /* pin remoteEP*/);
-
                 // save a copy of the original EndPoint in the asyncResult
                 asyncResult.SocketAddressOriginal = IPEndPointExtensions.Serialize(endPointSnapshot);
 
@@ -4071,22 +4049,8 @@ namespace System.Net.Sockets
                     m_RightEndPoint = endPointSnapshot;
                 }
 
-                int bytesTransferred;
-                errorCode = Interop.Winsock.WSARecvFrom(
-                    _handle,
-                    ref asyncResult.m_SingleBuffer,
-                    1,
-                    out bytesTransferred,
-                    ref socketFlags,
-                    asyncResult.GetSocketAddressPtr(),
-                    asyncResult.GetSocketAddressSizePtr(),
-                    asyncResult.OverlappedHandle,
-                    IntPtr.Zero);
+                errorCode = SocketPal.ReceiveFromAsync(_handle, buffer, offset, size, socketFlags, socketAddress, asyncResult);
 
-                if (errorCode != SocketError.Success)
-                {
-                    errorCode = SocketPal.GetLastSocketError();
-                }
                 GlobalLog.Print("Socket#" + Logging.HashString(this) + "::DoBeginReceiveFrom() Interop.Winsock.WSARecvFrom returns:" + errorCode.ToString() + " size:" + size.ToString() + " returning AsyncResult:" + Logging.HashString(asyncResult));
             }
             catch (ObjectDisposedException)

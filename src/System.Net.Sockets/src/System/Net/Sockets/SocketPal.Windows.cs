@@ -606,6 +606,32 @@ namespace System.Net.Sockets
             return errorCode;
         }
 
+        public static unsafe SocketError SendToAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
+        {
+            // Set up asyncResult for overlapped WSASendTo.
+            // This call will use completion ports.
+            asyncResult.SetUnmanagedStructures(buffer, offset, count, socketAddress, false /* don't pin RemoteEP*/);
+
+            int bytesTransferred;
+            errorCode = Interop.Winsock.WSASendTo(
+                handle,
+                ref asyncResult.m_SingleBuffer,
+                1, // only ever 1 buffer being sent
+                out bytesTransferred,
+                socketFlags,
+                asyncResult.GetSocketAddressPtr(),
+                asyncResult.SocketAddress.Size,
+                asyncResult.OverlappedHandle,
+                IntPtr.Zero);
+
+            if (errorCode != SocketError.Success)
+            {
+                errorCode = SocketPal.GetLastSocketError();
+            }
+
+            return errorCode;
+        }
+
         public static unsafe SocketError ReceiveAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
             // Set up asyncResult for overlapped WSARecv.
@@ -653,6 +679,32 @@ namespace System.Net.Sockets
             {
                 errorCode = GetLastSocketError();
                 GlobalLog.Assert(errorCode != SocketError.Success, "Socket#{0}::DoBeginReceive()|GetLastWin32Error() returned zero.", Logging.HashString(this));
+            }
+
+            return errorCode;
+        }
+
+        public static unsafe SocketError ReceiveFromAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
+        {
+            // Set up asyncResult for overlapped WSARecvFrom.
+            // This call will use completion ports on WinNT and Overlapped IO on Win9x.
+            asyncResult.SetUnmanagedStructures(buffer, offset, count, socketAddress, true /* pin remoteEP*/);
+
+            int bytesTransferred;
+            errorCode = Interop.Winsock.WSARecvFrom(
+                handle,
+                ref asyncResult.m_SingleBuffer,
+                1,
+                out bytesTransferred,
+                ref socketFlags,
+                asyncResult.GetSocketAddressPtr(),
+                asyncResult.GetSocketAddressSizePtr(),
+                asyncResult.OverlappedHandle,
+                IntPtr.Zero);
+
+            if (errorCode != SocketError.Success)
+            {
+                errorCode = SocketPal.GetLastSocketError();
             }
 
             return errorCode;

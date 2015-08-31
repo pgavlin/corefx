@@ -236,6 +236,7 @@
     <Compile Include="System\Net\Sockets\_AcceptOverlappedAsyncResult.Unix.cs" />
     <Compile Include="System\Net\Sockets\_BaseOverlappedAsyncResult.Unix.cs" />
     <Compile Include="System\Net\Sockets\_ConnectOverlappedAsyncResult.Unix.cs" />
+    <Compile Include="System\Net\Sockets\_OverlappedAsyncResult.Unix.cs" />
     <Compile Include="System\Net\Sockets\Socket.Unix.cs" />
     <Compile Include="System\Net\Sockets\SocketPal.Unix.cs" />
 

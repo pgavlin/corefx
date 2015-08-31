@@ -818,6 +818,17 @@ namespace System.Net.Sockets
             return SocketError.IOPending;
         }
 
+        public static unsafe SocketError SendToAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
+        {
+            // TODO: audit "completed synchronously" behavior
+            if (!handle.AsyncContext.SendToAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress.Buffer, socketAddress.Size, asyncResult.CompletionCallback))
+            {
+                return (SocketError)asyncResult.ErrorCode;
+            }
+
+            return SocketError.IOPending;
+        }
+
         public static unsafe SocketError ReceiveAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
             // TODO: audit "completed synchronously" behavior
@@ -833,6 +844,17 @@ namespace System.Net.Sockets
         {
             // TODO: audit "completed synchronously" behavior
             if (!handle.AsyncContext.ReceiveAsync(buffers, GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback))
+            {
+                return (SocketError)asyncResult.ErrorCode;
+            }
+
+            return SocketError.IOPending;
+        }
+
+        public static unsafe SocketError ReceiveFromAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
+        {
+            // TODO: audit "completed synchronously" behavior
+            if (!handle.AsyncContext.ReceiveFromAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress.Buffer, socketAddress.InternalSize, asyncResult.CompletionCallback))
             {
                 return (SocketError)asyncResult.ErrorCode;
             }
