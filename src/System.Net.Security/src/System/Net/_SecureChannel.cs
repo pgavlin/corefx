@@ -59,7 +59,7 @@ namespace System.Net.Security
 
         private readonly bool m_ServerMode;
         private readonly bool m_RemoteCertRequired;
-        private readonly Interop.SchProtocols m_ProtocolFlags;
+        private readonly int m_ProtocolFlags;
         private readonly EncryptionPolicy m_EncryptionPolicy;
         private SslConnectionInfo m_ConnectionInfo;
 
@@ -81,7 +81,7 @@ namespace System.Net.Security
         private bool m_RefreshCredentialNeeded;
 
 
-        internal SecureChannel(string hostname, bool serverMode, Interop.SchProtocols protocolFlags, X509Certificate serverCertificate, X509CertificateCollection clientCertificates, bool remoteCertRequired, bool checkCertName,
+        internal SecureChannel(string hostname, bool serverMode, int protocolFlags, X509Certificate serverCertificate, X509CertificateCollection clientCertificates, bool remoteCertRequired, bool checkCertName,
                                                   bool checkCertRevocationStatus, EncryptionPolicy encryptionPolicy, LocalCertSelectionCallback certSelectionDelegate)
         {
             GlobalLog.Enter("SecureChannel#" + Logging.HashString(this) + "::.ctor", "hostname:" + hostname + " #clientCertificates=" + ((clientCertificates == null) ? "0" : clientCertificates.Count.ToString(NumberFormatInfo.InvariantInfo)));
@@ -95,9 +95,9 @@ namespace System.Net.Security
             m_ServerMode = serverMode;
 
             if (serverMode)
-                m_ProtocolFlags = (protocolFlags & Interop.SchProtocols.ServerMask);
+                m_ProtocolFlags = (protocolFlags & Interop.SChannel.ServerProtocolMask);
             else
-                m_ProtocolFlags = (protocolFlags & Interop.SchProtocols.ClientMask);
+                m_ProtocolFlags = (protocolFlags & Interop.SChannel.ClientProtocolMask);
 
             m_ServerCertificate = serverCertificate;
             m_ClientCertificates = clientCertificates;
@@ -786,7 +786,7 @@ namespace System.Net.Security
                     Interop.SecureCredential.Flags flags = Interop.SecureCredential.Flags.ValidateManual | Interop.SecureCredential.Flags.NoDefaultCred;
 
                     // ProjectK: always opt-in SCH_USE_STRONG_CRYPTO except for weak protocols or crypto
-                    if (((m_ProtocolFlags & (Interop.SchProtocols.Tls10 | Interop.SchProtocols.Tls11 | Interop.SchProtocols.Tls12)) != 0)
+                    if (((m_ProtocolFlags & (Interop.SChannel.SP_PROT_TLS1_0| Interop.SChannel.SP_PROT_TLS1_1 | Interop.SChannel.SP_PROT_TLS1_2)) != 0)
                          && (m_EncryptionPolicy != EncryptionPolicy.AllowNoEncryption) && (m_EncryptionPolicy != EncryptionPolicy.NoEncryption))
                     {
                         flags |= Interop.SecureCredential.Flags.UseStrongCrypto;

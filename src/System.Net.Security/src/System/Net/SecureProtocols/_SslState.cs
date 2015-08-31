@@ -146,13 +146,13 @@ namespace System.Net.Security
 
             if (isServer)
             {
-                enabledSslProtocols &= (SslProtocols)Interop.SchProtocols.ServerMask;
+                enabledSslProtocols &= (SslProtocols)Interop.SChannel.ServerProtocolMask;
                 if (serverCertificate == null)
                     throw new ArgumentNullException("serverCertificate");
             }
             else
             {
-                enabledSslProtocols &= (SslProtocols)Interop.SchProtocols.ClientMask;
+                enabledSslProtocols &= (SslProtocols)Interop.SChannel.ClientProtocolMask;
             }
 
             if ((int)enabledSslProtocols == 0)
@@ -173,7 +173,7 @@ namespace System.Net.Security
             _Exception = null;
             try
             {
-                _Context = new SecureChannel(targetHost, isServer, (Interop.SchProtocols)((int)enabledSslProtocols), serverCertificate, clientCertificates, remoteCertRequired,
+                _Context = new SecureChannel(targetHost, isServer, (int)enabledSslProtocols, serverCertificate, clientCertificates, remoteCertRequired,
                                                                checkCertName, checkCertRevocationStatus, _EncryptionPolicy, _CertSelectionDelegate);
             }
             catch (Win32Exception e)

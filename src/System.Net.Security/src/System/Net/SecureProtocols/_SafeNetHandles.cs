@@ -1481,43 +1481,6 @@ namespace System.Net.Security
     }
     //======================================================================
 
-    // Based on SafeLocalFree
-    internal class SafeLocalFreeChannelBinding : ChannelBinding
-    {
-        private const int LMEM_FIXED = 0;
-        private int size;
-
-        public override int Size
-        {
-            get { return size; }
-        }
-
-        public static SafeLocalFreeChannelBinding LocalAlloc(int cb)
-        {
-            SafeLocalFreeChannelBinding result;
-
-            result = Interop.SafeNetHandles.LocalAllocChannelBinding(LMEM_FIXED, (UIntPtr)cb);
-            if (result.IsInvalid)
-            {
-                result.SetHandleAsInvalid();
-                throw new OutOfMemoryException();
-            }
-
-            result.size = cb;
-            return result;
-        }
-
-        override protected bool ReleaseHandle()
-        {
-            return Interop.SafeNetHandles.LocalFree(handle) == IntPtr.Zero;
-        }
-
-        public override bool IsInvalid
-        {
-            get { return handle == new IntPtr(0) || handle == new IntPtr(-1); }
-        }
-    }
-
     // Based on SafeFreeContextBuffer
     internal abstract class SafeFreeContextBufferChannelBinding : ChannelBinding
     {
@@ -1627,11 +1590,6 @@ namespace System.Net.Security
         {
         }
 
-        internal IntPtr DangerousGetHandle()
-        {
-            return handle;
-        }
-
         protected override bool ReleaseHandle()
         {
             if (!IsInvalid)
@@ -1642,14 +1600,6 @@ namespace System.Net.Security
                 }
             }
             return true;
-        }
-
-        // This method will bypass refCount check done by VM
-        // Means it will force handle release if has a valid value
-        internal void Abort()
-        {
-            ReleaseHandle();
-            SetHandleAsInvalid();
         }
     }
 }

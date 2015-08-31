@@ -37,7 +37,7 @@ namespace System.Net.Security
         private struct SslCredKey
         {
             private byte[] _CertThumbPrint;
-            private Interop.SchProtocols _AllowedProtocols;
+            private int _AllowedProtocols;
             private EncryptionPolicy _EncryptionPolicy;
             private int _HashCode;
             //
@@ -45,7 +45,7 @@ namespace System.Net.Security
             //           the caller of this ctor has to ensure that a user cert object was inspected and
             //           optionally cloned.
             //
-            internal SslCredKey(byte[] thumbPrint, Interop.SchProtocols allowedProtocols, EncryptionPolicy encryptionPolicy)
+            internal SslCredKey(byte[] thumbPrint, int allowedProtocols, EncryptionPolicy encryptionPolicy)
             {
                 _CertThumbPrint = thumbPrint == null ? Array.Empty<byte>() : thumbPrint;
                 _HashCode = 0;
@@ -131,7 +131,7 @@ namespace System.Net.Security
         //
         // Note:thumbPrint is a cryptographicaly strong hash of a certificate
         //
-        internal static SafeFreeCredentials TryCachedCredential(byte[] thumbPrint, Interop.SchProtocols allowedProtocols, EncryptionPolicy encryptionPolicy)
+        internal static SafeFreeCredentials TryCachedCredential(byte[] thumbPrint, int allowedProtocols, EncryptionPolicy encryptionPolicy)
         {
             if (s_CachedCreds.Count == 0)
             {
@@ -158,7 +158,7 @@ namespace System.Net.Security
         //
         // ATTN: The thumbPrint must be from inspected and possbly cloned user Cert object or we get a security hole in SslCredKey ctor.
         //
-        internal static void CacheCredential(SafeFreeCredentials creds, byte[] thumbPrint, Interop.SchProtocols allowedProtocols, EncryptionPolicy encryptionPolicy)
+        internal static void CacheCredential(SafeFreeCredentials creds, byte[] thumbPrint, int allowedProtocols, EncryptionPolicy encryptionPolicy)
         {
             GlobalLog.Assert(creds != null, "CacheCredential|creds == null");
             if (creds.IsInvalid)

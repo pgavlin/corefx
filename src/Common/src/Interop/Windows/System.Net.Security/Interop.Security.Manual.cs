@@ -331,7 +331,7 @@ internal static partial class Interop
         private readonly IntPtr phMappers;               // == always null, OTHERWISE NOT RELIABLE
         public int cSupportedAlgs;
         private readonly IntPtr palgSupportedAlgs;       // == always null, OTHERWISE NOT RELIABLE
-        public SchProtocols grbitEnabledProtocols;
+        public int grbitEnabledProtocols;
         public int dwMinimumCipherStrength;
         public int dwMaximumCipherStrength;
         public int dwSessionLifespan;
@@ -350,7 +350,7 @@ internal static partial class Interop
             UseStrongCrypto = 0x00400000,
         }
 
-        public SecureCredential(int version, X509Certificate certificate, SecureCredential.Flags flags, SchProtocols protocols, EncryptionPolicy policy)
+        public SecureCredential(int version, X509Certificate certificate, SecureCredential.Flags flags, int protocols, EncryptionPolicy policy)
         {
             // default values required for a struct
             rootStore = phMappers = palgSupportedAlgs = certContextArray = IntPtr.Zero;
@@ -942,12 +942,6 @@ internal static partial class Interop
 
         [DllImport(Interop.Libraries.Handle, ExactSpelling = true, SetLastError = true)]
         internal static extern bool CloseHandle(IntPtr handle);
-
-        [DllImport(Interop.Libraries.Heap, EntryPoint = "LocalAlloc", SetLastError = true)]
-        internal static extern SafeLocalFreeChannelBinding LocalAllocChannelBinding(int uFlags, UIntPtr sizetdwBytes);
-
-        [DllImport(Interop.Libraries.Heap, ExactSpelling = true, SetLastError = true)]
-        internal static extern IntPtr LocalFree(IntPtr handle);
 
         [DllImport(Interop.Libraries.Crypt32, ExactSpelling = true, SetLastError = true)]
         internal static extern void CertFreeCertificateChain(
