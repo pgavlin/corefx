@@ -107,9 +107,9 @@ namespace System.Net.Http
         private object _lockObject = new object();
         private bool _doManualDecompressionCheck = false;
         private WinInetProxyHelper _proxyHelper = null;
-        private bool _automaticRedirection = true;
-        private int _maxAutomaticRedirections = 50;
-        private DecompressionMethods _automaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
+        private bool _automaticRedirection = HttpHandlerDefaults.DefaultAutomaticRedirection;
+        private int _maxAutomaticRedirections = HttpHandlerDefaults.DefaultMaxAutomaticRedirections;
+        private DecompressionMethods _automaticDecompression = HttpHandlerDefaults.DefaultAutomaticDecompression;
         private CookieUsePolicy _cookieUsePolicy = CookieUsePolicy.UseInternalCookieStoreOnly;
         private CookieContainer _cookieContainer = null;
 
@@ -1190,7 +1190,7 @@ namespace System.Net.Http
                         await state.RequestMessage.Content.CopyToAsync(
                             requestStream,
                             state.TransportContext).ConfigureAwait(false);
-                        requestStream.Flush();
+                        requestStream.EndUpload();
                     }
 
                     state.CancellationToken.ThrowIfCancellationRequested();
@@ -1875,12 +1875,11 @@ namespace System.Net.Http
                     Interop.WinHttp.WINHTTP_QUERY_CONTENT_ENCODING);
                 if (!string.IsNullOrEmpty(contentEncoding))
                 {
-                    contentEncoding = contentEncoding.ToUpperInvariant();
-                    if (contentEncoding.Contains(EncodingNameDeflate))
+                    if (contentEncoding.IndexOf(EncodingNameDeflate, StringComparison.OrdinalIgnoreCase) > -1)
                     {
                         useDeflateDecompression = true;
                     }
-                    else if (contentEncoding.Contains(EncodingNameGzip))
+                    else if (contentEncoding.IndexOf(EncodingNameGzip, StringComparison.OrdinalIgnoreCase) > -1)
                     {
                         useGzipDecompression = true;
                     }

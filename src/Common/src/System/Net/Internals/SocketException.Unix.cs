@@ -7,6 +7,7 @@ using System.Net.Sockets;
 
 namespace System.Net.Internals
 {
+    // TODO #2891: Add a public ctor to SocketException instead.
     internal class InternalSocketException : SocketException
     {
         public InternalSocketException(SocketError errorCode, int platformError)

@@ -14,7 +14,7 @@ namespace System.Net
         private static bool s_ipV6 = true;
 
         private static bool s_initialized;
-        private static object s_initializedLock = new object();
+        private static readonly object s_initializedLock = new object();
 
         public static bool OSSupportsIPv6
         {
@@ -81,7 +81,7 @@ namespace System.Net
             {
                 if (socket != -1)
                 {
-                    Interop.libc.close(socket);
+                    Interop.Sys.Close(socket);
                 }
             }
         }

@@ -51,7 +51,7 @@ namespace System.Net
             //               decision). This is done to minimize the number of
             //               possible tests that are needed.
             //
-            if (SocketProtocolSupportPal.OSSupportsIPv6 || includeIPv6)
+            if (includeIPv6 || SocketProtocolSupportPal.OSSupportsIPv6)
             {
                 //
                 // IPv6 enabled: use getaddrinfo() to obtain DNS information.
@@ -198,11 +198,12 @@ namespace System.Net
                     hostEntry = InternalGetHostByName(result.hostName, result.includeIPv6);
                 }
             }
+            catch (OutOfMemoryException)
+            {
+                throw;
+            }
             catch (Exception exception)
             {
-                if (exception is OutOfMemoryException)
-                    throw;
-
                 result.InvokeCallback(exception);
                 return;
             }
@@ -252,7 +253,7 @@ namespace System.Net
 
             // Start the resolve.
             Task.Factory.StartNew(
-                s => ResolveCallback(s), 
+                s => ResolveCallback(s),
                 asyncResult,
                 CancellationToken.None,
                 TaskCreationOptions.DenyChildAttach,
@@ -330,7 +331,7 @@ namespace System.Net
             return (IPHostEntry)castedResult.Result;
         }
 
-        public static IAsyncResult BeginGetHostEntry(string hostNameOrAddress, AsyncCallback requestCallback, object stateObject)
+        private static IAsyncResult BeginGetHostEntry(string hostNameOrAddress, AsyncCallback requestCallback, object stateObject)
         {
             if (Logging.On) Logging.Enter(Logging.Sockets, "DNS", "BeginGetHostEntry", hostNameOrAddress);
             IAsyncResult asyncResult = HostResolutionBeginHelper(hostNameOrAddress, false, requestCallback, stateObject);
@@ -339,7 +340,7 @@ namespace System.Net
             return asyncResult;
         } // BeginResolve
 
-        public static IAsyncResult BeginGetHostEntry(IPAddress address, AsyncCallback requestCallback, object stateObject)
+        private static IAsyncResult BeginGetHostEntry(IPAddress address, AsyncCallback requestCallback, object stateObject)
         {
             if (Logging.On) Logging.Enter(Logging.Sockets, "DNS", "BeginGetHostEntry", address);
             IAsyncResult asyncResult = HostResolutionBeginHelper(address, true, true, requestCallback, stateObject);
@@ -348,7 +349,7 @@ namespace System.Net
             return asyncResult;
         } // BeginResolve
 
-        public static IPHostEntry EndGetHostEntry(IAsyncResult asyncResult)
+        private static IPHostEntry EndGetHostEntry(IAsyncResult asyncResult)
         {
             if (Logging.On) Logging.Enter(Logging.Sockets, "DNS", "EndGetHostEntry", asyncResult);
             IPHostEntry ipHostEntry = HostResolutionEndHelper(asyncResult);
@@ -357,7 +358,7 @@ namespace System.Net
             return ipHostEntry;
         } // EndResolve()
 
-        public static IAsyncResult BeginGetHostAddresses(string hostNameOrAddress, AsyncCallback requestCallback, object state)
+        private static IAsyncResult BeginGetHostAddresses(string hostNameOrAddress, AsyncCallback requestCallback, object state)
         {
             if (Logging.On) Logging.Enter(Logging.Sockets, "DNS", "BeginGetHostAddresses", hostNameOrAddress);
             IAsyncResult asyncResult = HostResolutionBeginHelper(hostNameOrAddress, true, requestCallback, state);
@@ -366,7 +367,7 @@ namespace System.Net
             return asyncResult;
         } // BeginResolve
 
-        public static IPAddress[] EndGetHostAddresses(IAsyncResult asyncResult)
+        private static IPAddress[] EndGetHostAddresses(IAsyncResult asyncResult)
         {
             if (Logging.On) Logging.Enter(Logging.Sockets, "DNS", "EndGetHostAddresses", asyncResult);
             IPHostEntry ipHostEntry = HostResolutionEndHelper(asyncResult);
@@ -378,17 +379,29 @@ namespace System.Net
         //************* Task-based async public methods *************************
         public static Task<IPAddress[]> GetHostAddressesAsync(string hostNameOrAddress)
         {
-            return Task<IPAddress[]>.Factory.FromAsync(BeginGetHostAddresses, EndGetHostAddresses, hostNameOrAddress, null);
+            return Task<IPAddress[]>.Factory.FromAsync(
+                (arg, requestCallback, stateObject) => BeginGetHostAddresses(arg, requestCallback, stateObject),
+                asyncResult => EndGetHostAddresses(asyncResult),
+                hostNameOrAddress,
+                null);
         }
 
         public static Task<IPHostEntry> GetHostEntryAsync(IPAddress address)
         {
-            return Task<IPHostEntry>.Factory.FromAsync(BeginGetHostEntry, EndGetHostEntry, address, null);
+            return Task<IPHostEntry>.Factory.FromAsync(
+                (arg, requestCallback, stateObject) => BeginGetHostEntry(arg, requestCallback, stateObject),
+                asyncResult => EndGetHostEntry(asyncResult), 
+                address, 
+                null);
         }
 
         public static Task<IPHostEntry> GetHostEntryAsync(string hostNameOrAddress)
         {
-            return Task<IPHostEntry>.Factory.FromAsync(BeginGetHostEntry, EndGetHostEntry, hostNameOrAddress, null);
+            return Task<IPHostEntry>.Factory.FromAsync(
+                (arg, requestCallback, stateObject) => BeginGetHostEntry(arg, requestCallback, stateObject), 
+                asyncResult => EndGetHostEntry(asyncResult), 
+                hostNameOrAddress, 
+                null);
         }
     }
 }

@@ -9,6 +9,7 @@ namespace System.Net.Internals
 {
     internal class InternalSocketException : SocketException
     {
+        // TODO #2891: Add a public ctor to SocketException instead.
         public InternalSocketException(SocketError errorCode, int platformError)
             : base((int)errorCode)
         {
