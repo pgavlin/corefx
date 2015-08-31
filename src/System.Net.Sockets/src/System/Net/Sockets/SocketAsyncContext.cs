@@ -296,7 +296,7 @@ namespace System.Net.Sockets
             Interop.Error errno = Interop.Sys.GetLastError();
             if (errno != Interop.Error.EAGAIN && errno != Interop.Error.EWOULDBLOCK)
             {
-                errorCode = SafeCloseSocket.GetSocketErrorForErrorCode(errno);
+                errorCode = SocketPal.GetSocketErrorForErrorCode(errno);
                 return true;
             }
 
@@ -368,7 +368,7 @@ namespace System.Net.Sockets
             Interop.Error errno = Interop.Sys.GetLastError();
             if (errno != Interop.Error.EINPROGRESS)
             {
-                errorCode = SafeCloseSocket.GetSocketErrorForErrorCode(errno);
+                errorCode = SocketPal.GetSocketErrorForErrorCode(errno);
                 return true;
             }
 
@@ -550,7 +550,7 @@ namespace System.Net.Sockets
             if (err == -1)
             {
                 bytesReceived = 0;
-                errorCode = SafeCloseSocket.GetLastSocketError();
+                errorCode = SocketPal.GetLastSocketError();
                 return true;
             }
             if (available == 0)
@@ -582,7 +582,7 @@ namespace System.Net.Sockets
 
             if (errno != Interop.Error.EAGAIN && errno != Interop.Error.EWOULDBLOCK)
             {
-                errorCode = SafeCloseSocket.GetSocketErrorForErrorCode(errno);
+                errorCode = SocketPal.GetSocketErrorForErrorCode(errno);
                 return true;
             }
 
@@ -662,7 +662,7 @@ namespace System.Net.Sockets
             Interop.Error errno = Interop.Sys.GetLastError();
             if (errno != Interop.Error.EAGAIN && errno != Interop.Error.EWOULDBLOCK)
             {
-                errorCode = SafeCloseSocket.GetSocketErrorForErrorCode(errno);
+                errorCode = SocketPal.GetSocketErrorForErrorCode(errno);
                 return true;
             }
 
@@ -879,7 +879,7 @@ namespace System.Net.Sockets
                 {
                     if (errno != Interop.Error.EAGAIN && errno != Interop.Error.EWOULDBLOCK)
                     {
-                        errorCode = SafeCloseSocket.GetSocketErrorForErrorCode(errno);
+                        errorCode = SocketPal.GetSocketErrorForErrorCode(errno);
                         return true;
                     }
 
@@ -966,7 +966,7 @@ namespace System.Net.Sockets
                     Interop.Error errno = Interop.Sys.GetLastError();
                     if (errno != Interop.Error.EAGAIN && errno != Interop.Error.EWOULDBLOCK)
                     {
-                        errorCode = SafeCloseSocket.GetSocketErrorForErrorCode(errno);
+                        errorCode = SocketPal.GetSocketErrorForErrorCode(errno);
                         return true;
                     }
 

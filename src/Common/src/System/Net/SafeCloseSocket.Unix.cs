@@ -40,200 +40,6 @@ namespace System.Net.Sockets
             }
         }
 
-        // TODO: move these to Common
-        public static SocketError GetLastSocketError()
-        {
-            return GetSocketErrorForErrorCode(Interop.Sys.GetLastError());
-        }
-
-        public static SocketError GetSocketErrorForErrorCode(Interop.Error errorCode)
-        {
-            // TODO: audit these using winsock.h
-            switch (errorCode)
-            {
-                case (Interop.Error)0:
-                    return SocketError.Success;
-
-                case Interop.Error.EINTR:
-                    return SocketError.Interrupted;
-
-                case Interop.Error.EACCES:
-                    return SocketError.AccessDenied;
-
-                case Interop.Error.EFAULT:
-                    return SocketError.Fault;
-
-                case Interop.Error.EINVAL:
-                    return SocketError.InvalidArgument;
-
-                case Interop.Error.EMFILE:
-                case Interop.Error.ENFILE:
-                    return SocketError.TooManyOpenSockets;
-
-                case Interop.Error.EAGAIN:
-                    return SocketError.WouldBlock;
-
-                case Interop.Error.EINPROGRESS:
-                    return SocketError.InProgress;
-
-                case Interop.Error.EALREADY:
-                    return SocketError.AlreadyInProgress;
-
-                case Interop.Error.ENOTSOCK:
-                    return SocketError.NotSocket;
-
-                case Interop.Error.EDESTADDRREQ:
-                    return SocketError.DestinationAddressRequired;
-
-                case Interop.Error.EMSGSIZE:
-                    return SocketError.MessageSize;
-
-                case Interop.Error.EPROTOTYPE:
-                    return SocketError.ProtocolType;
-
-                case Interop.Error.ENOPROTOOPT:
-                    return SocketError.ProtocolOption;
-
-                case Interop.Error.EPROTONOSUPPORT:
-                    return SocketError.ProtocolNotSupported;
-
-                // SocketError.SocketNotSupported
-                // SocketError.OperationNotSupported
-                // SocketError.ProtocolFamilyNotSupported
-
-                case Interop.Error.EAFNOSUPPORT:
-                    return SocketError.AddressFamilyNotSupported;
-
-                case Interop.Error.EADDRINUSE:
-                    return SocketError.AddressAlreadyInUse;
-
-                case Interop.Error.EADDRNOTAVAIL:
-                    return SocketError.AddressNotAvailable;
-
-                case Interop.Error.ENETDOWN:
-                    return SocketError.NetworkDown;
-
-                case Interop.Error.ENETUNREACH:
-                    return SocketError.NetworkUnreachable;
-
-                case Interop.Error.ENETRESET:
-                    return SocketError.NetworkReset;
-
-                case Interop.Error.ECONNABORTED:
-                    return SocketError.ConnectionAborted;
-
-                case Interop.Error.ECONNRESET:
-                    return SocketError.ConnectionReset;
-
-                // SocketError.NoBufferSpaceAvailable
-
-                case Interop.Error.EISCONN:
-                    return SocketError.IsConnected;
-
-                case Interop.Error.ENOTCONN:
-                    return SocketError.NotConnected;
-
-                // SocketError.Shutdown
-
-                case Interop.Error.ETIMEDOUT:
-                    return SocketError.TimedOut;
-
-                case Interop.Error.ECONNREFUSED:
-                    return SocketError.ConnectionRefused;
-
-                // SocketError.HostDown
-
-                case Interop.Error.EHOSTUNREACH:
-                    return SocketError.HostUnreachable;
-
-                // SocketError.ProcessLimit
-
-                // Extended Windows Sockets error constant definitions
-                // SocketError.SystemNotReady
-                // SocketError.VersionNotSupported
-                // SocketError.NotInitialized
-                // SocketError.Disconnecting
-                // SocketError.TypeNotFound
-                // SocketError.HostNotFound
-                // SocketError.TryAgain
-                // SocketError.NoRecovery
-                // SocketError.NoData
-
-                // OS dependent errors
-                // SocketError.IOPending
-                // SocketError.OperationAborted
-
-                default:
-                    return SocketError.SocketError;
-            }
-        }
-
-        public static int GetPlatformAddressFamily(AddressFamily addressFamily)
-        {
-            switch (addressFamily)
-            {
-                case AddressFamily.Unspecified:
-                    return Interop.libc.AF_UNSPEC;
-
-                case AddressFamily.Unix:
-                    return Interop.libc.AF_UNIX;
-
-                case AddressFamily.InterNetwork:
-                    return Interop.libc.AF_INET;
-
-                case AddressFamily.InterNetworkV6:
-                    return Interop.libc.AF_INET6;
-
-                default:
-                    return (int)addressFamily;
-            }
-        }
-
-        public static int GetPlatformProtocolFamily(ProtocolFamily protocolFamily)
-        {
-            switch (protocolFamily)
-            {
-                case ProtocolFamily.Unspecified:
-                    return Interop.libc.PF_UNSPEC;
-
-                case ProtocolFamily.Unix:
-                    return Interop.libc.PF_UNIX;
-
-                case ProtocolFamily.InterNetwork:
-                    return Interop.libc.PF_INET;
-
-                case ProtocolFamily.InterNetworkV6:
-                    return Interop.libc.PF_INET6;
-
-                default:
-                    return (int)protocolFamily;
-            }
-        }
-
-        public static int GetPlatformSocketType(SocketType socketType)
-        {
-            switch (socketType)
-            {
-                case SocketType.Stream:
-                    return Interop.libc.SOCK_STREAM;
-
-                case SocketType.Dgram:
-                    return Interop.libc.SOCK_DGRAM;
-
-                case SocketType.Raw:
-                    return Interop.libc.SOCK_RAW;
-
-                case SocketType.Rdm:
-                    return Interop.libc.SOCK_RDM;
-
-                case SocketType.Seqpacket:
-                    return Interop.libc.SOCK_SEQPACKET;
-
-                default:
-                    return (int)socketType;
-            }
-        }
-
         public unsafe static SafeCloseSocket CreateSocket(int fileDescriptor)
         {
             return CreateSocket(InnerSafeCloseSocket.CreateSocket(fileDescriptor));
@@ -296,7 +102,7 @@ namespace System.Net.Sockets
 
 #if DEBUG
                     _closeSocketHandle = handle;
-                    _closeSocketResult = GetSocketErrorForErrorCode((Interop.Error)errorCode);
+                    _closeSocketResult = SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
 #endif
 
                     // If it's not EWOULDBLOCK, there's no more recourse - we either succeeded or failed.
@@ -306,7 +112,7 @@ namespace System.Net.Sockets
                         {
                             _asyncContext.Close();
                         }
-						return GetSocketErrorForErrorCode((Interop.Error)errorCode);
+						return SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
                     }
 
                     // The socket must be non-blocking with a linger timeout set.
@@ -320,13 +126,13 @@ namespace System.Net.Sockets
                         GlobalLog.Print("SafeCloseSocket::ReleaseHandle(handle:" + handle.ToString("x") + ") close()#2:" + errorCode.ToString());
 #if DEBUG
                         _closeSocketHandle = handle;
-                        _closeSocketResult = GetSocketErrorForErrorCode((Interop.Error)errorCode);
+                        _closeSocketResult = SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
 #endif
                         if (errorCode == 0)
                         {
                             _asyncContext.Close();
                         }
-                        return GetSocketErrorForErrorCode((Interop.Error)errorCode);
+                        return SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
 					}
 
                     // The socket could not be made blocking; fall through to the regular abortive close.
@@ -340,7 +146,7 @@ namespace System.Net.Sockets
 
 				errorCode = Interop.libc.setsockopt((int)handle, Interop.libc.SOL_SOCKET, Interop.libc.SO_LINGER, &linger, (uint)sizeof(Interop.libc.linger));
 #if DEBUG
-                _closeSocketLinger = GetSocketErrorForErrorCode((Interop.Error)errorCode);
+                _closeSocketLinger = SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
 #endif
 				if (errorCode == -1)
 				{
@@ -351,13 +157,13 @@ namespace System.Net.Sockets
                 if (errorCode != 0 && errorCode != (int)Interop.Error.EINVAL && errorCode != (int)Interop.Error.ENOPROTOOPT)
                 {
                     // Too dangerous to try closesocket() - it might block!
-                    return GetSocketErrorForErrorCode((Interop.Error)errorCode);
+                    return SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
                 }
 
                 errorCode = Interop.Sys.Close((int)handle);
 #if DEBUG
                 _closeSocketHandle = handle;
-                _closeSocketResult = GetSocketErrorForErrorCode((Interop.Error)errorCode);
+                _closeSocketResult = SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
 #endif
                 GlobalLog.Print("SafeCloseSocket::ReleaseHandle(handle:" + handle.ToString("x") + ") close#3():" + (errorCode == -1 ? (int)Interop.Sys.GetLastError() : errorCode).ToString());
 
@@ -365,7 +171,7 @@ namespace System.Net.Sockets
                 {
                     _asyncContext.Close();
                 }
-                return GetSocketErrorForErrorCode((Interop.Error)errorCode);
+                return SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
             }
 
             public static InnerSafeCloseSocket CreateSocket(int fileDescriptor)
@@ -377,8 +183,8 @@ namespace System.Net.Sockets
 
 			public static InnerSafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
 			{
-                int af = GetPlatformAddressFamily(addressFamily);
-                int sock = GetPlatformSocketType(socketType);
+                int af = SocketPal.GetPlatformAddressFamily(addressFamily);
+                int sock = SocketPal.GetPlatformSocketType(socketType);
                 int pt = (int)protocolType;
 
 				int fd = Interop.libc.socket(af, sock, pt);

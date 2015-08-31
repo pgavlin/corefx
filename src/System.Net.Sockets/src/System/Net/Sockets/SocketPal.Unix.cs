@@ -17,6 +17,178 @@ namespace System.Net.Sockets
 {
     internal static class SocketPal
     {
+        public static SocketError GetLastSocketError()
+        {
+            return GetSocketErrorForErrorCode(Interop.Sys.GetLastError());
+        }
+
+        public static SocketError GetSocketErrorForErrorCode(Interop.Error errorCode)
+        {
+            // TODO: audit these using winsock.h
+            switch (errorCode)
+            {
+                case (Interop.Error)0:
+                    return SocketError.Success;
+
+                case Interop.Error.EINTR:
+                    return SocketError.Interrupted;
+
+                case Interop.Error.EACCES:
+                    return SocketError.AccessDenied;
+
+                case Interop.Error.EFAULT:
+                    return SocketError.Fault;
+
+                case Interop.Error.EINVAL:
+                    return SocketError.InvalidArgument;
+
+                case Interop.Error.EMFILE:
+                case Interop.Error.ENFILE:
+                    return SocketError.TooManyOpenSockets;
+
+                case Interop.Error.EAGAIN:
+                    return SocketError.WouldBlock;
+
+                case Interop.Error.EINPROGRESS:
+                    return SocketError.InProgress;
+
+                case Interop.Error.EALREADY:
+                    return SocketError.AlreadyInProgress;
+
+                case Interop.Error.ENOTSOCK:
+                    return SocketError.NotSocket;
+
+                case Interop.Error.EDESTADDRREQ:
+                    return SocketError.DestinationAddressRequired;
+
+                case Interop.Error.EMSGSIZE:
+                    return SocketError.MessageSize;
+
+                case Interop.Error.EPROTOTYPE:
+                    return SocketError.ProtocolType;
+
+                case Interop.Error.ENOPROTOOPT:
+                    return SocketError.ProtocolOption;
+
+                case Interop.Error.EPROTONOSUPPORT:
+                    return SocketError.ProtocolNotSupported;
+
+                // SocketError.SocketNotSupported
+                // SocketError.OperationNotSupported
+                // SocketError.ProtocolFamilyNotSupported
+
+                case Interop.Error.EAFNOSUPPORT:
+                    return SocketError.AddressFamilyNotSupported;
+
+                case Interop.Error.EADDRINUSE:
+                    return SocketError.AddressAlreadyInUse;
+
+                case Interop.Error.EADDRNOTAVAIL:
+                    return SocketError.AddressNotAvailable;
+
+                case Interop.Error.ENETDOWN:
+                    return SocketError.NetworkDown;
+
+                case Interop.Error.ENETUNREACH:
+                    return SocketError.NetworkUnreachable;
+
+                case Interop.Error.ENETRESET:
+                    return SocketError.NetworkReset;
+
+                case Interop.Error.ECONNABORTED:
+                    return SocketError.ConnectionAborted;
+
+                case Interop.Error.ECONNRESET:
+                    return SocketError.ConnectionReset;
+
+                // SocketError.NoBufferSpaceAvailable
+
+                case Interop.Error.EISCONN:
+                    return SocketError.IsConnected;
+
+                case Interop.Error.ENOTCONN:
+                    return SocketError.NotConnected;
+
+                // SocketError.Shutdown
+
+                case Interop.Error.ETIMEDOUT:
+                    return SocketError.TimedOut;
+
+                case Interop.Error.ECONNREFUSED:
+                    return SocketError.ConnectionRefused;
+
+                // SocketError.HostDown
+
+                case Interop.Error.EHOSTUNREACH:
+                    return SocketError.HostUnreachable;
+
+                // SocketError.ProcessLimit
+
+                // Extended Windows Sockets error constant definitions
+                // SocketError.SystemNotReady
+                // SocketError.VersionNotSupported
+                // SocketError.NotInitialized
+                // SocketError.Disconnecting
+                // SocketError.TypeNotFound
+                // SocketError.HostNotFound
+                // SocketError.TryAgain
+                // SocketError.NoRecovery
+                // SocketError.NoData
+
+                // OS dependent errors
+                // SocketError.IOPending
+                // SocketError.OperationAborted
+
+                default:
+                    return SocketError.SocketError;
+            }
+        }
+
+        public static int GetPlatformAddressFamily(AddressFamily addressFamily)
+        {
+            switch (addressFamily)
+            {
+                case AddressFamily.Unspecified:
+                    return Interop.libc.AF_UNSPEC;
+
+                case AddressFamily.Unix:
+                    return Interop.libc.AF_UNIX;
+
+                case AddressFamily.InterNetwork:
+                    return Interop.libc.AF_INET;
+
+                case AddressFamily.InterNetworkV6:
+                    return Interop.libc.AF_INET6;
+
+                default:
+                    return (int)addressFamily;
+            }
+        }
+
+        public static int GetPlatformSocketType(SocketType socketType)
+        {
+            switch (socketType)
+            {
+                case SocketType.Stream:
+                    return Interop.libc.SOCK_STREAM;
+
+                case SocketType.Dgram:
+                    return Interop.libc.SOCK_DGRAM;
+
+                case SocketType.Raw:
+                    return Interop.libc.SOCK_RAW;
+
+                case SocketType.Rdm:
+                    return Interop.libc.SOCK_RDM;
+
+                case SocketType.Seqpacket:
+                    return Interop.libc.SOCK_SEQPACKET;
+
+                default:
+                    return (int)socketType;
+            }
+        }
+
         private static int GetPlatformSocketFlags(SocketFlags socketFlags)
         {
             const SocketFlags StandardFlagsMask = 
@@ -40,160 +212,212 @@ namespace System.Net.Sockets
                 ((socketFlags & SocketFlags.Truncated) == 0 ? 0 : Interop.libc.MSG_TRUNC);
         }
 
-        private static int GetPlatformOptionLevel(SocketOptionLevel optionLevel)
+        private static bool GetPlatformOptionInfo(SocketOptionLevel optionLevel, SocketOptionName optionName, out int optLevel, out int optName)
         {
+            // TODO: determine what option level honors these option names
+            // - SocketOptionName.BsdUrgent
+            // - case SocketOptionName.Expedited
+
+            // TODO: decide how to handle option names that have no corresponding name on *nix
             switch (optionLevel)
             {
                 case SocketOptionLevel.Socket:
-                    return Interop.libc.SOL_SOCKET;
+                    optLevel = Interop.libc.SOL_SOCKET;
+                    switch (optionName)
+                    {
+                        case SocketOptionName.Debug:
+                            optName = Interop.libc.SO_DEBUG;
+                            break;
+
+                        case SocketOptionName.AcceptConnection:
+                            optName = Interop.libc.SO_ACCEPTCONN;
+                            break;
+
+                        case SocketOptionName.ReuseAddress:
+                            optName = Interop.libc.SO_REUSEADDR;
+                            break;
+
+                        case SocketOptionName.KeepAlive:
+                            optName = Interop.libc.SO_KEEPALIVE;
+                            break;
+
+                        case SocketOptionName.DontRoute:
+                            optName = Interop.libc.SO_DONTROUTE;
+                            break;
+
+                        case SocketOptionName.Broadcast:
+                            optName = Interop.libc.SO_BROADCAST;
+                            break;
+
+                        // SocketOptionName.UseLoopback:
+
+                        case SocketOptionName.Linger:
+                            optName = Interop.libc.SO_LINGER;
+                            break;
+
+                        case SocketOptionName.OutOfBandInline:
+                            optName = Interop.libc.SO_OOBINLINE;
+                            break;
+
+                        // case SocketOptionName.DontLinger
+                        // case SocketOptionName.ExclusiveAddressUse
+
+                        case SocketOptionName.SendBuffer:
+                            optName = Interop.libc.SO_SNDBUF;
+                            break;
+
+                        case SocketOptionName.ReceiveBuffer:
+                            optName = Interop.libc.SO_RCVBUF;
+                            break;
+
+                        case SocketOptionName.SendLowWater:
+                            optName = Interop.libc.SO_SNDLOWAT;
+                            break;
+
+                        case SocketOptionName.ReceiveLowWater:
+                            optName = Interop.libc.SO_RCVLOWAT;
+                            break;
+
+                        case SocketOptionName.SendTimeout:
+                            optName = Interop.libc.SO_SNDTIMEO;
+                            break;
+
+                        case SocketOptionName.ReceiveTimeout:
+                            optName = Interop.libc.SO_RCVTIMEO;
+                            break;
+
+                        case SocketOptionName.Error:
+                            optName = Interop.libc.SO_ERROR;
+                            break;
+
+                        case SocketOptionName.Type:
+                            optName = Interop.libc.SO_TYPE;
+                            break;
+
+                        // case SocketOptionName.MaxConnections
+                        // case SocketOptionName.UpdateAcceptContext:
+                        // case SocketOptionName.UpdateConnectContext:
+
+                        default:
+                            optName = (int)optionName;
+                            return false;
+                    }
+                    return true;
 
                 case SocketOptionLevel.Tcp:
-                    return Interop.libc.IPPROTO_TCP;
+                    optLevel = Interop.libc.IPPROTO_TCP;
+                    switch (optionName)
+                    {
+                        case SocketOptionName.NoDelay:
+                            optName = Interop.libc.TCP_NODELAY;
+                            break;
+
+                        default:
+                            optName = (int)optionName;
+                            return false;
+                    }
+                    return true;
 
                 case SocketOptionLevel.Udp:
-                    return Interop.libc.IPPROTO_UDP;
+                    optLevel = Interop.libc.IPPROTO_UDP;
+
+                    // case SocketOptionName.NoChecksum:
+                    // case SocketOptionName.ChecksumCoverage:
+
+                    optName = (int)optionName;
+                    return false;
 
                 case SocketOptionLevel.IP:
-                    return Interop.libc.IPPROTO_IP;
+                    optLevel = Interop.libc.IPPROTO_IP;
+                    switch (optionName)
+                    {
+                        case SocketOptionName.IPOptions:
+                            optName = Interop.libc.IP_OPTIONS;
+                            break;
+
+                        case SocketOptionName.HeaderIncluded:
+                            optName = Interop.libc.IP_HDRINCL;
+                            break;
+
+                        case SocketOptionName.TypeOfService:
+                            optName = Interop.libc.IP_TOS;
+                            break;
+
+                        case SocketOptionName.IpTimeToLive:
+                            optName = Interop.libc.IP_TTL;
+                            break;
+
+                        case SocketOptionName.MulticastInterface:
+                            optName = Interop.libc.IP_MULTICAST_IF;
+                            break;
+
+                        case SocketOptionName.MulticastTimeToLive:
+                            optName = Interop.libc.IP_MULTICAST_TTL;
+                            break;
+
+                        case SocketOptionName.MulticastLoopback:
+                            optName = Interop.libc.IP_MULTICAST_LOOP;
+                            break;
+
+                        case SocketOptionName.AddMembership:
+                            optName = Interop.libc.IP_ADD_MEMBERSHIP;
+                            break;
+
+                        case SocketOptionName.DropMembership:
+                            optName = Interop.libc.IP_DROP_MEMBERSHIP;
+                            break;
+
+                        // case SocketOptionName.DontFragment
+
+                        case SocketOptionName.AddSourceMembership:
+                            optName = Interop.libc.IP_ADD_SOURCE_MEMBERSHIP;
+                            break;
+
+                        case SocketOptionName.DropSourceMembership:
+                            optName = Interop.libc.IP_DROP_SOURCE_MEMBERSHIP;
+                            break;
+
+                        case SocketOptionName.BlockSource:
+                            optName = Interop.libc.IP_BLOCK_SOURCE;
+                            break;
+
+                        case SocketOptionName.UnblockSource:
+                            optName = Interop.libc.IP_UNBLOCK_SOURCE;
+                            break;
+
+                        case SocketOptionName.PacketInformation:
+                            optName = Interop.libc.IP_PKTINFO;
+                            break;
+
+                        default:
+                            optName = (int)optionName;
+                            return false;
+                    }
+                    return true;
 
                 case SocketOptionLevel.IPv6:
-                    return Interop.libc.IPPROTO_IPV6;
+                    optLevel = Interop.libc.IPPROTO_IPV6;
+                    switch (optionName)
+                    {
+                        // case SocketOptionName.HopLimit:
+
+                        // case SocketOption.IPProtectionLevel:
+
+                        case SocketOptionName.IPv6Only:
+                            optName = Interop.libc.IPV6_V6ONLY;
+                            break;
+
+                        default:
+                            optName = (int)optionName;
+                            return false;
+                    }
+                    return true;
 
                 default:
                     // TODO: rethink this
-                    return (int)optionLevel;
-            }
-        }
-
-        private static int GetPlatformOptionName(SocketOptionName optionName)
-        {
-            // TODO: some enum names have the same underlying value. This cannot be handled.
-            switch (optionName)
-            {
-                case SocketOptionName.Debug:
-                    return Interop.libc.SO_DEBUG;
-
-                case SocketOptionName.AcceptConnection:
-                    return Interop.libc.SO_ACCEPTCONN;
-
-                case SocketOptionName.ReuseAddress:
-                    return Interop.libc.SO_REUSEADDR;
-
-                case SocketOptionName.KeepAlive:
-                    return Interop.libc.SO_KEEPALIVE;
-
-                case SocketOptionName.DontRoute:
-                    return Interop.libc.SO_DONTROUTE;
-
-                case SocketOptionName.Broadcast:
-                    return Interop.libc.SO_BROADCAST;
-
-                // SocketOptionName.UseLoopback:
-
-                case SocketOptionName.Linger:
-                    return Interop.libc.SO_LINGER;
-
-                case SocketOptionName.OutOfBandInline:
-                    return Interop.libc.SO_OOBINLINE;
-
-                // case SocketOptionName.DontLinger
-                // case SocketOptionName.ExclusiveAddressUse
-
-                case SocketOptionName.SendBuffer:
-                    return Interop.libc.SO_SNDBUF;
-
-                case SocketOptionName.ReceiveBuffer:
-                    return Interop.libc.SO_RCVBUF;
-
-                case SocketOptionName.SendLowWater:
-                    return Interop.libc.SO_SNDLOWAT;
-
-                case SocketOptionName.ReceiveLowWater:
-                    return Interop.libc.SO_RCVLOWAT;
-
-                case SocketOptionName.SendTimeout:
-                    return Interop.libc.SO_SNDTIMEO;
-
-                case SocketOptionName.ReceiveTimeout:
-                    return Interop.libc.SO_RCVTIMEO;
-
-                case SocketOptionName.Error:
-                    return Interop.libc.SO_ERROR;
-
-                case SocketOptionName.Type:
-                    return Interop.libc.SO_TYPE;
-
-                // case SocketOptionName.MaxConnections
-
-                //case SocketOptionName.IPOptions:
-                //    return Interop.libc.IP_OPTIONS;
-
-                //case SocketOptionName.HeaderIncluded:
-                //    return Interop.libc.IP_HDRINCL;
-
-                case SocketOptionName.TypeOfService:
-                    return Interop.libc.IP_TOS;
-
-                //case SocketOptionName.IpTimeToLive:
-                //    return Interop.libc.IP_TTL;
-
-                case SocketOptionName.MulticastInterface:
-                    return Interop.libc.IP_MULTICAST_IF;
-
-                case SocketOptionName.MulticastTimeToLive:
-                    return Interop.libc.IP_MULTICAST_TTL;
-
-                case SocketOptionName.MulticastLoopback:
-                    return Interop.libc.IP_MULTICAST_LOOP;
-
-                case SocketOptionName.AddMembership:
-                    return Interop.libc.IP_ADD_MEMBERSHIP;
-
-                case SocketOptionName.DropMembership:
-                    return Interop.libc.IP_DROP_MEMBERSHIP;
-
-                // case SocketOptionName.DontFragment
-
-                case SocketOptionName.AddSourceMembership:
-                    return Interop.libc.IP_ADD_SOURCE_MEMBERSHIP;
-
-                //case SocketOptionName.DropMembership:
-                //    return Interop.libc.IP_DROP_SOURCE_MEMBERSHIP;
-
-                case SocketOptionName.BlockSource:
-                    return Interop.libc.IP_BLOCK_SOURCE;
-
-                case SocketOptionName.UnblockSource:
-                    return Interop.libc.IP_UNBLOCK_SOURCE;
-
-                case SocketOptionName.PacketInformation:
-                    return Interop.libc.IP_PKTINFO;
-
-                // case SocketOptionName.HopLimit:
-
-                // case SocketOption.IPProtectionLevel:
-
-                //case SocketOptionName.IPv6Only:
-                //    return Interop.libc.IPV6_V6ONLY;
-
-                //case SocketOptionName.NoDelay:
-                //    return Interop.libc.TCP_NODELAY;
-
-                // case SocketOptionName.BsdUrgent
-
-                // case SocketOptionName.Expedited
-
-                // case SocketOptionName.NoChecksum:
-
-                // case SocketOptionName.ChecksumCoverage:
-
-                // case SocketOptionName.UpdateAcceptContext:
-
-                // case SocketOptionName.UpdateConnectContext:
-
-                default:
-                    // TODO: rethink this
-                    return (int)optionName;
+                    optLevel = (int)optionLevel;
+                    optName = (int)optionName;
+                    return false;
             }
         }
 
@@ -214,11 +438,6 @@ namespace System.Net.Sockets
                     // TODO: rethink this
                     return (int)how;
             }
-        }
-
-        public static SocketError GetLastSocketError()
-        {
-            return SafeCloseSocket.GetLastSocketError();
         }
 
         public static SafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
@@ -616,8 +835,8 @@ namespace System.Net.Sockets
 
         public static unsafe SocketError SetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, int optionValue)
         {
-            int optLevel = GetPlatformOptionLevel(optionLevel);
-            int optName = GetPlatformOptionName(optionName);
+            int optLevel, optName;
+            GetPlatformOptionInfo(optionLevel, optionName, out optLevel, out optName);
 
             int err = Interop.libc.setsockopt(handle.FileDescriptor, optLevel, optName, &optionValue, sizeof(int));
 
@@ -626,8 +845,8 @@ namespace System.Net.Sockets
 
         public static unsafe SocketError SetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, byte[] optionValue)
         {
-            int optLevel = GetPlatformOptionLevel(optionLevel);
-            int optName = GetPlatformOptionName(optionName);
+            int optLevel, optName;
+            GetPlatformOptionInfo(optionLevel, optionName, out optLevel, out optName);
 
             int err;
             if (optionValue == null || optionValue.Length == 0)
@@ -647,8 +866,9 @@ namespace System.Net.Sockets
 
         public static unsafe SocketError GetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, out int optionValue)
         {
-            int optLevel = GetPlatformOptionLevel(optionLevel);
-            int optName = GetPlatformOptionName(optionName);
+            int optLevel, optName;
+            GetPlatformOptionInfo(optionLevel, optionName, out optLevel, out optName);
+
             uint optLen = 4; // sizeof(int)
             int value = 0;
 
@@ -660,8 +880,9 @@ namespace System.Net.Sockets
 
         public static unsafe SocketError GetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, byte[] optionValue, ref int optionLength)
         {
-            int optLevel = GetPlatformOptionLevel(optionLevel);
-            int optName = GetPlatformOptionName(optionName);
+            int optLevel, optName;
+            GetPlatformOptionInfo(optionLevel, optionName, out optLevel, out optName);
+
             uint optLen = (uint)optionLength;
 
             int err;
