@@ -176,13 +176,6 @@ namespace System.Net.Internals
             return Buffer.Length - IntPtr.Size;
         }
 
-        // For ReceiveFrom we need to update the address size upon IO return
-        internal unsafe void SetSize(IntPtr ptr)
-        {
-            // Apparently it must be less or equal the original value since ReceiveFrom cannot reallocate the address buffer
-            InternalSize = *(int*)ptr;
-        }
-
         public override bool Equals(object comparand)
         {
             SocketAddress castedComparand = comparand as SocketAddress;

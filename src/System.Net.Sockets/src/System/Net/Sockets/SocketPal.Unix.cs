@@ -1031,7 +1031,18 @@ namespace System.Net.Sockets
         public static unsafe SocketError SendAsync(SafeCloseSocket handle, IList<ArraySegment<byte>> buffers, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
             // TODO: audit "completed synchronously" behavior
-            if (!handle.AsyncContext.SendAsync(buffers, GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback))
+            if (!handle.AsyncContext.SendAsync(new BufferList(buffers), GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback))
+            {
+                return (SocketError)asyncResult.ErrorCode;
+            }
+
+            return SocketError.IOPending;
+        }
+
+        public static unsafe SocketError SendAsync(SafeCloseSocket handle, BufferOffsetSize[] buffers, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
+        {
+            // TODO: audit "completed synchronously" behavior
+            if (!handle.AsyncContext.SendAsync(new BufferList(buffers), GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback))
             {
                 return (SocketError)asyncResult.ErrorCode;
             }
@@ -1041,6 +1052,8 @@ namespace System.Net.Sockets
 
         public static unsafe SocketError SendToAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
         {
+            asyncResult.SocketAddress = socketAddress;
+
             // TODO: audit "completed synchronously" behavior
             if (!handle.AsyncContext.SendToAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress.Buffer, socketAddress.Size, asyncResult.CompletionCallback))
             {
@@ -1074,6 +1087,8 @@ namespace System.Net.Sockets
 
         public static unsafe SocketError ReceiveFromAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
         {
+            asyncResult.SocketAddress = socketAddress;
+
             // TODO: audit "completed synchronously" behavior
             if (!handle.AsyncContext.ReceiveFromAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress.Buffer, socketAddress.InternalSize, asyncResult.CompletionCallback))
             {

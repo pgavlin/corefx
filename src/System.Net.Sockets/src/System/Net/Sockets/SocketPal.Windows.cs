@@ -608,6 +608,31 @@ namespace System.Net.Sockets
             return errorCode;
         }
 
+        public static unsafe SocketError SendAsync(SafeCloseSocket handle, BufferOffsetSize[] buffers, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
+        {
+            // Set up asyncResult for overlapped WSASend.
+            // This call will use completion ports.
+            asyncResult.SetUnmanagedStructures(buffers);
+
+            // This can throw ObjectDisposedException.
+            int bytesTransferred;
+            SocketError errorCode = Interop.Winsock.WSASend(
+                handle,
+                asyncResult.m_WSABuffers,
+                asyncResult.m_WSABuffers.Length,
+                out bytesTransferred,
+                socketFlags,
+                asyncResult.OverlappedHandle,
+                IntPtr.Zero);
+
+            if (errorCode != SocketError.Success)
+            {
+                errorCode = GetLastSocketError();
+            }
+
+            return errorCode;
+        }
+
         public static unsafe SocketError SendToAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
         {
             // Set up asyncResult for overlapped WSASendTo.

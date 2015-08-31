@@ -40,7 +40,12 @@ namespace System.Net.Sockets
             {
                 return _socketAddress;
             }
+            set
+            {
+                _socketAddress = value;
+            }
         }
+
         //
         internal Internals.SocketAddress SocketAddressOriginal
         {

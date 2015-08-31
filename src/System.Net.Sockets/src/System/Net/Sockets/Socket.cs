@@ -3885,7 +3885,7 @@ namespace System.Net.Sockets
             castedAsyncResult.EndCalled = true;
 
             // Update socket address size
-            castedAsyncResult.SocketAddress.SetSize(castedAsyncResult.GetSocketAddressSizePtr());
+            castedAsyncResult.SocketAddress.InternalSize = castedAsyncResult.GetSocketAddressSize();
 
             if (!socketAddressOriginal.Equals(castedAsyncResult.SocketAddress))
             {
@@ -4139,7 +4139,7 @@ namespace System.Net.Sockets
             castedAsyncResult.EndCalled = true;
 
             // Update socket address size
-            castedAsyncResult.SocketAddress.SetSize(castedAsyncResult.GetSocketAddressSizePtr());
+            castedAsyncResult.SocketAddress.InternalSize = castedAsyncResult.GetSocketAddressSize();
 
             if (!socketAddressOriginal.Equals(castedAsyncResult.SocketAddress))
             {
@@ -6702,25 +6702,7 @@ namespace System.Net.Sockets
             SocketError errorCode = SocketError.SocketError;
             try
             {
-                // Set up asyncResult for overlapped WSASend.
-                // This call will use completion ports.
-                asyncResult.SetUnmanagedStructures(buffers);
-
-                // This can throw ObjectDisposedException.
-                int bytesTransferred;
-                errorCode = Interop.Winsock.WSASend(
-                    _handle,
-                    asyncResult.m_WSABuffers,
-                    asyncResult.m_WSABuffers.Length,
-                    out bytesTransferred,
-                    socketFlags,
-                    asyncResult.OverlappedHandle,
-                    IntPtr.Zero);
-
-                if (errorCode != SocketError.Success)
-                {
-                    errorCode = SocketPal.GetLastSocketError();
-                }
+                errorCode = SocketPal.SendAsync(_handle, buffers, socketFlags, asyncResult);
                 GlobalLog.Print("Socket#" + Logging.HashString(this) + "::BeginMultipleSend() Interop.Winsock.WSASend returns:" + errorCode.ToString() + " size:" + buffers.Length.ToString() + " returning AsyncResult:" + Logging.HashString(asyncResult));
             }
             finally

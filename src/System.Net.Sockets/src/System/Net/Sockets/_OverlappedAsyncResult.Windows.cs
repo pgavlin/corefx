@@ -35,6 +35,11 @@ namespace System.Net.Sockets
             return Marshal.UnsafeAddrOfPinnedArrayElement(_socketAddress.Buffer, _socketAddress.GetAddressSizeOffset());
         }
 
+        internal unsafe int GetSocketAddressSize()
+        {
+            return *(int*)GetSocketAddressSizePtr();
+        }
+
         //
         // SetUnmanagedStructures -
         // Fills in Overlapped Structures used in an Async Overlapped Winsock call

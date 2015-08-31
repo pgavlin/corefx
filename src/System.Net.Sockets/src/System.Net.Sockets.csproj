@@ -218,6 +218,7 @@
     <Compile Include="System\Net\Sockets\_ConnectOverlappedAsyncResult.Windows.cs" />
     <Compile Include="System\Net\Sockets\_OverlappedAsyncResult.Windows.cs" />
     <Compile Include="System\Net\Sockets\Socket.Windows.cs" />
+    <Compile Include="System\Net\Sockets\SocketAsyncEventArgs.Windows.cs" />
     <Compile Include="System\Net\Sockets\SocketPal.Windows.cs" />
 
     <Compile Include="$(CommonPath)\System\Net\SafeCloseSocket.Windows.cs">
@@ -240,11 +241,12 @@
     <Compile Include="System\Net\Sockets\_BaseOverlappedAsyncResult.Unix.cs" />
     <Compile Include="System\Net\Sockets\_ConnectOverlappedAsyncResult.Unix.cs" />
     <Compile Include="System\Net\Sockets\_OverlappedAsyncResult.Unix.cs" />
+    <Compile Include="System\Net\Sockets\BufferList.cs" />
     <Compile Include="System\Net\Sockets\Socket.Unix.cs" />
     <Compile Include="System\Net\Sockets\SocketPal.Unix.cs" />
 
-    <!-- TODO: remove this -->
-    <Compile Include="System\Net\Sockets\_OverlappedAsyncResult.Windows.cs" />
+    <!-- TODO: *nix implementation -->
+    <Compile Include="System\Net\Sockets\SocketAsyncEventArgs.Windows.cs" />
 
     <!-- TODO: remove this -->
     <Compile Include="RefactoringShims\InteropShim.cs">

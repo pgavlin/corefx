@@ -40,7 +40,7 @@ namespace System.Net.Sockets
         {
             public Action<int, byte[], int, SocketError> Callback;
             public byte[] Buffer;
-            public IList<ArraySegment<byte>> Buffers;
+            public BufferList Buffers;
             public int BufferIndex;
             public int Offset;
             public int Count;
@@ -393,7 +393,7 @@ namespace System.Net.Sockets
             return received;
         }
 
-        private static unsafe int Receive(int fd, int flags, int available, IList<ArraySegment<byte>> buffers, out Interop.Error errno)
+        private static unsafe int Receive(int fd, int flags, int available, BufferList buffers, out Interop.Error errno)
         {
             // Pin buffers and set up iovecs
             int maxBuffers = buffers.Count;
@@ -504,7 +504,7 @@ namespace System.Net.Sockets
 
             var operation = new TransferOperation {
                 Callback = callback,
-                Buffers = buffers,
+                Buffers = new BufferList(buffers),
                 Flags = flags,
                 BytesTransferred = bytesReceived
             };
@@ -530,12 +530,12 @@ namespace System.Net.Sockets
 
         private static bool TryCompleteReceive(int fileDescriptor, byte[] buffer, int offset, int count, int flags, out int bytesReceived, out SocketError errorCode)
         {
-            return TryCompleteReceive(fileDescriptor, buffer, null, offset, count, flags, out bytesReceived, out errorCode);
+            return TryCompleteReceive(fileDescriptor, buffer, default(BufferList), offset, count, flags, out bytesReceived, out errorCode);
         }
 
         private static bool TryCompleteReceive(int fileDescriptor, IList<ArraySegment<byte>> buffers, int flags, out int bytesReceived, out SocketError errorCode)
         {
-            return TryCompleteReceive(fileDescriptor, null, buffers, 0, 0, flags, out bytesReceived, out errorCode);
+            return TryCompleteReceive(fileDescriptor, null, new BufferList(buffers), 0, 0, flags, out bytesReceived, out errorCode);
         }
 
         private static bool TryCompleteReceive(int fileDescriptor, TransferOperation operation)
@@ -543,7 +543,7 @@ namespace System.Net.Sockets
             return TryCompleteReceive(fileDescriptor, operation.Buffer, operation.Buffers, operation.Offset, operation.Count, operation.Flags, out operation.BytesTransferred, out operation.ErrorCode);
         }
 
-        private static unsafe bool TryCompleteReceive(int fileDescriptor, byte[] buffer, IList<ArraySegment<byte>> buffers, int offset, int count, int flags, out int bytesReceived, out SocketError errorCode)
+        private static unsafe bool TryCompleteReceive(int fileDescriptor, byte[] buffer, BufferList buffers, int offset, int count, int flags, out int bytesReceived, out SocketError errorCode)
         {
             int available;
             int err = Interop.libc.ioctl(fileDescriptor, (UIntPtr)Interop.libc.FIONREAD, &available);
@@ -567,7 +567,7 @@ namespace System.Net.Sockets
             }
             else
             {
-                Debug.Assert(buffers != null);
+                Debug.Assert(buffers.IsInitialized);
                 received = Receive(fileDescriptor, flags, available, buffers, out errno);
             }
 
@@ -689,7 +689,7 @@ namespace System.Net.Sockets
             return sent;
         }
 
-        private static unsafe int Send(int fd, int flags, IList<ArraySegment<byte>> buffers, ref int bufferIndex, ref int offset, out Interop.Error errno)
+        private static unsafe int Send(int fd, int flags, BufferList buffers, ref int bufferIndex, ref int offset, out Interop.Error errno)
         {
             // Pin buffers and set up iovecs
             int startIndex = bufferIndex, startOffset = offset;
@@ -802,7 +802,7 @@ namespace System.Net.Sockets
             return true;
         }
 
-        public bool SendAsync(IList<ArraySegment<byte>> buffers, int flags, Action<int, byte[], int, SocketError> callback)
+        public bool SendAsync(BufferList buffers, int flags, Action<int, byte[], int, SocketError> callback)
         {
             int bufferIndex = 0;
             int offset = 0;
@@ -845,10 +845,10 @@ namespace System.Net.Sockets
         private static bool TryCompleteSend(int fileDescriptor, byte[] buffer, ref int offset, ref int count, int flags, ref int bytesSent, out SocketError errorCode)
         {
             int bufferIndex = 0;
-            return TryCompleteSend(fileDescriptor, buffer, null, ref bufferIndex, ref offset, ref count, flags, ref bytesSent, out errorCode);
+            return TryCompleteSend(fileDescriptor, buffer, default(BufferList), ref bufferIndex, ref offset, ref count, flags, ref bytesSent, out errorCode);
         }
 
-        private static bool TryCompleteSend(int fileDescriptor, IList<ArraySegment<byte>> buffers, ref int bufferIndex, ref int offset, int flags, ref int bytesSent, out SocketError errorCode)
+        private static bool TryCompleteSend(int fileDescriptor, BufferList buffers, ref int bufferIndex, ref int offset, int flags, ref int bytesSent, out SocketError errorCode)
         {
             int count = 0;
             return TryCompleteSend(fileDescriptor, null, buffers, ref bufferIndex, ref offset, ref count, flags, ref bytesSent, out errorCode);
@@ -859,7 +859,7 @@ namespace System.Net.Sockets
             return TryCompleteSend(fileDescriptor, operation.Buffer, operation.Buffers, ref operation.BufferIndex, ref operation.Offset, ref operation.Count, operation.Flags, ref operation.BytesTransferred, out operation.ErrorCode);
         }
 
-        private static bool TryCompleteSend(int fileDescriptor, byte[] buffer, IList<ArraySegment<byte>> buffers, ref int bufferIndex, ref int offset, ref int count, int flags, ref int bytesSent, out SocketError errorCode)
+        private static bool TryCompleteSend(int fileDescriptor, byte[] buffer, BufferList buffers, ref int bufferIndex, ref int offset, ref int count, int flags, ref int bytesSent, out SocketError errorCode)
         {
             for (;;)
             {
@@ -871,7 +871,7 @@ namespace System.Net.Sockets
                 }
                 else
                 {
-                    Debug.Assert(buffers != null);
+                    Debug.Assert(buffers.IsInitialized);
                     sent = Send(fileDescriptor, flags, buffers, ref bufferIndex, ref offset, out errno);
                 }
 
@@ -891,7 +891,7 @@ namespace System.Net.Sockets
 
                 bool isComplete = sent == 0 ||
                     (buffer != null && count == 0) ||
-                    (buffers != null && bufferIndex == buffers.Count);
+                    (buffers.IsInitialized && bufferIndex == buffers.Count);
                 if (isComplete)
                 {
                     errorCode = SocketError.Success;
