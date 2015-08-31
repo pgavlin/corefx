@@ -1083,7 +1083,7 @@ namespace System.Net.Sockets
             return SocketError.IOPending;
         }
 
-        public static unsafe SocketError AcceptAsync(SafeCloseSocket handle, SafeCloseSocket acceptHandle, int socketAddressSize, AcceptOverlappedAsyncResult asyncResult)
+        public static unsafe SocketError AcceptAsync(Socket socket, SafeCloseSocket handle, SafeCloseSocket acceptHandle, int receiveSize, int socketAddressSize, AcceptOverlappedAsyncResult asyncResult)
         {
             Debug.Assert(acceptHandle == null);
 

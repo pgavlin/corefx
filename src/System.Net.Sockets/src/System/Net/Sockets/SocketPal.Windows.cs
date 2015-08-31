@@ -17,8 +17,10 @@ namespace System.Net.Sockets
 {
     internal static class SocketPal
     {
-        private static void MicrosecondsToTimeValue(long microseconds, ref TimeValue socketTime)
+        private static void MicrosecondsToTimeValue(long microseconds, ref Interop.Winsock.TimeValue socketTime)
         {
+            const int microcnv = 1000000;
+
             socketTime.Seconds = (int)(microseconds / microcnv);
             socketTime.Microseconds = (int)(microseconds % microcnv);
         }
@@ -391,7 +393,7 @@ namespace System.Net.Sockets
 
         public static unsafe SocketError SetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, int optionValue)
         {
-            return Interop.winsock.setsockopt(
+            return Interop.Winsock.setsockopt(
                 handle,
                 optionLevel,
                 optionName,
@@ -434,7 +436,7 @@ namespace System.Net.Sockets
         {
             IntPtr rawHandle = handle.DangerousGetHandle();
             IntPtr[] fileDescriptorSet = new IntPtr[2] { (IntPtr)1, rawHandle };
-            TimeValue IOwait = new TimeValue();
+            Interop.Winsock.TimeValue IOwait = new Interop.Winsock.TimeValue();
 
             //
             // negative timeout value implies indefinite wait
@@ -493,7 +495,7 @@ namespace System.Net.Sockets
             int socketCount;
             if (microseconds != -1)
             {
-                TimeValue IOwait = new TimeValue();
+                Interop.Winsock.TimeValue IOwait = new Interop.Winsock.TimeValue();
                 MicrosecondsToTimeValue((long)(uint)microseconds, ref IOwait);
 
                 socketCount =
@@ -531,8 +533,8 @@ namespace System.Net.Sockets
 
         public static SocketError Shutdown(SafeCloseSocket handle, SocketShutdown how)
         {
-            int err = Interop.Winsock.shutdown(handle, (int)how);
-            return (SocketError)err == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
+            SocketError err = Interop.Winsock.shutdown(handle, (int)how);
+            return err == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
         }
 
         public static unsafe SocketError ConnectAsync(Socket socket, SafeCloseSocket handle, byte[] socketAddress, int socketAddressLen, ConnectOverlappedAsyncResult asyncResult)
@@ -613,7 +615,7 @@ namespace System.Net.Sockets
             asyncResult.SetUnmanagedStructures(buffer, offset, count, socketAddress, false /* don't pin RemoteEP*/);
 
             int bytesTransferred;
-            errorCode = Interop.Winsock.WSASendTo(
+            SocketError errorCode = Interop.Winsock.WSASendTo(
                 handle,
                 ref asyncResult.m_SingleBuffer,
                 1, // only ever 1 buffer being sent
@@ -652,7 +654,6 @@ namespace System.Net.Sockets
             if (errorCode != SocketError.Success)
             {
                 errorCode = GetLastSocketError();
-                GlobalLog.Assert(errorCode != SocketError.Success, "Socket#{0}::DoBeginReceive()|GetLastWin32Error() returned zero.", Logging.HashString(this));
             }
 
             return errorCode;
@@ -678,7 +679,6 @@ namespace System.Net.Sockets
             if (errorCode != SocketError.Success)
             {
                 errorCode = GetLastSocketError();
-                GlobalLog.Assert(errorCode != SocketError.Success, "Socket#{0}::DoBeginReceive()|GetLastWin32Error() returned zero.", Logging.HashString(this));
             }
 
             return errorCode;
@@ -691,7 +691,7 @@ namespace System.Net.Sockets
             asyncResult.SetUnmanagedStructures(buffer, offset, count, socketAddress, true /* pin remoteEP*/);
 
             int bytesTransferred;
-            errorCode = Interop.Winsock.WSARecvFrom(
+            SocketError errorCode = Interop.Winsock.WSARecvFrom(
                 handle,
                 ref asyncResult.m_SingleBuffer,
                 1,
@@ -710,7 +710,7 @@ namespace System.Net.Sockets
             return errorCode;
         }
 
-        public static unsafe SocketError AcceptAsync(SafeCloseSocket handle, SafeCloseSocket acceptHandle, int socketAddressSize, AcceptOverlappedAsyncResult asyncResult)
+        public static unsafe SocketError AcceptAsync(Socket socket, SafeCloseSocket handle, SafeCloseSocket acceptHandle, int receiveSize, int socketAddressSize, AcceptOverlappedAsyncResult asyncResult)
         {
             //the buffer needs to contain the requested data plus room for two sockaddrs and 16 bytes
             //of associated data for each.
@@ -728,7 +728,7 @@ namespace System.Net.Sockets
             // This can throw ObjectDisposedException.
             int bytesTransferred;
             SocketError errorCode = SocketError.Success;
-            if (!AcceptEx(
+            if (!socket.AcceptEx(
                 handle,
                 acceptHandle,
                 Marshal.UnsafeAddrOfPinnedArrayElement(asyncResult.Buffer, 0),

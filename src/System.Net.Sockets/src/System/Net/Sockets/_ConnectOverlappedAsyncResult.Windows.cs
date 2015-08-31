@@ -12,7 +12,7 @@ namespace System.Net.Sockets
     //
     //  ConnectOverlappedAsyncResult - used to take care of storage for async Socket BeginAccept call.
     //
-    internal class ConnectOverlappedAsyncResult : BaseOverlappedAsyncResult
+    internal partial class ConnectOverlappedAsyncResult : BaseOverlappedAsyncResult
     {
         //
         // This method is called by base.CompletionPortCallback base.OverlappedCallback as part of IO completion

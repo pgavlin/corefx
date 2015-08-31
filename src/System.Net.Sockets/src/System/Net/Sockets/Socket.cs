@@ -85,7 +85,6 @@ namespace System.Net.Sockets
         private static object s_InternalSyncObject;
         private int _closeTimeout = Socket.DefaultCloseTimeout;
         private int _intCleanedUp;                 // 0 if not completed >0 otherwise.
-        private const int microcnv = 1000000;
         private readonly static int s_protocolInformationSize = Marshal.SizeOf<Interop.Winsock.WSAPROTOCOL_INFO>();
 
         internal static volatile bool s_Initialized;
@@ -3492,6 +3491,8 @@ namespace System.Net.Sockets
             //
             if (errorCode != SocketError.Success)
             {
+                GlobalLog.Assert(errorCode != SocketError.Success, "Socket#{0}::DoBeginReceive()|GetLastWin32Error() returned zero.", Logging.HashString(this));
+
                 //
                 // update our internal state after this socket error and throw
                 UpdateStatusAfterSocketError(errorCode);
@@ -4322,7 +4323,7 @@ namespace System.Net.Sockets
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::DoBeginAccept() AcceptSocket:" + Logging.HashString(acceptSocket));
 
             int socketAddressSize = m_RightEndPoint.Serialize().Size;
-            SocketError errorCode = SocketPal.AcceptAsync(_handle, acceptHandle, socketAddressSize, asyncResult);
+            SocketError errorCode = SocketPal.AcceptAsync(this, _handle, acceptHandle, receiveSize, socketAddressSize, asyncResult);
 
             errorCode = asyncResult.CheckAsyncCallOverlappedResult(errorCode);
 
@@ -5524,7 +5525,7 @@ namespace System.Net.Sockets
             }
         }
 
-        private bool AcceptEx(SafeCloseSocket listenSocketHandle,
+        internal bool AcceptEx(SafeCloseSocket listenSocketHandle,
                               SafeCloseSocket acceptSocketHandle,
                               IntPtr buffer,
                               int len,
@@ -5606,7 +5607,7 @@ namespace System.Net.Sockets
             return recvMsg(socketHandle, msg, out bytesTransferred, overlapped, completionRoutine);
         }
 
-        private SocketError WSARecvMsg_Blocking(IntPtr socketHandle, IntPtr msg, out int bytesTransferred, IntPtr overlapped, IntPtr completionRoutine)
+        internal SocketError WSARecvMsg_Blocking(IntPtr socketHandle, IntPtr msg, out int bytesTransferred, IntPtr overlapped, IntPtr completionRoutine)
         {
             EnsureDynamicWinsockMethods();
             WSARecvMsgDelegate_Blocking recvMsg_Blocking = _dynamicWinsockMethods.GetDelegate<WSARecvMsgDelegate_Blocking>(_handle);
