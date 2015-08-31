@@ -9,26 +9,25 @@ using System.Threading.Tasks;
 namespace System.Net
 {
     // LazyAsyncResult - Base class for all IAsyncResult classes
-    // that want to take advantage of lazy allocated event handles
+    // that want to take advantage of lazy allocated event handles.
     internal class LazyAsyncResult : IAsyncResult
     {
         private const int c_HighBit = unchecked((int)0x80000000);
         private const int c_ForceAsyncCount = 50;
 
-#if !NET_PERF
         // This is to avoid user mistakes when they queue another async op from a callback the completes sync.
         [ThreadStatic]
-        private static ThreadContext t_ThreadContext;
+        private static ThreadContext s_ThreadContext;
 
         private static ThreadContext CurrentThreadContext
         {
             get
             {
-                ThreadContext threadContext = t_ThreadContext;
+                ThreadContext threadContext = s_ThreadContext;
                 if (threadContext == null)
                 {
                     threadContext = new ThreadContext();
-                    t_ThreadContext = threadContext;
+                    s_ThreadContext = threadContext;
                 }
                 return threadContext;
             }
@@ -38,7 +37,6 @@ namespace System.Net
         {
             internal int m_NestedIOCount;
         }
-#endif
 
 #if DEBUG
         internal object _DebugAsyncChain = null;           // Optionally used to track chains of async calls.
@@ -56,10 +54,10 @@ namespace System.Net
         private int _intCompleted;                 // Sign bit indicates synchronous completion if set.
                                                    // Remaining bits count the number of InvokeCallbak() calls.
 
-        private bool _endCalled;                   // true if the user called the End*() method.
-        private bool _userEvent;                   // true if the event has been (or is about to be) handed to the user
+        private bool _endCalled;                   // True if the user called the End*() method.
+        private bool _userEvent;                   // True if the event has been (or is about to be) handed to the user
 
-        private object _event;                     // lazy allocated event to be returned in the IAsyncResult for the client to wait on
+        private object _event;                     // Lazy allocated event to be returned in the IAsyncResult for the client to wait on.
 
 
         internal LazyAsyncResult(object myObject, object myState, AsyncCallback myCallBack)
@@ -69,14 +67,10 @@ namespace System.Net
             _asyncCallback = myCallBack;
             _result = DBNull.Value;
             GlobalLog.Print("LazyAsyncResult#" + Logging.HashString(this) + "::.ctor()");
-#if TRACK_LAR
-            _MyIndex = Interlocked.Increment(ref _PendingIndex);
-            _PendingResults.Add(_MyIndex, this);
-#endif
         }
 
         // Allows creating a pre-completed result with less interlockeds.  Beware!  Constructor calls the callback.
-        // if a derived class ever uses this and overloads Cleanup, this may need to change
+        // If a derived class ever uses this and overloads Cleanup, this may need to change.
         internal LazyAsyncResult(object myObject, object myState, AsyncCallback myCallBack, object result)
         {
             GlobalLog.Assert(result != DBNull.Value, "LazyAsyncResult#{0}::.ctor()|Result can't be set to DBNull - it's a special internal value.", Logging.HashString(this));
@@ -99,7 +93,7 @@ namespace System.Net
             GlobalLog.Print("LazyAsyncResult#" + Logging.HashString(this) + "::.ctor() (pre-completed)");
         }
 
-        // Interface method to return the original async object:
+        // Interface method to return the original async object.
         internal object AsyncObject
         {
             get
@@ -132,9 +126,6 @@ namespace System.Net
 
         // Interface property to return a WaitHandle that can be waited on for I/O completion.
         // This property implements lazy event creation.
-        // the event object is only created when this property is accessed,
-        // since we're internally only using callbacks, as long as the user is using
-        // callbacks as well we will not create an event at all.
         // If this is used, the event cannot be disposed because it is under the control of the
         // application.  Internal should use InternalWaitForCompletion instead - never AsyncWaitHandle.
         public WaitHandle AsyncWaitHandle
@@ -181,8 +172,6 @@ namespace System.Net
         // May return with a null handle.  That means it thought it got one, but it was disposed in the mean time.
         private bool LazilyCreateEvent(out ManualResetEvent waitHandle)
         {
-            // lazy allocation of the event:
-            // if this property is never accessed this object is never created
             waitHandle = new ManualResetEvent(false);
             try
             {
@@ -265,7 +254,7 @@ namespace System.Net
                 }
 #endif
 
-                // Look at just the low bits to see if it's been incremented.  If it hasn't, set the high bit
+                // Verify low bits to see if it's been incremented.  If it hasn't, set the high bit
                 // to show that it's been looked at.
                 int result = _intCompleted;
                 if (result == 0)
@@ -276,7 +265,7 @@ namespace System.Net
             }
         }
 
-        // Use to see if something's completed without fixing CompletedSynchronously
+        // Use to see if something's completed without fixing CompletedSynchronously.
         internal bool InternalPeekCompleted
         {
             get
@@ -299,7 +288,6 @@ namespace System.Net
                 //
                 // But if the result was set here (as a preemptive error or for some other reason),
                 // then the "result" parameter passed to InvokeCallback() will be ignored.
-                //
 
                 // It's an error to call after the result has been completed or with DBNull.
                 GlobalLog.Assert(value != DBNull.Value, "LazyAsyncResult#{0}::set_Result()|Result can't be set to DBNull - it's a special internal value.", Logging.HashString(this));
@@ -333,8 +321,7 @@ namespace System.Net
             }
         }
 
-        // A method for completing the IO with a result
-        // and invoking the user's callback.
+        // A method for completing the IO with a result and invoking the user's callback.
         // Used by derived classes to pass context into an overridden Complete().  Useful
         // for determining the 'winning' thread in case several may simultaneously call
         // the equivalent of InvokeCallback().
@@ -362,8 +349,6 @@ namespace System.Net
                 if (_result == DBNull.Value)
                     _result = result;
 
-                // Does this need a memory barrier to be sure this thread gets the m_Event if it's set?  I don't think so
-                // because the Interlockeds on m_IntCompleted/m_Event should serve as the barrier.
                 ManualResetEvent asyncEvent = (ManualResetEvent)_event;
                 if (asyncEvent != null)
                 {
@@ -382,15 +367,13 @@ namespace System.Net
             }
         }
 
-        // A method for completing the IO with a result
-        // and invoking the user's callback.
+        // A method for completing the IO with a result and invoking the user's callback.
         internal void InvokeCallback(object result)
         {
             ProtectedInvokeCallback(result, IntPtr.Zero);
         }
 
-        // A method for completing the IO without a result
-        // and invoking the user's callback.
+        // A method for completing the IO without a result and invoking the user's callback.
         internal void InvokeCallback()
         {
             ProtectedInvokeCallback(null, IntPtr.Zero);
@@ -403,34 +386,28 @@ namespace System.Net
         //
         protected virtual void Complete(IntPtr userToken)
         {
-#if !NET_PERF
             bool offloaded = false;
             ThreadContext threadContext = CurrentThreadContext;
             try
             {
                 ++threadContext.m_NestedIOCount;
-#else
-            try
-            {
-#endif
                 if (_asyncCallback != null)
                 {
                     GlobalLog.Print("LazyAsyncResult#" + Logging.HashString(this) + "::Complete() invoking callback");
 
-#if !NET_PERF
                     if (threadContext.m_NestedIOCount >= c_ForceAsyncCount)
                     {
                         GlobalLog.Print("LazyAsyncResult::Complete *** OFFLOADED the user callback ***");
                         Task.Factory.StartNew(
-                            s => WorkerThreadComplete(s),
-                            null, 
+                            s => WorkerThreadComplete(s), 
+                            null,
                             CancellationToken.None,
                             TaskCreationOptions.DenyChildAttach,
                             TaskScheduler.Default);
+
                         offloaded = true;
                     }
                     else
-#endif
                     {
                         _asyncCallback(this);
                     }
@@ -442,21 +419,16 @@ namespace System.Net
             }
             finally
             {
-#if !NET_PERF
                 --threadContext.m_NestedIOCount;
 
                 // Never call this method unless interlocked m_IntCompleted check has succeeded (like in this case)
                 if (!offloaded)
-#endif
                 {
                     Cleanup();
                 }
             }
         }
 
-
-
-#if !NET_PERF
         // Only called in the above method
         private void WorkerThreadComplete(object state)
         {
@@ -469,28 +441,17 @@ namespace System.Net
                 Cleanup();
             }
         }
-#endif
 
         // Custom instance cleanup method.
         // Derived types override this method to release unmanaged resources associated with an IO request.
         protected virtual void Cleanup()
         {
-#if TRACK_LAR
-            _PendingResults.Remove(_MyIndex);
-#endif
         }
 
         internal object InternalWaitForCompletion()
         {
             return WaitForCompletion(true);
         }
-
-        /*
-        internal object InternalWaitForCompletionNoSideEffects()
-        {
-            return WaitForCompletion(false);
-        }
-        */
 
         private object WaitForCompletion(bool snap)
         {

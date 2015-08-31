@@ -121,7 +121,7 @@ namespace System.Net
             }
         }
 
-        // Security: We need an assert for a call into WindowsIdentity.GetCurrent
+        // Security: We need an assert for a call into WindowsIdentity.GetCurrent.
         private void SafeCaptureIdentity()
         {
             _Wi = WindowsIdentity.GetCurrent();
@@ -307,28 +307,6 @@ namespace System.Net
             return calledCallback;
         }
 
-        /* enable when needed
-                //
-                // Use this to block until FinishPostingAsyncOp() completes.  Must check for null.
-                //
-                internal object PostingLock
-                {
-                    get
-                    {
-                        return _Lock;
-                    }
-                }
-
-                //
-                // Call this if you want to cancel any flowing.
-                //
-                internal void InvokeCallbackWithoutContext(object result)
-                {
-                    ProtectedInvokeCallback(result, (IntPtr) 1);
-                }
-        */
-
-        //
         protected override void Cleanup()
         {
             base.Cleanup();

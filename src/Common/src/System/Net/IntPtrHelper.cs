@@ -5,12 +5,6 @@ namespace System.Net
 {
     internal static class IntPtrHelper
     {
-        /*
-        // Consider removing.
-        internal static IntPtr Add(IntPtr a, IntPtr b) {
-            return (IntPtr) ((long)a + (long)b);
-        }
-        */
         internal static IntPtr Add(IntPtr a, int b)
         {
             return (IntPtr)((long)a + (long)b);

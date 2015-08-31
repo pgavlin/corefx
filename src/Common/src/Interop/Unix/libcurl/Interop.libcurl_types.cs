@@ -29,8 +29,10 @@ internal static partial class Interop
 
             internal const int CURLOPT_NOBODY = CurlOptionLongBase + 44;
             internal const int CURLOPT_UPLOAD = CurlOptionLongBase + 46;
+            internal const int CURLOPT_POST = CurlOptionLongBase + 47;
             internal const int CURLOPT_FOLLOWLOCATION = CurlOptionLongBase + 52;
             internal const int CURLOPT_PROXYPORT = CurlOptionLongBase + 59;
+            internal const int CURLOPT_POSTFIELDSIZE = CurlOptionLongBase + 60;
             internal const int CURLOPT_MAXREDIRS = CurlOptionLongBase + 68;
             internal const int CURLOPT_PROXYTYPE = CurlOptionLongBase + 101;
             internal const int CURLOPT_HTTPAUTH = CurlOptionLongBase + 107;
@@ -46,6 +48,7 @@ internal static partial class Interop
             internal const int CURLOPT_ACCEPTENCODING = CurlOptionObjectPointBase + 102;
             internal const int CURLOPT_PRIVATE = CurlOptionObjectPointBase + 103;
             internal const int CURLOPT_IOCTLDATA = CurlOptionObjectPointBase + 131;
+            internal const int CURLOPT_COPYPOSTFIELDS = CurlOptionObjectPointBase + 165;
             internal const int CURLOPT_USERNAME = CurlOptionObjectPointBase + 173;
             internal const int CURLOPT_PASSWORD = CurlOptionObjectPointBase + 174;
 

@@ -67,7 +67,7 @@ namespace System.Net
 
         public static unsafe IPHostEntry GetHostByAddr(IPAddress addr)
         {
-            // TODO: Optimize this (or decide if this legacy code can be removed):
+            // TODO #2891: Optimize this (or decide if this legacy code can be removed):
             byte[] addressBytes = addr.GetAddressBytes();
             var address = new Interop.libc.in_addr { s_addr = unchecked((uint)BitConverter.ToInt32(addressBytes, 0)) };
 
