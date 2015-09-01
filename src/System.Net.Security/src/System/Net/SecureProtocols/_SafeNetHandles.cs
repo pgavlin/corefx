@@ -304,71 +304,6 @@ namespace System.Net.Security
 
     ///////////////////////////////////////////////////////////////
     //
-    // Implementation of handles that require CertFreeCertificateChain
-    //
-    ///////////////////////////////////////////////////////////////
-    internal sealed class SafeFreeCertChain : SafeHandleZeroOrMinusOneIsInvalid
-    {
-        // This ctor will create a handle that we >>don't<< own
-        internal SafeFreeCertChain(IntPtr handle) : base(false)
-        {
-            SetHandle(handle);
-        }
-
-        internal SafeFreeCertChain(IntPtr handle, bool ownsHandle)
-            : base(ownsHandle)
-        {
-            SetHandle(handle);
-        }
-
-        public override string ToString()
-        {
-            return "0x" + DangerousGetHandle().ToString("x");
-        }
-
-        protected override bool ReleaseHandle()
-        {
-            Interop.SafeNetHandles.CertFreeCertificateChain(handle);
-            return true;
-        }
-    }
-
-    ///////////////////////////////////////////////////////////////
-    //
-    // Implementation of handles that require CertFreeCertificateChainList
-    //
-    ///////////////////////////////////////////////////////////////
-    internal sealed class SafeFreeCertChainList : SafeHandleZeroOrMinusOneIsInvalid
-    {
-        internal SafeFreeCertChainList() : base(true) { }
-
-        public override string ToString()
-        {
-            return "0x" + DangerousGetHandle().ToString("x");
-        }
-
-        protected override bool ReleaseHandle()
-        {
-            // TODO: Make this work better in a future version
-            //
-            // According to the CertSelectCertificateChains MSDN documentation
-            // http://msdn.microsoft.com/en-us/library/windows/desktop/dd433797(v=vs.85).aspx
-            //
-            // "Storage for the array is allocated by the CertSelectCertificateChains function. 
-            // To free the allocated memory you must first release each individual chain context
-            // in the array by calling the CertFreeCertificateChain function. Then you must free 
-            // the memory by calling the CertFreeCertificateChainList function."
-            //
-            // However, we don't loop thru the chain list here and call CertFreeCertificateChain
-            // on each chain because we already did when we used the chains in the UnsafeNativeMethods.cs,
-            // Interop.NativePKI.FindClientCertificates() method.
-            Interop.SafeNetHandles.CertFreeCertificateChainList(handle);
-            return true;
-        }
-    }
-
-    ///////////////////////////////////////////////////////////////
-    //
     // Implementation of handles required CertFreeCertificateContext
     //
     ///////////////////////////////////////////////////////////////
@@ -397,29 +332,6 @@ namespace System.Net.Security
         }
     }
 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct SSPIHandle
-    {
-        private IntPtr HandleHi;
-        private IntPtr HandleLo;
-
-        public bool IsZero
-        {
-            get { return HandleHi == IntPtr.Zero && HandleLo == IntPtr.Zero; }
-        }
-
-        internal void SetToInvalid()
-        {
-            HandleHi = IntPtr.Zero;
-            HandleLo = IntPtr.Zero;
-        }
-
-        public override string ToString()
-        {
-            { return HandleHi.ToString("x") + ":" + HandleLo.ToString("x"); }
-        }
-    }
-
     ///////////////////////////////////////////////////////////////
     //
     // Implementation of handles dependable on FreeCredentialsHandle
@@ -435,11 +347,11 @@ namespace System.Net.Security
     {
 #endif
 
-        internal SSPIHandle _handle;    //should be always used as by ref in PINvokes parameters
+        internal Interop.Secur32.SSPIHandle _handle;    //should be always used as by ref in PINvokes parameters
 
         protected SafeFreeCredentials() : base(IntPtr.Zero, true)
         {
-            _handle = new SSPIHandle();
+            _handle = new Interop.Secur32.SSPIHandle();
         }
 
 #if TRAVE
@@ -735,13 +647,13 @@ namespace System.Net.Security
         // ATN: _handle is internal since it is used on PInvokes by other wrapper methods.
         //      However all such wrappers MUST manually and reliably adjust refCounter of SafeDeleteContext handle.
         //
-        internal SSPIHandle _handle;
+        internal Interop.Secur32.SSPIHandle _handle;
 
         protected SafeFreeCredentials _EffectiveCredential;
 
         protected SafeDeleteContext() : base(IntPtr.Zero, true)
         {
-            _handle = new SSPIHandle();
+            _handle = new Interop.Secur32.SSPIHandle();
         }
 
         public override bool IsInvalid
@@ -825,7 +737,7 @@ namespace System.Net.Security
 
             int errorCode = -1;
 
-            SSPIHandle contextHandle = new SSPIHandle();
+            Interop.Secur32.SSPIHandle contextHandle = new Interop.Secur32.SSPIHandle();
             if (refContext != null)
                 contextHandle = refContext._handle;
 
@@ -999,7 +911,7 @@ namespace System.Net.Security
             }
             finally
             {
-                SSPIHandle credentialHandle = inCredentials._handle;
+                Interop.Secur32.SSPIHandle credentialHandle = inCredentials._handle;
                 long timeStamp;
 
                 if (!b1)
@@ -1120,7 +1032,7 @@ namespace System.Net.Security
 
             int errorCode = -1;
 
-            SSPIHandle contextHandle = new SSPIHandle();
+            Interop.Secur32.SSPIHandle contextHandle = new Interop.Secur32.SSPIHandle();
             if (refContext != null)
                 contextHandle = refContext._handle;
 
@@ -1291,7 +1203,7 @@ namespace System.Net.Security
             }
             finally
             {
-                SSPIHandle credentialHandle = inCredentials._handle;
+                Interop.Secur32.SSPIHandle credentialHandle = inCredentials._handle;
                 long timeStamp;
 
                 if (!b1)
@@ -1409,7 +1321,7 @@ namespace System.Net.Security
                     }
                 }
 
-                SSPIHandle contextHandle = new SSPIHandle();
+                Interop.Secur32.SSPIHandle contextHandle = new Interop.Secur32.SSPIHandle();
                 if (refContext != null)
                 {
                     contextHandle = refContext._handle;

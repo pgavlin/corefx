@@ -15,6 +15,7 @@ using System.ComponentModel;
 using System.Security.Principal;
 using System.Security;
 using System.Collections;
+using Microsoft.Win32.SafeHandles;
 
 namespace System.Net.Security
 {
@@ -1300,20 +1301,26 @@ namespace System.Net.Security
                         unsafe
                         {
                             uint status = 0;
-                            Interop.ChainPolicyParameter cppStruct = new Interop.ChainPolicyParameter();
-                            cppStruct.cbSize = Interop.ChainPolicyParameter.StructSize;
-                            cppStruct.dwFlags = 0;
 
+                            var eppStruct = new Interop.Crypt32.SSL_EXTRA_CERT_CHAIN_POLICY_PARA() {
+                                cbSize = (uint)Marshal.SizeOf<Interop.Crypt32.SSL_EXTRA_CERT_CHAIN_POLICY_PARA>(),
+                                dwAuthType = IsServer ? Interop.Crypt32.AuthType.AUTHTYPE_SERVER : Interop.Crypt32.AuthType.AUTHTYPE_CLIENT,
+                                fdwChecks = 0,
+                                pwszServerName = null
+                            };
 
-                            Interop.SSL_EXTRA_CERT_CHAIN_POLICY_PARA eppStruct = new Interop.SSL_EXTRA_CERT_CHAIN_POLICY_PARA(IsServer);
-                            cppStruct.pvExtraPolicyPara = &eppStruct;
+                            var cppStruct = new Interop.Crypt32.CERT_CHAIN_POLICY_PARA() {
+                                cbSize = (uint)Marshal.SizeOf<Interop.Crypt32.CERT_CHAIN_POLICY_PARA>(),
+                                dwFlags = 0,
+                                pvExtraPolicyPara = &eppStruct
+                            };
 
                             fixed (char* namePtr = m_HostName)
                             {
                                 eppStruct.pwszServerName = namePtr;
                                 cppStruct.dwFlags |= (int)(Interop.IgnoreCertProblem.none & ~Interop.IgnoreCertProblem.invalid_name);
 
-                                SafeFreeCertChain chainContext = new SafeFreeCertChain(chain.SafeHandle.DangerousGetHandle());
+                                SafeX509ChainHandle chainContext = chain.SafeHandle;
                                 status = Interop.CertificateChainPolicy.Verify(chainContext, ref cppStruct);
                                 if ((Interop.CertificateProblem)status == Interop.CertificateProblem.CertCN_NO_MATCH)
                                     sslPolicyErrors |= SslPolicyErrors.RemoteCertificateNameMismatch;

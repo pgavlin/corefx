@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Win32.SafeHandles;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -148,58 +149,7 @@ internal static partial class Interop
         MatchTypeAnd = 0x00,
         MatchTypeOr = 0x01,
     }
-
-    [StructLayout(LayoutKind.Sequential)]
-    internal unsafe struct ChainPolicyParameter
-    {
-        public uint cbSize;
-        public uint dwFlags;
-        public SSL_EXTRA_CERT_CHAIN_POLICY_PARA* pvExtraPolicyPara;
-
-        public static readonly uint StructSize = (uint)Marshal.SizeOf<ChainPolicyParameter>();
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    internal unsafe struct SSL_EXTRA_CERT_CHAIN_POLICY_PARA
-    {
-        [StructLayout(LayoutKind.Explicit)]
-        internal struct U
-        {
-            [FieldOffset(0)]
-            internal uint cbStruct;  //DWORD
-            [FieldOffset(0)]
-            internal uint cbSize;    //DWORD
-        };
-        internal U u;
-        internal int dwAuthType;  //DWORD
-        internal uint fdwChecks;   //DWORD
-        internal char* pwszServerName; //WCHAR* // used to check against CN=xxxx
-
-        internal SSL_EXTRA_CERT_CHAIN_POLICY_PARA(bool amIServer)
-        {
-            u.cbStruct = StructSize;
-            u.cbSize = StructSize;
-            //#      define      AUTHTYPE_CLIENT         1
-            //#      define      AUTHTYPE_SERVER         2
-            dwAuthType = amIServer ? 1 : 2;
-            fdwChecks = 0;
-            pwszServerName = null;
-        }
-        static readonly uint StructSize = (uint)Marshal.SizeOf<SSL_EXTRA_CERT_CHAIN_POLICY_PARA>();
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    internal unsafe struct ChainPolicyStatus
-    {
-        public uint cbSize;
-        public uint dwError;
-        public uint lChainIndex;
-        public uint lElementIndex;
-        public void* pvExtraPolicyStatus;
-
-        public static readonly uint StructSize = (uint)Marshal.SizeOf<ChainPolicyStatus>();
-    }
-
+        
     [StructLayout(LayoutKind.Sequential)]
     internal unsafe struct CertEnhKeyUse
     {
@@ -787,13 +737,14 @@ internal static partial class Interop
     {
         private const uint IgnoreUnmatchedCN = 0x00001000;
 
-        internal static uint Verify(SafeFreeCertChain chainContext, ref ChainPolicyParameter cpp)
+        internal static uint Verify(SafeX509ChainHandle chainContext, ref Interop.Crypt32.CERT_CHAIN_POLICY_PARA cpp)
         {
             GlobalLog.Enter("PolicyWrapper::VerifyChainPolicy", "chainContext=" + chainContext + ", options=" + String.Format("0x{0:x}", cpp.dwFlags));
-            ChainPolicyStatus status = new ChainPolicyStatus();
-            status.cbSize = ChainPolicyStatus.StructSize;
-            int errorCode =
-                NativePKI.CertVerifyCertificateChainPolicy(
+            var status = new Interop.Crypt32.CERT_CHAIN_POLICY_STATUS();
+            status.cbSize = (uint)Marshal.SizeOf<Interop.Crypt32.CERT_CHAIN_POLICY_STATUS>();
+                
+            bool errorCode =
+                Interop.Crypt32.CertVerifyCertificateChainPolicy(
                     (IntPtr)ChainPolicyType.SSL,
                     chainContext,
                     ref cpp,
@@ -851,17 +802,24 @@ internal static partial class Interop
         private uint[] GetChainErrors(string hostName, X509Chain chain, ref bool fatalError)
         {
             fatalError = false;
-            SafeFreeCertChain chainContext = new SafeFreeCertChain(chain.SafeHandle.DangerousGetHandle());
+            SafeX509ChainHandle chainContext = chain.SafeHandle;
             List<uint> certificateProblems = new List<uint>();
             unsafe
             {
                 uint status = 0;
-                ChainPolicyParameter cppStruct = new ChainPolicyParameter();
-                cppStruct.cbSize = ChainPolicyParameter.StructSize;
-                cppStruct.dwFlags = 0;
 
-                SSL_EXTRA_CERT_CHAIN_POLICY_PARA eppStruct = new SSL_EXTRA_CERT_CHAIN_POLICY_PARA(false);
-                cppStruct.pvExtraPolicyPara = &eppStruct;
+                var eppStruct = new Interop.Crypt32.SSL_EXTRA_CERT_CHAIN_POLICY_PARA() {
+                    cbSize = (uint)Marshal.SizeOf<Interop.Crypt32.SSL_EXTRA_CERT_CHAIN_POLICY_PARA>(),
+                    dwAuthType = Interop.Crypt32.AuthType.AUTHTYPE_CLIENT,
+                    fdwChecks = 0,
+                    pwszServerName = null
+                };
+
+                var cppStruct = new Interop.Crypt32.CERT_CHAIN_POLICY_PARA() {
+                    cbSize = (uint)Marshal.SizeOf<Interop.Crypt32.CERT_CHAIN_POLICY_PARA>(),
+                    dwFlags = 0,
+                    pvExtraPolicyPara = &eppStruct
+                };
 
                 fixed (char* namePtr = hostName)
                 {
@@ -901,44 +859,10 @@ internal static partial class Interop
         }
     }
 
-    //
-    // UnsafeNclNativeMethods.NativePKI class contains methods
-    // imported from crypt32.dll.
-    // They deal mainly with certificates handling when doing https://
-    //
-    internal static class NativePKI
-    {
-        [DllImport(Interop.Libraries.Crypt32, ExactSpelling = true, SetLastError = true)]
-        internal static extern int CertVerifyCertificateChainPolicy(
-            [In] IntPtr policy,
-            [In] SafeFreeCertChain chainContext,
-            [In] ref ChainPolicyParameter cpp,
-            [In, Out] ref ChainPolicyStatus ps);
-    }
-
-    internal static class NativeNTSSPI
-    {
-        [DllImport(Interop.Libraries.Secur32, ExactSpelling = true, SetLastError = true)]
-        internal static extern int EncryptMessage(
-              ref SSPIHandle contextHandle,
-              [In] uint qualityOfProtection,
-              [In, Out] SecurityBufferDescriptor inputOutput,
-              [In] uint sequenceNumber
-              );
-
-        [DllImport(Interop.Libraries.Secur32, ExactSpelling = true, SetLastError = true)]
-        internal static unsafe extern int DecryptMessage(
-              [In] ref SSPIHandle contextHandle,
-              [In, Out] SecurityBufferDescriptor inputOutput,
-              [In] uint sequenceNumber,
-                   uint* qualityOfProtection
-              );
-    };
-
     internal static class SafeNetHandles
     {
         [DllImport(Interop.Libraries.Secur32, ExactSpelling = true, SetLastError = true)]
-        internal static extern int QuerySecurityContextToken(ref SSPIHandle phContext, [Out] out SafeCloseHandle handle);
+        internal static extern int QuerySecurityContextToken(ref Interop.Secur32.SSPIHandle phContext, [Out] out SafeCloseHandle handle);
 
         [DllImport(Interop.Libraries.Handle, ExactSpelling = true, SetLastError = true)]
         internal static extern bool CloseHandle(IntPtr handle);
@@ -964,22 +888,22 @@ internal static partial class Interop
 
         [DllImport(Interop.Libraries.Secur32, ExactSpelling = true, SetLastError = true)]
         internal static extern int FreeCredentialsHandle(
-              ref SSPIHandle handlePtr
+              ref Interop.Secur32.SSPIHandle handlePtr
               );
 
         [DllImport(Interop.Libraries.Secur32, ExactSpelling = true, SetLastError = true)]
         internal static extern int DeleteSecurityContext(
-              ref SSPIHandle handlePtr
+              ref Interop.Secur32.SSPIHandle handlePtr
               );
 
         [DllImport(Interop.Libraries.Secur32, ExactSpelling = true, SetLastError = true)]
         internal unsafe static extern int AcceptSecurityContext(
-                  ref SSPIHandle credentialHandle,
+                  ref Interop.Secur32.SSPIHandle credentialHandle,
                   [In] void* inContextPtr,
                   [In] SecurityBufferDescriptor inputBuffer,
                   [In] ContextFlags inFlags,
                   [In] Endianness endianness,
-                  ref SSPIHandle outContextPtr,
+                  ref Interop.Secur32.SSPIHandle outContextPtr,
                   [In, Out] SecurityBufferDescriptor outputBuffer,
                   [In, Out] ref ContextFlags attributes,
                   out long timeStamp
@@ -987,13 +911,13 @@ internal static partial class Interop
 
         [DllImport(Interop.Libraries.Secur32, ExactSpelling = true, SetLastError = true)]
         internal unsafe static extern int QueryContextAttributesW(
-            ref SSPIHandle contextHandle,
+            ref Interop.Secur32.SSPIHandle contextHandle,
             [In] ContextAttribute attribute,
             [In] void* buffer);
 
         [DllImport(Interop.Libraries.Secur32, ExactSpelling = true, SetLastError = true)]
         internal unsafe static extern int SetContextAttributesW(
-            ref SSPIHandle contextHandle,
+            ref Interop.Secur32.SSPIHandle contextHandle,
             [In] ContextAttribute attribute,
             [In] byte[] buffer,
             [In] int bufferSize);
@@ -1012,7 +936,7 @@ internal static partial class Interop
                   [In] ref AuthIdentity authdata,
                   [In] void* keyCallback,
                   [In] void* keyArgument,
-                  ref SSPIHandle handlePtr,
+                  ref Interop.Secur32.SSPIHandle handlePtr,
                   [Out] out long timeStamp
                   );
 
@@ -1025,7 +949,7 @@ internal static partial class Interop
                   [In] IntPtr zero,
                   [In] void* keyCallback,
                   [In] void* keyArgument,
-                  ref SSPIHandle handlePtr,
+                  ref Interop.Secur32.SSPIHandle handlePtr,
                   [Out] out long timeStamp
                   );
 
@@ -1039,7 +963,7 @@ internal static partial class Interop
                   [In] SafeSspiAuthDataHandle authdata,
                   [In] void* keyCallback,
                   [In] void* keyArgument,
-                  ref SSPIHandle handlePtr,
+                  ref Interop.Secur32.SSPIHandle handlePtr,
                   [Out] out long timeStamp
                   );
 
@@ -1052,13 +976,13 @@ internal static partial class Interop
                   [In] ref SecureCredential authData,
                   [In] void* keyCallback,
                   [In] void* keyArgument,
-                  ref SSPIHandle handlePtr,
+                  ref Interop.Secur32.SSPIHandle handlePtr,
                   [Out] out long timeStamp
                   );
 
         [DllImport(Interop.Libraries.Secur32, ExactSpelling = true, SetLastError = true)]
         internal unsafe static extern int InitializeSecurityContextW(
-                  ref SSPIHandle credentialHandle,
+                  ref Interop.Secur32.SSPIHandle credentialHandle,
                   [In] void* inContextPtr,
                   [In] byte* targetName,
                   [In] ContextFlags inFlags,
@@ -1066,7 +990,7 @@ internal static partial class Interop
                   [In] Endianness endianness,
                   [In] SecurityBufferDescriptor inputBuffer,
                   [In] int reservedII,
-                  ref SSPIHandle outContextPtr,
+                  ref Interop.Secur32.SSPIHandle outContextPtr,
                   [In, Out] SecurityBufferDescriptor outputBuffer,
                   [In, Out] ref ContextFlags attributes,
                   out long timeStamp

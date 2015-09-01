@@ -128,7 +128,7 @@ namespace System.Net
             {
                 if (b)
                 {
-                    status = Interop.NativeNTSSPI.EncryptMessage(ref context._handle, 0, inputOutput, sequenceNumber);
+                    status = Interop.Secur32.EncryptMessage(ref context._handle, 0, inputOutput, sequenceNumber);
                     context.DangerousRelease();
                 }
             }
@@ -157,7 +157,7 @@ namespace System.Net
             {
                 if (b)
                 {
-                    status = Interop.NativeNTSSPI.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, null);
+                    status = Interop.Secur32.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, null);
                     context.DangerousRelease();
                 }
             }
@@ -311,7 +311,7 @@ namespace System.Net
             {
                 if (b)
                 {
-                    status = Interop.NativeNTSSPI.EncryptMessage(ref context._handle, 0, inputOutput, sequenceNumber);
+                    status = Interop.Secur32.EncryptMessage(ref context._handle, 0, inputOutput, sequenceNumber);
                     context.DangerousRelease();
                 }
             }
@@ -342,7 +342,7 @@ namespace System.Net
             {
                 if (b)
                 {
-                    status = Interop.NativeNTSSPI.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, &qop);
+                    status = Interop.Secur32.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, &qop);
                     context.DangerousRelease();
                 }
             }
@@ -350,7 +350,7 @@ namespace System.Net
             const uint SECQOP_WRAP_NO_ENCRYPT = 0x80000001;
             if (status == 0 && qop == SECQOP_WRAP_NO_ENCRYPT)
             {
-                GlobalLog.Assert("NativeNTSSPI.DecryptMessage", "Expected qop = 0, returned value = " + qop.ToString("x", CultureInfo.InvariantCulture));
+                GlobalLog.Assert("Secur32.DecryptMessage", "Expected qop = 0, returned value = " + qop.ToString("x", CultureInfo.InvariantCulture));
                 throw new InvalidOperationException(SR.net_auth_message_not_encrypted);
             }
 
@@ -382,7 +382,7 @@ namespace System.Net
                 if (b)
                 {
                     const uint SECQOP_WRAP_NO_ENCRYPT = 0x80000001;
-                    status = Interop.NativeNTSSPI.EncryptMessage(ref context._handle, SECQOP_WRAP_NO_ENCRYPT, inputOutput, sequenceNumber);
+                    status = Interop.Secur32.EncryptMessage(ref context._handle, SECQOP_WRAP_NO_ENCRYPT, inputOutput, sequenceNumber);
                     context.DangerousRelease();
                 }
             }
@@ -413,7 +413,7 @@ namespace System.Net
             {
                 if (b)
                 {
-                    status = Interop.NativeNTSSPI.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, &qop);
+                    status = Interop.Secur32.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, &qop);
                     context.DangerousRelease();
                 }
             }

@@ -19,6 +19,9 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Windows_Release|AnyCPU' " />
 
   <ItemGroup>
+    <!-- TODO: break into proper Interop -->
+    <Compile Include="Interop.TODO.cs" />
+    
     <Compile Include="System\PinnableBufferCache.cs" />
     <Compile Include="System\Net\_SecureChannel.cs" />
     <Compile Include="System\Net\_SSPIWrapper.cs" />
@@ -125,9 +128,17 @@
       <Link>Interop\Windows\Interop.Libraries.cs</Link>
     </Compile>
 
-    <!-- TODO: break into proper Interop -->
-    <Compile Include="$(CommonPath)\Interop\Windows\System.Net.Security\Interop.Security.Manual.cs">
-      <Link>Interop\Windows\System.Net.Security\Interop.Security.Manual.cs</Link>
+    <!-- NativePKI -->
+    <Compile Include="$(CommonPath)\Interop\Windows\Crypt32\Interop.certificates.cs">
+      <Link>Interop\Windows\Crypt32\Interop.certificates.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\Interop\Windows\Crypt32\Interop.certificates_types.cs">
+      <Link>Interop\Windows\Crypt32\Interop.certificates_types.cs</Link>
+    </Compile>
+    
+    <!-- NativeSSPI -->
+    <Compile Include="$(CommonPath)\Interop\Windows\secur32\Interop.SSPI.cs">
+      <Link>Interop\Windows\secur32\Interop.SSPI.cs</Link>
     </Compile>
     
     <Compile Include="$(CommonPath)\Interop\Windows\SChannel\Interop.SchProtocols.cs">
