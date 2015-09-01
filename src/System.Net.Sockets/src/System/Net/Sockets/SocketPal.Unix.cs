@@ -189,7 +189,7 @@ namespace System.Net.Sockets
             }
         }
 
-        private static int GetPlatformSocketFlags(SocketFlags socketFlags)
+        public static int GetPlatformSocketFlags(SocketFlags socketFlags)
         {
             const SocketFlags StandardFlagsMask = 
                 SocketFlags.ControlDataTruncated |
@@ -210,6 +210,29 @@ namespace System.Net.Sockets
                 ((socketFlags & SocketFlags.OutOfBand) == 0 ? 0 : Interop.libc.MSG_OOB) |
                 ((socketFlags & SocketFlags.Peek) == 0 ? 0 : Interop.libc.MSG_PEEK) |
                 ((socketFlags & SocketFlags.Truncated) == 0 ? 0 : Interop.libc.MSG_TRUNC);
+        }
+
+        public static SocketFlags GetSocketFlags(int platformSocketFlags)
+        {
+            const int StandardFlagsMask = 
+                Interop.libc.MSG_CTRUNC |
+                Interop.libc.MSG_DONTROUTE |
+                Interop.libc.MSG_OOB |
+                Interop.libc.MSG_PEEK |
+                Interop.libc.MSG_TRUNC;
+
+            if ((platformSocketFlags & StandardFlagsMask) != 0)
+            {
+                // TODO: how to handle this?
+                return (SocketFlags)platformSocketFlags;
+            }
+
+            return
+                ((platformSocketFlags & Interop.libc.MSG_CTRUNC) == 0 ? 0 : SocketFlags.ControlDataTruncated) |
+                ((platformSocketFlags & Interop.libc.MSG_DONTROUTE) == 0 ? 0 : SocketFlags.DontRoute) |
+                ((platformSocketFlags & Interop.libc.MSG_OOB) == 0 ? 0 : SocketFlags.OutOfBand) |
+                ((platformSocketFlags & Interop.libc.MSG_PEEK) == 0 ? 0 : SocketFlags.Peek) |
+                ((platformSocketFlags & Interop.libc.MSG_TRUNC) == 0 ? 0 : SocketFlags.Truncated);
         }
 
         private static bool GetPlatformOptionInfo(SocketOptionLevel optionLevel, SocketOptionName optionName, out int optLevel, out int optName)

@@ -30,7 +30,7 @@ namespace System.Net.Sockets
                 "(Socket#" + Logging.HashString(socket) + ")");
         }
 
-        public void CompletionCallback(int numBytes, byte[] socketAddress, int socketAddressLen, SocketError errorCode)
+        public void CompletionCallback(int numBytes, SocketError errorCode)
         {
             ErrorCode = (int)errorCode;
             InvokeCallback(PostCompletion(numBytes));

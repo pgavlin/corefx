@@ -14,17 +14,15 @@ namespace System.Net.Sockets
             return _socketAddressSize;
         }
 
-        public new void CompletionCallback(int numBytes, byte[] socketAddress, int socketAddressSize, SocketError errorCode)
+        public void CompletionCallback(int numBytes, byte[] socketAddress, int socketAddressSize, int receivedFlags, SocketError errorCode)
         {
-            ErrorCode = (int)errorCode;
-
             if (_socketAddress != null)
             {
                 Debug.Assert(socketAddress == null || _socketAddress.Buffer == socketAddress);
                 _socketAddressSize = socketAddressSize;
             }
 
-            InvokeCallback(PostCompletion(numBytes));
+            base.CompletionCallback(numBytes, errorCode);
         }
     }
 }

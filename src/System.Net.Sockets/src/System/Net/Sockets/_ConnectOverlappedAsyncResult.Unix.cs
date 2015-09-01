@@ -16,7 +16,7 @@ namespace System.Net.Sockets
     {
         public void CompletionCallback(SocketError errorCode)
         {
-            CompletionCallback(0, null, 0, errorCode);
+            CompletionCallback(0, errorCode);
         }
 
         //

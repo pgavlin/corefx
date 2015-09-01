@@ -5209,9 +5209,9 @@ namespace System.Net.Sockets
             // Make the native call.
             SocketError socketError;
 
-            Debug.Assert(e.m_SendPacketsDescriptor != null);
+            Debug.Assert(e.SendPacketsDescriptorCount != null);
 
-            if (e.m_SendPacketsDescriptor.Length > 0)
+            if (e.SendPacketsDescriptorCount > 0)
             {
                 try
                 {

@@ -28,7 +28,6 @@ namespace System.Net.Sockets
 
         // BufferList property variables.
         internal IList<ArraySegment<byte>> m_BufferList;
-        private bool _bufferListChanged;
 
         // BytesTransferred property variables.
         private int _bytesTransferred;
@@ -57,9 +56,6 @@ namespace System.Net.Sockets
 
         // SendPacketsElements property variables.
         internal SendPacketsElement[] m_SendPacketsElements;
-        private SendPacketsElement[] _sendPacketsElementsInternal;
-        internal int m_SendPacketsElementsFileCount;
-        internal int m_SendPacketsElementsBufferCount;
 
         // SocketError property variables.
         private SocketError _socketError;
@@ -151,8 +147,7 @@ namespace System.Net.Sockets
                         throw new ArgumentException(SR.Format(SR.net_ambiguousbuffers, "Buffer"));
                     }
                     m_BufferList = value;
-                    _bufferListChanged = true;
-                    CheckPinMultipleBuffers();
+                    SetupMultipleBuffers();
                 }
                 finally
                 {
@@ -228,7 +223,7 @@ namespace System.Net.Sockets
                 try
                 {
                     m_SendPacketsElements = value;
-                    _sendPacketsElementsInternal = null;
+                    SetupSendPacketsElements();
                 }
                 finally
                 {
@@ -324,7 +319,7 @@ namespace System.Net.Sockets
                 }
 
                 // Pin new or unpin old buffer.
-                CheckPinSingleBuffer(true);
+                SetupSingleBuffer();
             }
             finally
             {
@@ -741,7 +736,7 @@ namespace System.Net.Sockets
                     // Get the endpoint.
                     Internals.SocketAddress remoteSocketAddress = IPEndPointExtensions.Serialize(_currentSocket.m_RightEndPoint);
 
-                    socketError = FinishAcceptOperation(remoteSocketAddress);
+                    socketError = FinishOperationAccept(remoteSocketAddress);
 
                     if (socketError == SocketError.Success)
                     {

@@ -243,10 +243,8 @@
     <Compile Include="System\Net\Sockets\_OverlappedAsyncResult.Unix.cs" />
     <Compile Include="System\Net\Sockets\BufferList.cs" />
     <Compile Include="System\Net\Sockets\Socket.Unix.cs" />
+    <Compile Include="System\Net\Sockets\SocketAsyncEventArgs.Unix.cs" />
     <Compile Include="System\Net\Sockets\SocketPal.Unix.cs" />
-
-    <!-- TODO: *nix implementation -->
-    <Compile Include="System\Net\Sockets\SocketAsyncEventArgs.Windows.cs" />
 
     <!-- TODO: remove this -->
     <Compile Include="RefactoringShims\InteropShim.cs">

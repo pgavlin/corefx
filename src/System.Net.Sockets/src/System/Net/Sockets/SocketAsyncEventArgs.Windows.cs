@@ -28,6 +28,7 @@ namespace System.Net.Sockets
 
         // BufferList property variables.
         internal WSABuffer[] m_WSABufferArray;
+        private bool _bufferListChanged;
 
         // Internal buffers for WSARecvMsg
         private byte[] _WSAMessageBuffer;
@@ -49,10 +50,15 @@ namespace System.Net.Sockets
         internal IntPtr m_PtrSocketAddressBuffer;
         internal IntPtr m_PtrSocketAddressBufferSize;
 
+        // SendPacketsElements property variables.
+        private SendPacketsElement[] _sendPacketsElementsInternal;
+        internal Interop.Winsock.TransmitPacketsElement[] m_SendPacketsDescriptor;
+        internal int m_SendPacketsElementsFileCount;
+        internal int m_SendPacketsElementsBufferCount;
+
         // Internal variables for SendPackets
         internal FileStream[] m_SendPacketsFileStreams;
         internal SafeHandle[] m_SendPacketsFileHandles;
-        internal Interop.Winsock.TransmitPacketsElement[] m_SendPacketsDescriptor;
         internal IntPtr m_PtrSendPacketsDescriptor;
 
         // Overlapped object related variables.
@@ -74,6 +80,14 @@ namespace System.Net.Sockets
         private int _pinnedSingleBufferOffset;
         private int _pinnedSingleBufferCount;
 
+        internal int? SendPacketsDescriptorCount
+        {
+            get
+            {
+                return m_SendPacketsDescriptor == null ? null : m_sendPacketsDescriptor.Length;
+            }
+        }
+
         private void InitializeInternals()
         {
             // Zero tells TransmitPackets to select a default send size.
@@ -85,12 +99,28 @@ namespace System.Net.Sockets
             FreeOverlapped(calledFromFinalizer);
         }
 
+        private void SetupSingleBuffer()
+        {
+            CheckPinSingleBuffer(true);
+        }
+
+        private void SetupMultipleBuffers()
+        {
+            _bufferListChanged = true;
+            CheckPinMultipleBuffers();
+        }
+
+        private void SetupSendPacketsElements()
+        {
+            _sendPacketsElementsInternal = null;
+        }
+
         private void InnerComplete()
         {
             CompleteIOCPOperation();
         }
 
-        internal unsafe void PrepareIOCPOperation()
+        private unsafe void PrepareIOCPOperation()
         {
             Debug.Assert(_currentSocket != null, "m_CurrentSocket is null");
             Debug.Assert(_currentSocket.SafeHandle != null, "m_CurrentSocket.SafeHandle is null");
@@ -123,7 +153,7 @@ namespace System.Net.Sockets
             m_PtrNativeOverlapped = new SafeNativeOverlapped(_currentSocket.SafeHandle, overlapped);
         }
 
-        internal void CompleteIOCPOperation()
+        private void CompleteIOCPOperation()
         {
             // TODO: Optimization to remove callbacks if the operations are completed synchronously:
             //       Use SetFileCompletionNotificationModes(FILE_SKIP_COMPLETION_PORT_ON_SUCCESS).
@@ -1013,7 +1043,7 @@ namespace System.Net.Sockets
             }
         }
 
-        private SocketError FinishAcceptOperation(Internals.SocketAddress remoteSocketAddress)
+        private SocketError FinishOperationAccept(Internals.SocketAddress remoteSocketAddress)
         {
             SocketError socketError;
             IntPtr localAddr;

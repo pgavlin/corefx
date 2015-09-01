@@ -25,7 +25,7 @@ namespace System.Net.Sockets
             }
         }
 
-        public new void CompletionCallback(int acceptedFileDescriptor, byte[] socketAddress, int socketAddressLen, SocketError errorCode)
+        public void CompletionCallback(int acceptedFileDescriptor, byte[] socketAddress, int socketAddressLen, SocketError errorCode)
         {
             // TODO: receive bytes if necessary
 
@@ -39,7 +39,7 @@ namespace System.Net.Sockets
                 SafeCloseSocket.CreateSocket(acceptedFileDescriptor),
                 _listenSocket.m_RightEndPoint.Create(remoteSocketAddress));
 
-            base.CompletionCallback(0, socketAddress, socketAddressLen, errorCode);
+            base.CompletionCallback(0, errorCode);
         }
 
         internal override object PostCompletion(int numBytes)

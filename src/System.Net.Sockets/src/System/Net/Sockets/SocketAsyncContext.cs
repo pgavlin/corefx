@@ -38,7 +38,7 @@ namespace System.Net.Sockets
 
         private sealed class TransferOperation : AsyncOperation
         {
-            public Action<int, byte[], int, SocketError> Callback;
+            public Action<int, byte[], int, int, SocketError> Callback;
             public byte[] Buffer;
             public BufferList Buffers;
             public int BufferIndex;
@@ -48,12 +48,13 @@ namespace System.Net.Sockets
             public byte[] SocketAddress;
             public int SocketAddressLen;
             public int BytesTransferred;
+            public int ReceivedFlags;
 
             public override void Complete()
             {
                 Debug.Assert(Callback != null);
 
-                Callback(BytesTransferred, SocketAddress, SocketAddressLen, ErrorCode);
+                Callback(BytesTransferred, SocketAddress, SocketAddressLen, ReceivedFlags, ErrorCode);
             }
         }
 
@@ -376,29 +377,73 @@ namespace System.Net.Sockets
             return false;
         }
 
-        private static unsafe int Receive(int fd, int flags, int available, byte[] buffer, int offset, int count, out Interop.Error errno)
+        private static unsafe int Receive(int fd, int flags, int available, byte[] buffer, int offset, int count, byte[] socketAddress, ref int socketAddressLen, out int receivedFlags, out Interop.Error errno)
         {
+            Debug.Assert(socketAddress != null || socketAddressLen == 0);
+
+            var pinnedSocketAddress = default(GCHandle);
+            Interop.libc.sockaddr* sockAddr = null;
+            uint sockAddrLen = 0;
+
             int received;
-            fixed (byte* b = buffer)
+            try
             {
-                received = (int)Interop.libc.recv(fd, &b[offset], (IntPtr)Math.Min(count, available), flags);
+                if (socketAddress != null)
+                {
+                    pinnedSocketAddress = GCHandle.Alloc(socketAddress, GCHandleType.Pinned);
+                    sockAddr = (Interop.libc.sockaddr*)pinnedSocketAddress.AddrOfPinnedObject();
+                    sockAddrLen = (uint)socketAddressLen;
+                }
+
+                fixed (byte* b = buffer)
+                {
+                    var iov = new Interop.libc.iovec {
+                        iov_base = &b[offset],
+                        iov_len = (IntPtr)count
+                    };
+
+                    var msghdr = new Interop.libc.msghdr {
+                        msg_name = sockAddr,
+                        msg_namelen = sockAddrLen,
+                        msg_iov = &iov,
+                        msg_iovlen = (IntPtr)1,
+                        msg_control = null,
+                        msg_controllen = IntPtr.Zero,
+                    };
+
+                    received = (int)Interop.libc.recvmsg(fd, &msghdr, flags);
+                    receivedFlags = msghdr.msg_flags;
+                }
             }
-            errno = Interop.Sys.GetLastError();
+            finally
+            {
+                if (pinnedSocketAddress.IsAllocated)
+                {
+                    pinnedSocketAddress.Free();
+                }
+            }
 
             if (received == -1)
             {
+                errno = Interop.Sys.GetLastError();
                 return -1;
             }
 
+            socketAddressLen = (int)sockAddrLen;
+            errno = Interop.Error.SUCCESS;
             return received;
         }
 
-        private static unsafe int Receive(int fd, int flags, int available, BufferList buffers, out Interop.Error errno)
+        private static unsafe int Receive(int fd, int flags, int available, BufferList buffers, byte[] socketAddress, ref int socketAddressLen, out int receivedFlags, out Interop.Error errno)
         {
             // Pin buffers and set up iovecs
             int maxBuffers = buffers.Count;
             var handles = new GCHandle[maxBuffers];
             var iovecs = new Interop.libc.iovec[maxBuffers];
+
+            var pinnedSocketAddress = default(GCHandle);
+            Interop.libc.sockaddr* sockAddr = null;
+            uint sockAddrLen = 0;
 
             int received = 0;
             int toReceive = 0, iovCount = maxBuffers;
@@ -423,12 +468,19 @@ namespace System.Net.Sockets
                     iovecs[i].iov_len = (IntPtr)space;
                 }
 
+                if (socketAddress != null)
+                {
+                    pinnedSocketAddress = GCHandle.Alloc(socketAddress, GCHandleType.Pinned);
+                    sockAddr = (Interop.libc.sockaddr*)pinnedSocketAddress.AddrOfPinnedObject();
+                    sockAddrLen = (uint)socketAddressLen;
+                }
+
                 // Make the call
                 fixed (Interop.libc.iovec* iov = iovecs)
                 {
                     var msghdr = new Interop.libc.msghdr {
-                        msg_name = null,
-                        msg_namelen = 0,
+                        msg_name = sockAddr,
+                        msg_namelen = sockAddrLen,
                         msg_iov = iov,
                         msg_iovlen = (IntPtr)iovCount,
                         msg_control = null,
@@ -436,8 +488,8 @@ namespace System.Net.Sockets
                     };
 
                     received = (int)Interop.libc.recvmsg(fd, &msghdr, flags);
+                    receivedFlags = msghdr.msg_flags;
                 }
-                errno = Interop.Sys.GetLastError();
             }
             finally
             {
@@ -449,18 +501,37 @@ namespace System.Net.Sockets
                         handles[i].Free();
                     }
                 }
+
+                if (pinnedSocketAddress.IsAllocated)
+                {
+                    pinnedSocketAddress.Free();
+                }
             }
 
+            if (received == -1)
+            {
+                errno = Interop.Sys.GetLastError();
+                return -1;
+            }
+
+            socketAddressLen = (int)sockAddrLen;
+            errno = Interop.Error.SUCCESS;
             return received;
         }
 
-        public bool ReceiveAsync(byte[] buffer, int offset, int count, int flags, Action<int, byte[], int, SocketError> callback)
+        public bool ReceiveAsync(byte[] buffer, int offset, int count, int flags, Action<int, byte[], int, int, SocketError> callback)
+        {
+            return ReceiveFromAsync(buffer, offset, count, flags, null, 0, callback);
+        }
+
+        public bool ReceiveFromAsync(byte[] buffer, int offset, int count, int flags, byte[] socketAddress, int socketAddressLen, Action<int, byte[], int, int, SocketError> callback)
         {
             int bytesReceived;
+            int receivedFlags;
             SocketError errorCode;
-            if (TryCompleteReceive(_fileDescriptor, buffer, offset, count, flags, out bytesReceived, out errorCode))
+            if (TryCompleteReceiveFrom(_fileDescriptor, buffer, offset, count, flags, socketAddress, ref socketAddressLen, out bytesReceived, out receivedFlags, out errorCode))
             {
-                callback(bytesReceived, null, 0, errorCode);
+                callback(bytesReceived, socketAddress, socketAddressLen, receivedFlags, errorCode);
                 return false;
             }
 
@@ -470,7 +541,10 @@ namespace System.Net.Sockets
                 Offset = offset,
                 Count = count,
                 Flags = flags,
-                BytesTransferred = bytesReceived
+                SocketAddress = socketAddress,
+                SocketAddressLen = socketAddressLen,
+                BytesTransferred = bytesReceived,
+                ReceivedFlags = receivedFlags
             };
 
             bool isStopped;
@@ -479,11 +553,11 @@ namespace System.Net.Sockets
                 if (isStopped)
                 {
                     // TODO: is this error code reasonable for a closed socket? Check with Winsock.
-                    callback(0, null, 0, SocketError.Shutdown);
+                    callback(0, null, 0, 0, SocketError.Shutdown);
                     return false;
                 }
 
-                if (TryCompleteReceive(_fileDescriptor, operation))
+                if (TryCompleteReceiveFrom(_fileDescriptor, operation))
                 {
                     QueueCompletion(operation);
                     break;
@@ -492,13 +566,19 @@ namespace System.Net.Sockets
             return true;
         }
 
-        public bool ReceiveAsync(IList<ArraySegment<byte>> buffers, int flags, Action<int, byte[], int, SocketError> callback)
+        public bool ReceiveAsync(IList<ArraySegment<byte>> buffers, int flags, Action<int, byte[], int, int, SocketError> callback)
+        {
+            return ReceiveFromAsync(buffers, flags, null, 0, callback);
+        }
+
+        public bool ReceiveFromAsync(IList<ArraySegment<byte>> buffers, int flags, byte[] socketAddress, int socketAddressLen, Action<int, byte[], int, int, SocketError> callback)
         {
             int bytesReceived;
+            int receivedFlags;
             SocketError errorCode;
-            if (TryCompleteReceive(_fileDescriptor, buffers, flags, out bytesReceived, out errorCode))
+            if (TryCompleteReceiveFrom(_fileDescriptor, buffers, flags, socketAddress, ref socketAddressLen, out bytesReceived, out receivedFlags, out errorCode))
             {
-                callback(bytesReceived, null, 0, errorCode);
+                callback(bytesReceived, socketAddress, socketAddressLen, receivedFlags, errorCode);
                 return false;
             }
 
@@ -506,7 +586,8 @@ namespace System.Net.Sockets
                 Callback = callback,
                 Buffers = new BufferList(buffers),
                 Flags = flags,
-                BytesTransferred = bytesReceived
+                BytesTransferred = bytesReceived,
+                ReceivedFlags = receivedFlags
             };
 
             bool isStopped;
@@ -515,11 +596,11 @@ namespace System.Net.Sockets
                 if (isStopped)
                 {
                     // TODO: is this error code reasonable for a closed socket? Check with Winsock.
-                    callback(0, null, 0, SocketError.Shutdown);
+                    callback(0, null, 0, 0, SocketError.Shutdown);
                     return false;
                 }
 
-                if (TryCompleteReceive(_fileDescriptor, operation))
+                if (TryCompleteReceiveFrom(_fileDescriptor, operation))
                 {
                     QueueCompletion(operation);
                     break;
@@ -528,28 +609,29 @@ namespace System.Net.Sockets
             return true;
         }
 
-        private static bool TryCompleteReceive(int fileDescriptor, byte[] buffer, int offset, int count, int flags, out int bytesReceived, out SocketError errorCode)
+        private static bool TryCompleteReceiveFrom(int fileDescriptor, byte[] buffer, int offset, int count, int flags, byte[] socketAddress, ref int socketAddressLen, out int bytesReceived, out int receivedFlags, out SocketError errorCode)
         {
-            return TryCompleteReceive(fileDescriptor, buffer, default(BufferList), offset, count, flags, out bytesReceived, out errorCode);
+            return TryCompleteReceiveFrom(fileDescriptor, buffer, default(BufferList), offset, count, flags, socketAddress, ref socketAddressLen, out bytesReceived, out receivedFlags, out errorCode);
         }
 
-        private static bool TryCompleteReceive(int fileDescriptor, IList<ArraySegment<byte>> buffers, int flags, out int bytesReceived, out SocketError errorCode)
+        private static bool TryCompleteReceiveFrom(int fileDescriptor, IList<ArraySegment<byte>> buffers, int flags, byte[] socketAddress, ref int socketAddressLen, out int bytesReceived, out int receivedFlags, out SocketError errorCode)
         {
-            return TryCompleteReceive(fileDescriptor, null, new BufferList(buffers), 0, 0, flags, out bytesReceived, out errorCode);
+            return TryCompleteReceiveFrom(fileDescriptor, null, new BufferList(buffers), 0, 0, flags, socketAddress, ref socketAddressLen, out bytesReceived, out receivedFlags, out errorCode);
         }
 
-        private static bool TryCompleteReceive(int fileDescriptor, TransferOperation operation)
+        private static bool TryCompleteReceiveFrom(int fileDescriptor, TransferOperation operation)
         {
-            return TryCompleteReceive(fileDescriptor, operation.Buffer, operation.Buffers, operation.Offset, operation.Count, operation.Flags, out operation.BytesTransferred, out operation.ErrorCode);
+            return TryCompleteReceiveFrom(fileDescriptor, operation.Buffer, operation.Buffers, operation.Offset, operation.Count, operation.Flags, operation.SocketAddress, ref operation.SocketAddressLen, out operation.BytesTransferred, out operation.ReceivedFlags, out operation.ErrorCode);
         }
 
-        private static unsafe bool TryCompleteReceive(int fileDescriptor, byte[] buffer, BufferList buffers, int offset, int count, int flags, out int bytesReceived, out SocketError errorCode)
+        private static unsafe bool TryCompleteReceiveFrom(int fileDescriptor, byte[] buffer, BufferList buffers, int offset, int count, int flags, byte[] socketAddress, ref int socketAddressLen, out int bytesReceived, out int receivedFlags, out SocketError errorCode)
         {
             int available;
             int err = Interop.libc.ioctl(fileDescriptor, (UIntPtr)Interop.libc.FIONREAD, &available);
             if (err == -1)
             {
                 bytesReceived = 0;
+                receivedFlags = 0;
                 errorCode = SocketPal.GetLastSocketError();
                 return true;
             }
@@ -563,12 +645,12 @@ namespace System.Net.Sockets
             Interop.Error errno;
             if (buffer != null)
             {
-                received = Receive(fileDescriptor, flags, available, buffer, offset, count, out errno);
+                received = Receive(fileDescriptor, flags, available, buffer, offset, count, socketAddress, ref socketAddressLen, out receivedFlags, out errno);
             }
             else
             {
                 Debug.Assert(buffers.IsInitialized);
-                received = Receive(fileDescriptor, flags, available, buffers, out errno);
+                received = Receive(fileDescriptor, flags, available, buffers, socketAddress, ref socketAddressLen, out receivedFlags, out errno);
             }
 
             if (received != -1)
@@ -590,109 +672,55 @@ namespace System.Net.Sockets
             return false;
         }
 
-        public bool ReceiveFromAsync(byte[] buffer, int offset, int count, int flags, byte[] peerAddress, int peerAddressLen, Action<int, byte[], int, SocketError> callback)
+        private static unsafe int Send(int fd, int flags, byte[] buffer, ref int offset, ref int count, byte[] socketAddress, int socketAddressLen, out Interop.Error errno)
         {
-            int bytesReceived;
-            SocketError errorCode;
-            if (TryCompleteReceiveFrom(_fileDescriptor, buffer, offset, count, flags, peerAddress, ref peerAddressLen, out bytesReceived, out errorCode))
-            {
-                callback(bytesReceived, peerAddress, peerAddressLen, errorCode);
-                return false;
-            }
+            var pinnedSocketAddress = default(GCHandle);
+            Interop.libc.sockaddr* sockAddr = null;
+            uint sockAddrLen = 0;
 
-            var operation = new TransferOperation {
-                Callback = callback,
-                Buffer = buffer,
-                Offset = offset,
-                Count = count,
-                Flags = flags,
-                SocketAddress = peerAddress,
-                SocketAddressLen = peerAddressLen,
-                BytesTransferred = bytesReceived
-            };
-
-            bool isStopped;
-            while (!TryBeginOperation(ref _receiveQueue, operation, out isStopped))
-            {
-                if (isStopped)
-                {
-                    // TODO: is this error code reasonable for a closed socket? Check with Winsock.
-                    callback(0, null, 0, SocketError.Shutdown);
-                    return false;
-                }
-
-                if (TryCompleteReceiveFrom(_fileDescriptor, operation))
-                {
-                    QueueCompletion(operation);
-                    break;
-                }
-            }
-            return true;
-        }
-
-        private static bool TryCompleteReceiveFrom(int fileDescriptor, TransferOperation operation)
-        {
-            return TryCompleteReceiveFrom(fileDescriptor, operation.Buffer, operation.Offset, operation.Count, operation.Flags, operation.SocketAddress, ref operation.SocketAddressLen, out operation.BytesTransferred, out operation.ErrorCode);
-        }
-
-        private static unsafe bool TryCompleteReceiveFrom(int fileDescriptor, byte[] buffer, int offset, int count, int flags, byte[] socketAddress, ref int socketAddressLen, out int bytesReceived, out SocketError errorCode)
-        {
-            Debug.Assert(buffer != null);
-
-            uint sockAddrLen = (uint)socketAddressLen;
-
-            int received;
-            fixed (byte* b = buffer)
-            fixed (byte* rawSocketAddress = socketAddress)
-            {
-                var sockAddr = (Interop.libc.sockaddr*)rawSocketAddress;
-                received = (int)Interop.libc.recvfrom(fileDescriptor, &b[offset], (IntPtr)count, flags, sockAddr, &sockAddrLen);
-            }
-
-            if (received != -1)
-            {
-                bytesReceived = received;
-                socketAddressLen = (int)sockAddrLen;
-                errorCode = SocketError.Success;
-                return true;
-            }
-
-            bytesReceived = 0;
-            
-            Interop.Error errno = Interop.Sys.GetLastError();
-            if (errno != Interop.Error.EAGAIN && errno != Interop.Error.EWOULDBLOCK)
-            {
-                errorCode = SocketPal.GetSocketErrorForErrorCode(errno);
-                return true;
-            }
-
-            errorCode = SocketError.Success;
-            return false;
-        }
-
-        private static unsafe int Send(int fd, int flags, byte[] buffer, ref int offset, ref int count, out Interop.Error errno)
-        {
             int sent;
-            fixed (byte* b = buffer)
+            try
             {
-                sent = (int)Interop.libc.send(fd, &b[offset], (IntPtr)count, flags);
+                if (socketAddress != null)
+                {
+                    pinnedSocketAddress = GCHandle.Alloc(socketAddress, GCHandleType.Pinned);
+                    sockAddr = (Interop.libc.sockaddr*)pinnedSocketAddress.AddrOfPinnedObject();
+                    sockAddrLen = (uint)socketAddressLen;
+                }
+
+                fixed (byte* b = buffer)
+                {
+                    sent = (int)Interop.libc.sendto(fd, &b[offset], (IntPtr)count, flags, sockAddr, sockAddrLen);
+                }
             }
-            errno = Interop.Sys.GetLastError();
+            finally
+            {
+                if (pinnedSocketAddress.IsAllocated)
+                {
+                    pinnedSocketAddress.Free();
+                }
+            }
 
             if (sent == -1)
             {
+                errno = Interop.Sys.GetLastError();
                 return -1;
             }
 
+            errno = Interop.Error.SUCCESS;
             offset += sent;
             count -= sent;
             return sent;
         }
 
-        private static unsafe int Send(int fd, int flags, BufferList buffers, ref int bufferIndex, ref int offset, out Interop.Error errno)
+        private static unsafe int Send(int fd, int flags, BufferList buffers, ref int bufferIndex, ref int offset, byte[] socketAddress, int socketAddressLen, out Interop.Error errno)
         {
             // Pin buffers and set up iovecs
             int startIndex = bufferIndex, startOffset = offset;
+
+            var pinnedSocketAddress = default(GCHandle);
+            Interop.libc.sockaddr* sockAddr = null;
+            uint sockAddrLen = 0;
 
             int maxBuffers = buffers.Count - startIndex;
             var handles = new GCHandle[maxBuffers];
@@ -712,12 +740,19 @@ namespace System.Net.Sockets
                     iovecs[i].iov_len = (IntPtr)(buffer.Count - startOffset);
                 }
 
+                if (socketAddress != null)
+                {
+                    pinnedSocketAddress = GCHandle.Alloc(socketAddress, GCHandleType.Pinned);
+                    sockAddr = (Interop.libc.sockaddr*)pinnedSocketAddress.AddrOfPinnedObject();
+                    sockAddrLen = (uint)socketAddressLen;
+                }
+
                 // Make the call
                 fixed (Interop.libc.iovec* iov = iovecs)
                 {
                     var msghdr = new Interop.libc.msghdr {
-                        msg_name = null,
-                        msg_namelen = 0,
+                        msg_name = sockAddr,
+                        msg_namelen = sockAddrLen,
                         msg_iov = iov,
                         msg_iovlen = (IntPtr)iovCount,
                         msg_control = null,
@@ -737,6 +772,11 @@ namespace System.Net.Sockets
                     {
                         handles[i].Free();
                     }
+                }
+
+                if (pinnedSocketAddress.IsAllocated)
+                {
+                    pinnedSocketAddress.Free();
                 }
             }
 
@@ -764,13 +804,18 @@ namespace System.Net.Sockets
             return sent;
         }
 
-        public bool SendAsync(byte[] buffer, int offset, int count, int flags, Action<int, byte[], int, SocketError> callback)
+        public bool SendAsync(byte[] buffer, int offset, int count, int flags, Action<int, byte[], int, int, SocketError> callback)
+        {
+            return SendToAsync(buffer, offset, count, flags, null, 0, callback);
+        }
+
+        public bool SendToAsync(byte[] buffer, int offset, int count, int flags, byte[] socketAddress, int socketAddressLen, Action<int, byte[], int, int, SocketError> callback)
         {
             int bytesSent = 0;
             SocketError errorCode;
-            if (TryCompleteSend(_fileDescriptor, buffer, ref offset, ref count, flags, ref bytesSent, out errorCode))
+            if (TryCompleteSendTo(_fileDescriptor, buffer, ref offset, ref count, flags, socketAddress, socketAddressLen, ref bytesSent, out errorCode))
             {
-                callback(bytesSent, null, 0, errorCode);
+                callback(bytesSent, socketAddress, socketAddressLen, 0, errorCode);
                 return false;
             }
 
@@ -780,6 +825,8 @@ namespace System.Net.Sockets
                 Offset = offset,
                 Count = count,
                 Flags = flags,
+                SocketAddress = socketAddress,
+                SocketAddressLen = socketAddressLen,
                 BytesTransferred = bytesSent
             };
 
@@ -789,11 +836,11 @@ namespace System.Net.Sockets
                 if (isStopped)
                 {
                     // TODO: is this error code reasonable for a closed socket? Check with Winsock.
-                    callback(0, null, 0, SocketError.Shutdown);
+                    callback(0, null, 0, 0, SocketError.Shutdown);
                     return false;
                 }
 
-                if (TryCompleteSend(_fileDescriptor, operation))
+                if (TryCompleteSendTo(_fileDescriptor, operation))
                 {
                     QueueCompletion(operation);
                     break;
@@ -802,15 +849,20 @@ namespace System.Net.Sockets
             return true;
         }
 
-        public bool SendAsync(BufferList buffers, int flags, Action<int, byte[], int, SocketError> callback)
+        public bool SendAsync(BufferList buffers, int flags, Action<int, byte[], int, int, SocketError> callback)
+        {
+            return SendToAsync(buffers, flags, null, 0, callback);
+        }
+
+        public bool SendToAsync(BufferList buffers, int flags, byte[] socketAddress, int socketAddressLen, Action<int, byte[], int, int, SocketError> callback)
         {
             int bufferIndex = 0;
             int offset = 0;
             int bytesSent = 0;
             SocketError errorCode;
-            if (TryCompleteSend(_fileDescriptor, buffers, ref bufferIndex, ref offset, flags, ref bytesSent, out errorCode))
+            if (TryCompleteSendTo(_fileDescriptor, buffers, ref bufferIndex, ref offset, flags, socketAddress, socketAddressLen, ref bytesSent, out errorCode))
             {
-                callback(bytesSent, null, 0, errorCode);
+                callback(bytesSent, socketAddress, socketAddressLen, 0, errorCode);
                 return false;
             }
 
@@ -820,6 +872,8 @@ namespace System.Net.Sockets
                 BufferIndex = bufferIndex,
                 Offset = offset,
                 Flags = flags,
+                SocketAddress = socketAddress,
+                SocketAddressLen = socketAddressLen,
                 BytesTransferred = bytesSent
             };
 
@@ -829,11 +883,11 @@ namespace System.Net.Sockets
                 if (isStopped)
                 {
                     // TODO: is this error code reasonable for a closed socket? Check with Winsock.
-                    callback(0, null, 0, SocketError.Shutdown);
+                    callback(0, null, 0, 0, SocketError.Shutdown);
                     return false;
                 }
 
-                if (TryCompleteSend(_fileDescriptor, operation))
+                if (TryCompleteSendTo(_fileDescriptor, operation))
                 {
                     QueueCompletion(operation);
                     break;
@@ -842,24 +896,24 @@ namespace System.Net.Sockets
             return true;
         }
 
-        private static bool TryCompleteSend(int fileDescriptor, byte[] buffer, ref int offset, ref int count, int flags, ref int bytesSent, out SocketError errorCode)
+        private static bool TryCompleteSendTo(int fileDescriptor, byte[] buffer, ref int offset, ref int count, int flags, byte[] socketAddress, int socketAddressLen, ref int bytesSent, out SocketError errorCode)
         {
             int bufferIndex = 0;
-            return TryCompleteSend(fileDescriptor, buffer, default(BufferList), ref bufferIndex, ref offset, ref count, flags, ref bytesSent, out errorCode);
+            return TryCompleteSendTo(fileDescriptor, buffer, default(BufferList), ref bufferIndex, ref offset, ref count, flags, socketAddress, socketAddressLen, ref bytesSent, out errorCode);
         }
 
-        private static bool TryCompleteSend(int fileDescriptor, BufferList buffers, ref int bufferIndex, ref int offset, int flags, ref int bytesSent, out SocketError errorCode)
+        private static bool TryCompleteSendTo(int fileDescriptor, BufferList buffers, ref int bufferIndex, ref int offset, int flags, byte[] socketAddress, int socketAddressLen, ref int bytesSent, out SocketError errorCode)
         {
             int count = 0;
-            return TryCompleteSend(fileDescriptor, null, buffers, ref bufferIndex, ref offset, ref count, flags, ref bytesSent, out errorCode);
+            return TryCompleteSendTo(fileDescriptor, null, buffers, ref bufferIndex, ref offset, ref count, flags, socketAddress, socketAddressLen, ref bytesSent, out errorCode);
         }
 
-        private static bool TryCompleteSend(int fileDescriptor, TransferOperation operation)
+        private static bool TryCompleteSendTo(int fileDescriptor, TransferOperation operation)
         {
-            return TryCompleteSend(fileDescriptor, operation.Buffer, operation.Buffers, ref operation.BufferIndex, ref operation.Offset, ref operation.Count, operation.Flags, ref operation.BytesTransferred, out operation.ErrorCode);
+            return TryCompleteSendTo(fileDescriptor, operation.Buffer, operation.Buffers, ref operation.BufferIndex, ref operation.Offset, ref operation.Count, operation.Flags, operation.SocketAddress, operation.SocketAddressLen, ref operation.BytesTransferred, out operation.ErrorCode);
         }
 
-        private static bool TryCompleteSend(int fileDescriptor, byte[] buffer, BufferList buffers, ref int bufferIndex, ref int offset, ref int count, int flags, ref int bytesSent, out SocketError errorCode)
+        private static bool TryCompleteSendTo(int fileDescriptor, byte[] buffer, BufferList buffers, ref int bufferIndex, ref int offset, ref int count, int flags, byte[] socketAddress, int socketAddressLen, ref int bytesSent, out SocketError errorCode)
         {
             for (;;)
             {
@@ -867,12 +921,12 @@ namespace System.Net.Sockets
                 Interop.Error errno;
                 if (buffer != null)
                 {
-                    sent = Send(fileDescriptor, flags, buffer, ref offset, ref count, out errno);
+                    sent = Send(fileDescriptor, flags, buffer, ref offset, ref count, socketAddress, socketAddressLen, out errno);
                 }
                 else
                 {
                     Debug.Assert(buffers.IsInitialized);
-                    sent = Send(fileDescriptor, flags, buffers, ref bufferIndex, ref offset, out errno);
+                    sent = Send(fileDescriptor, flags, buffers, ref bufferIndex, ref offset, socketAddress, socketAddressLen, out errno);
                 }
 
                 if (sent == -1)
@@ -893,92 +947,6 @@ namespace System.Net.Sockets
                     (buffer != null && count == 0) ||
                     (buffers.IsInitialized && bufferIndex == buffers.Count);
                 if (isComplete)
-                {
-                    errorCode = SocketError.Success;
-                    return true;
-                }
-            }
-        }
-
-        public bool SendToAsync(byte[] buffer, int offset, int count, int flags, byte[] peerAddress, int peerAddressLen, Action<int, byte[], int, SocketError> callback)
-        {
-            // TODO: audit behavior w.r.t. sending a complete buffer against WSASendTo
-
-            int bytesSent = 0;
-            SocketError errorCode;
-            if (TryCompleteSendTo(_fileDescriptor, buffer, ref offset, ref count, flags, peerAddress, peerAddressLen, ref bytesSent, out errorCode))
-            {
-                callback(bytesSent, peerAddress, peerAddressLen, errorCode);
-                return false;
-            }
-
-            var operation = new TransferOperation {
-                Callback = callback,
-                Buffer = buffer,
-                Offset = offset,
-                Count = count,
-                Flags = flags,
-                SocketAddress = peerAddress,
-                SocketAddressLen = peerAddressLen,
-                BytesTransferred = bytesSent
-            };
-
-            bool isStopped;
-            while (!TryBeginOperation(ref _sendQueue, operation, out isStopped))
-            {
-                if (isStopped)
-                {
-                    // TODO: is this error code reasonable for a closed socket? Check with Winsock.
-                    callback(0, null, 0, SocketError.Shutdown);
-                    return false;
-                }
-
-                if (TryCompleteSendTo(_fileDescriptor, operation))
-                {
-                    QueueCompletion(operation);
-                    break;
-                }
-            }
-            return true;
-        }
-
-        private static bool TryCompleteSendTo(int fileDescriptor, TransferOperation operation)
-        {
-            return TryCompleteSendTo(fileDescriptor, operation.Buffer, ref operation.Offset, ref operation.Count, operation.Flags, operation.SocketAddress, operation.SocketAddressLen, ref operation.BytesTransferred, out operation.ErrorCode);
-        }
-
-        private static unsafe bool TryCompleteSendTo(int fileDescriptor, byte[] buffer, ref int offset, ref int count, int flags, byte[] socketAddress, int socketAddressLen, ref int bytesSent, out SocketError errorCode)
-        {
-            Debug.Assert(buffer != null);
-
-            for (;;)
-            {
-                int sent;
-                fixed (byte* b = buffer)
-                fixed (byte* rawSocketAddress = socketAddress)
-                {
-                    var sockAddr = (Interop.libc.sockaddr*)rawSocketAddress;
-                    sent = (int)Interop.libc.sendto(fileDescriptor, &b[offset], (IntPtr)count, flags, sockAddr, (uint)socketAddressLen);
-                }
-
-                if (sent == -1)
-                {
-                    Interop.Error errno = Interop.Sys.GetLastError();
-                    if (errno != Interop.Error.EAGAIN && errno != Interop.Error.EWOULDBLOCK)
-                    {
-                        errorCode = SocketPal.GetSocketErrorForErrorCode(errno);
-                        return true;
-                    }
-
-                    errorCode = SocketError.Success;
-                    return false;
-                }
-
-                bytesSent += sent;
-                offset += sent;
-                count -= sent;
-
-                if (sent == 0 || count == 0)
                 {
                     errorCode = SocketError.Success;
                     return true;
@@ -1029,8 +997,12 @@ namespace System.Net.Sockets
                             Interop.Error errorCode;
                             if (!_engine.TryUnregister(ref _handle, _fileDescriptor, 0, out errorCode))
                             {
-                                // TODO: throw an appropiate exception
-                                throw new Exception(string.Format("HandleEvents HUP: {0}", errorCode));
+                                if (errorCode != Interop.Error.EBADF)
+                                {
+                                    // TODO: throw an appropiate exception
+                                    throw new Exception(string.Format("HandleEvents HUP: {0}", errorCode));
+                                }
+                                _handle.Free();
                             }
 
                             _registeredEvents = 0;
@@ -1065,7 +1037,7 @@ namespace System.Net.Sockets
                     while (!sendQueue.IsEmpty)
                     {
                         TransferOperation op = sendQueue.Head;
-                        bool completed = TryCompleteSend(_fileDescriptor, op);
+                        bool completed = TryCompleteSendTo(_fileDescriptor, op);
                         Debug.Assert(completed);
                         sendQueue.Dequeue();
                         QueueCompletion(op);
@@ -1074,7 +1046,7 @@ namespace System.Net.Sockets
                     while (!receiveQueue.IsEmpty)
                     {
                         TransferOperation op = receiveQueue.Head;
-                        bool completed = TryCompleteReceive(_fileDescriptor, op);
+                        bool completed = TryCompleteReceiveFrom(_fileDescriptor, op);
                         Debug.Assert(completed);
                         receiveQueue.Dequeue();
                         QueueCompletion(op);
@@ -1097,7 +1069,7 @@ namespace System.Net.Sockets
                     while (!receiveQueue.IsEmpty)
                     {
                         TransferOperation op = receiveQueue.Head;
-                        bool completed = TryCompleteReceive(_fileDescriptor, op);
+                        bool completed = TryCompleteReceiveFrom(_fileDescriptor, op);
                         Debug.Assert(completed);
                         receiveQueue.Dequeue();
                         QueueCompletion(op);
@@ -1158,7 +1130,7 @@ namespace System.Net.Sockets
                         do
                         {
                             op = _receiveQueue.Head;
-                            if (TryCompleteReceive(_fileDescriptor, op))
+                            if (TryCompleteReceiveFrom(_fileDescriptor, op))
                             {
                                 EndOperation(ref _receiveQueue);
                                 QueueCompletion(op);
@@ -1202,7 +1174,7 @@ namespace System.Net.Sockets
                         do
                         {
                             op = _sendQueue.Head;
-                            if (TryCompleteSend(_fileDescriptor, op))
+                            if (TryCompleteSendTo(_fileDescriptor, op))
                             {
                                 EndOperation(ref _sendQueue);
                                 QueueCompletion(op);
