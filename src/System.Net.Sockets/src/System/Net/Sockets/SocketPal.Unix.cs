@@ -1036,45 +1036,25 @@ namespace System.Net.Sockets
         public static unsafe SocketError ConnectAsync(Socket socket, SafeCloseSocket handle, byte[] socketAddress, int socketAddressLen, ConnectOverlappedAsyncResult asyncResult)
         {
             // TODO: audit "completed synchronously" behavior
-            if (!handle.AsyncContext.ConnectAsync(socketAddress, socketAddressLen, asyncResult.CompletionCallback))
-            {
-                return (SocketError)asyncResult.ErrorCode;
-            }
-
-            return SocketError.IOPending;
+            return handle.AsyncContext.ConnectAsync(socketAddress, socketAddressLen, asyncResult.CompletionCallback);
         }
 
         public static unsafe SocketError SendAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
             // TODO: audit "completed synchronously" behavior
-            if (!handle.AsyncContext.SendAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback))
-            {
-                return (SocketError)asyncResult.ErrorCode;
-            }
-
-            return SocketError.IOPending;
+            return handle.AsyncContext.SendAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback);
         }
 
         public static unsafe SocketError SendAsync(SafeCloseSocket handle, IList<ArraySegment<byte>> buffers, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
             // TODO: audit "completed synchronously" behavior
-            if (!handle.AsyncContext.SendAsync(new BufferList(buffers), GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback))
-            {
-                return (SocketError)asyncResult.ErrorCode;
-            }
-
-            return SocketError.IOPending;
+            return handle.AsyncContext.SendAsync(new BufferList(buffers), GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback);
         }
 
         public static unsafe SocketError SendAsync(SafeCloseSocket handle, BufferOffsetSize[] buffers, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
             // TODO: audit "completed synchronously" behavior
-            if (!handle.AsyncContext.SendAsync(new BufferList(buffers), GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback))
-            {
-                return (SocketError)asyncResult.ErrorCode;
-            }
-
-            return SocketError.IOPending;
+            return handle.AsyncContext.SendAsync(new BufferList(buffers), GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback);
         }
 
         public static unsafe SocketError SendToAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
@@ -1082,34 +1062,19 @@ namespace System.Net.Sockets
             asyncResult.SocketAddress = socketAddress;
 
             // TODO: audit "completed synchronously" behavior
-            if (!handle.AsyncContext.SendToAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress.Buffer, socketAddress.Size, asyncResult.CompletionCallback))
-            {
-                return (SocketError)asyncResult.ErrorCode;
-            }
-
-            return SocketError.IOPending;
+            return handle.AsyncContext.SendToAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress.Buffer, socketAddress.Size, asyncResult.CompletionCallback);
         }
 
         public static unsafe SocketError ReceiveAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
             // TODO: audit "completed synchronously" behavior
-            if (!handle.AsyncContext.ReceiveAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback))
-            {
-                return (SocketError)asyncResult.ErrorCode;
-            }
-
-            return SocketError.IOPending;
+            return handle.AsyncContext.ReceiveAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback);
         }
 
         public static unsafe SocketError ReceiveAsync(SafeCloseSocket handle, IList<ArraySegment<byte>> buffers, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
             // TODO: audit "completed synchronously" behavior
-            if (!handle.AsyncContext.ReceiveAsync(buffers, GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback))
-            {
-                return (SocketError)asyncResult.ErrorCode;
-            }
-
-            return SocketError.IOPending;
+            return handle.AsyncContext.ReceiveAsync(buffers, GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback);
         }
 
         public static unsafe SocketError ReceiveFromAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
@@ -1117,12 +1082,7 @@ namespace System.Net.Sockets
             asyncResult.SocketAddress = socketAddress;
 
             // TODO: audit "completed synchronously" behavior
-            if (!handle.AsyncContext.ReceiveFromAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress.Buffer, socketAddress.InternalSize, asyncResult.CompletionCallback))
-            {
-                return (SocketError)asyncResult.ErrorCode;
-            }
-
-            return SocketError.IOPending;
+            return handle.AsyncContext.ReceiveFromAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress.Buffer, socketAddress.InternalSize, asyncResult.CompletionCallback);
         }
 
         public static unsafe SocketError AcceptAsync(Socket socket, SafeCloseSocket handle, SafeCloseSocket acceptHandle, int receiveSize, int socketAddressSize, AcceptOverlappedAsyncResult asyncResult)
@@ -1132,12 +1092,7 @@ namespace System.Net.Sockets
             byte[] socketAddressBuffer = new byte[socketAddressSize];
 
             // TODO: audit "completed synchronously" behavior
-            if (!handle.AsyncContext.AcceptAsync(socketAddressBuffer, socketAddressSize, asyncResult.CompletionCallback))
-            {
-                return (SocketError)asyncResult.ErrorCode;
-            }
-
-            return SocketError.IOPending;
+            return handle.AsyncContext.AcceptAsync(socketAddressBuffer, socketAddressSize, asyncResult.CompletionCallback);
         }
     }
 }

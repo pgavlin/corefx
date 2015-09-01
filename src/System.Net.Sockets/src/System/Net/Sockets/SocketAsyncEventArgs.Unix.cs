@@ -65,12 +65,7 @@ namespace System.Net.Sockets
             bytesTransferred = 0;
 
             // TODO: audit "completed synchronously" behavior
-            if (!handle.AsyncContext.AcceptAsync(m_Buffer ?? m_AcceptBuffer, m_AcceptAddressBufferCount / 2, AcceptCompletionCallback))
-            {
-                return _socketError;
-            }
-
-            return SocketError.IOPending;
+            return handle.AsyncContext.AcceptAsync(m_Buffer ?? m_AcceptBuffer, m_AcceptAddressBufferCount / 2, AcceptCompletionCallback);
         }
 
         private void InnerStartOperationConnect()
@@ -88,12 +83,7 @@ namespace System.Net.Sockets
             bytesTransferred = 0;
 
             // TODO: audit "completed synchronously" behavior
-            if (!handle.AsyncContext.ConnectAsync(m_SocketAddress.Buffer, m_SocketAddress.Size, ConnectCompletionCallback))
-            {
-                return _socketError;
-            }
-
-            return SocketError.IOPending;
+            return handle.AsyncContext.ConnectAsync(m_SocketAddress.Buffer, m_SocketAddress.Size, ConnectCompletionCallback);
         }
 
         private void InnerStartOperationDisconnect()
@@ -125,27 +115,20 @@ namespace System.Net.Sockets
         {
             int platformFlags = SocketPal.GetPlatformSocketFlags(m_SocketFlags);
 
-            bool completed;
+            SocketError errorCode;
             if (m_Buffer != null)
             {
-                completed = !handle.AsyncContext.ReceiveAsync(m_Buffer, m_Offset, m_Count, platformFlags, TransferCompletionCallback);
+                errorCode = handle.AsyncContext.ReceiveAsync(m_Buffer, m_Offset, m_Count, platformFlags, TransferCompletionCallback);
             }
             else
             {
-                completed = !handle.AsyncContext.ReceiveAsync(m_BufferList, platformFlags, TransferCompletionCallback);
+                errorCode = handle.AsyncContext.ReceiveAsync(m_BufferList, platformFlags, TransferCompletionCallback);
             }
 
             // TODO: audit "completed synchronously" behavior
-            if (completed)
-            {
-                flags = _receivedFlags;
-                bytesTransferred = _bytesTransferred;
-                return _socketError;
-            }
-
             flags = m_SocketFlags;
             bytesTransferred = 0;
-            return SocketError.IOPending;
+            return errorCode;
         }
 
         private void InnerStartOperationReceiveFrom()
@@ -158,27 +141,20 @@ namespace System.Net.Sockets
         {
             int platformFlags = SocketPal.GetPlatformSocketFlags(m_SocketFlags);
 
-            bool completed;
+            SocketError errorCode;
             if (m_Buffer != null)
             {
-                completed = !handle.AsyncContext.ReceiveFromAsync(m_Buffer, m_Offset, m_Count, platformFlags, m_SocketAddress.Buffer, m_SocketAddress.Size, TransferCompletionCallback);
+                errorCode = handle.AsyncContext.ReceiveFromAsync(m_Buffer, m_Offset, m_Count, platformFlags, m_SocketAddress.Buffer, m_SocketAddress.Size, TransferCompletionCallback);
             }
             else
             {
-                completed = !handle.AsyncContext.ReceiveFromAsync(m_BufferList, platformFlags, m_SocketAddress.Buffer, m_SocketAddress.Size, TransferCompletionCallback);
+                errorCode = handle.AsyncContext.ReceiveFromAsync(m_BufferList, platformFlags, m_SocketAddress.Buffer, m_SocketAddress.Size, TransferCompletionCallback);
             }
 
             // TODO: audit "completed synchronously" behavior
-            if (completed)
-            {
-                flags = _receivedFlags;
-                bytesTransferred = _bytesTransferred;
-                return _socketError;
-            }
-
             flags = m_SocketFlags;
             bytesTransferred = 0;
-            return SocketError.IOPending;
+            return errorCode;
         }
 
         private void InnerStartOperationReceiveMessageFrom()
@@ -203,25 +179,18 @@ namespace System.Net.Sockets
         {
             int platformFlags = SocketPal.GetPlatformSocketFlags(m_SocketFlags);
 
-            bool completed;
+            SocketError errorCode;
             if (m_Buffer != null)
             {
-                completed = !handle.AsyncContext.SendAsync(m_Buffer, m_Offset, m_Count, platformFlags, TransferCompletionCallback);
+                errorCode = handle.AsyncContext.SendAsync(m_Buffer, m_Offset, m_Count, platformFlags, TransferCompletionCallback);
             }
             else
             {
-                completed = !handle.AsyncContext.SendAsync(new BufferList(m_BufferList), platformFlags, TransferCompletionCallback);
-            }
-
-            // TODO: audit "completed synchronously" behavior
-            if (completed)
-            {
-                bytesTransferred = _bytesTransferred;
-                return _socketError;
+                errorCode = handle.AsyncContext.SendAsync(new BufferList(m_BufferList), platformFlags, TransferCompletionCallback);
             }
 
             bytesTransferred = 0;
-            return SocketError.IOPending;
+            return errorCode;
         }
 
         private void InnerStartOperationSendPackets()
@@ -244,25 +213,19 @@ namespace System.Net.Sockets
         {
             int platformFlags = SocketPal.GetPlatformSocketFlags(m_SocketFlags);
 
-            bool completed;
+            SocketError errorCode;
             if (m_Buffer != null)
             {
-                completed = !handle.AsyncContext.SendToAsync(m_Buffer, m_Offset, m_Count, platformFlags, m_SocketAddress.Buffer, m_SocketAddress.Size, TransferCompletionCallback);
+                errorCode = handle.AsyncContext.SendToAsync(m_Buffer, m_Offset, m_Count, platformFlags, m_SocketAddress.Buffer, m_SocketAddress.Size, TransferCompletionCallback);
             }
             else
             {
-                completed = !handle.AsyncContext.SendToAsync(new BufferList(m_BufferList), platformFlags, m_SocketAddress.Buffer, m_SocketAddress.Size, TransferCompletionCallback);
+                errorCode = handle.AsyncContext.SendToAsync(new BufferList(m_BufferList), platformFlags, m_SocketAddress.Buffer, m_SocketAddress.Size, TransferCompletionCallback);
             }
 
             // TODO: audit "completed synchronously" behavior
-            if (completed)
-            {
-                bytesTransferred = _bytesTransferred;
-                return _socketError;
-            }
-
             bytesTransferred = 0;
-            return SocketError.IOPending;
+            return errorCode;
         }
 
         internal void LogBuffer(int size)
