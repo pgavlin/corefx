@@ -131,7 +131,7 @@ namespace System.Net.Security
 
         protected override bool ReleaseHandle()
         {
-            return Interop.SspiHelper.SspiFreeAuthIdentity(handle) == Interop.SecurityStatus.OK;
+            return Interop.Secur32.SspiFreeAuthIdentity(handle) == Interop.SecurityStatus.OK;
         }
     }
 
@@ -162,7 +162,7 @@ namespace System.Net.Security
         {
             int res = -1;
             SafeFreeContextBuffer_SECURITY pkgArray_SECURITY = null;
-            res = Interop.SafeNetHandles_SECURITY.EnumerateSecurityPackagesW(out pkgnum, out pkgArray_SECURITY);
+            res = Interop.Secur32.EnumerateSecurityPackagesW(out pkgnum, out pkgArray_SECURITY);
             pkgArray = pkgArray_SECURITY;
 
             if (res != 0 && pkgArray != null)
@@ -221,7 +221,7 @@ namespace System.Net.Security
             {
                 if (b)
                 {
-                    status = Interop.SafeNetHandles_SECURITY.QueryContextAttributesW(ref phContext._handle, contextAttribute, buffer);
+                    status = Interop.Secur32.QueryContextAttributesW(ref phContext._handle, contextAttribute, buffer);
                     phContext.DangerousRelease();
                 }
 
@@ -280,7 +280,7 @@ namespace System.Net.Security
             {
                 if (b)
                 {
-                    status = Interop.SafeNetHandles_SECURITY.SetContextAttributesW(
+                    status = Interop.Secur32.SetContextAttributesW(
                         ref phContext._handle, contextAttribute, buffer, buffer.Length);
                     phContext.DangerousRelease();
                 }
@@ -297,7 +297,7 @@ namespace System.Net.Security
 
         override protected bool ReleaseHandle()
         {
-            return Interop.SafeNetHandles_SECURITY.FreeContextBuffer(handle) == 0;
+            return Interop.Secur32.FreeContextBuffer(handle) == 0;
         }
     }
     //=======================================================
@@ -327,7 +327,7 @@ namespace System.Net.Security
 
         override protected bool ReleaseHandle()
         {
-            Interop.SafeNetHandles.CertFreeCertificateContext(handle);
+            Interop.Crypt32.CertFreeCertificateContext(handle);
             return true;
         }
     }
@@ -392,7 +392,7 @@ namespace System.Net.Security
 
             outCredential = new SafeFreeCredential_SECURITY();
 
-            errorCode = Interop.SafeNetHandles_SECURITY.AcquireCredentialsHandleW(
+            errorCode = Interop.Secur32.AcquireCredentialsHandleW(
                                                     null,
                                                     package,
                                                     (int)intent,
@@ -433,7 +433,7 @@ namespace System.Net.Security
 
             outCredential = new SafeFreeCredential_SECURITY();
 
-            errorCode = Interop.SafeNetHandles_SECURITY.AcquireCredentialsHandleW(
+            errorCode = Interop.Secur32.AcquireCredentialsHandleW(
                                                 null,
                                                 package,
                                                 (int)intent,
@@ -472,7 +472,7 @@ namespace System.Net.Security
             long timeStamp;
 
             outCredential = new SafeFreeCredential_SECURITY();
-            errorCode = Interop.SafeNetHandles_SECURITY.AcquireCredentialsHandleW(
+            errorCode = Interop.Secur32.AcquireCredentialsHandleW(
                                                     null,
                                                     package,
                                                     (int)intent,
@@ -521,7 +521,7 @@ namespace System.Net.Security
 
                 outCredential = new SafeFreeCredential_SECURITY();
 
-                errorCode = Interop.SafeNetHandles_SECURITY.AcquireCredentialsHandleW(
+                errorCode = Interop.Secur32.AcquireCredentialsHandleW(
                                                     null,
                                                     package,
                                                     (int)intent,
@@ -622,7 +622,7 @@ namespace System.Net.Security
 
         override protected bool ReleaseHandle()
         {
-            return Interop.SafeNetHandles_SECURITY.FreeCredentialsHandle(ref _handle) == 0;
+            return Interop.Secur32.FreeCredentialsHandle(ref _handle) == 0;
         }
     }
     //======================================================================
@@ -921,7 +921,7 @@ namespace System.Net.Security
                 }
                 else if (b1 && b2)
                 {
-                    errorCode = Interop.SafeNetHandles_SECURITY.InitializeSecurityContextW(
+                    errorCode = Interop.Secur32.InitializeSecurityContextW(
                                 ref credentialHandle,
                                 inContextPtr,
                                 targetName,
@@ -1213,7 +1213,7 @@ namespace System.Net.Security
                 }
                 else if (b1 && b2)
                 {
-                    errorCode = Interop.SafeNetHandles_SECURITY.AcceptSecurityContext(
+                    errorCode = Interop.Secur32.AcceptSecurityContext(
                                 ref credentialHandle,
                                 inContextPtr,
                                 inputBuffer,
@@ -1352,7 +1352,7 @@ namespace System.Net.Security
                     {
                         if (b)
                         {
-                            errorCode = Interop.SafeNetHandles_SECURITY.CompleteAuthToken(contextHandle.IsZero ? null : &contextHandle, inSecurityBufferDescriptor);
+                            errorCode = Interop.Secur32.CompleteAuthToken(contextHandle.IsZero ? null : &contextHandle, inSecurityBufferDescriptor);
                             refContext.DangerousRelease();
                         }
                     }
@@ -1388,7 +1388,7 @@ namespace System.Net.Security
             if (this._EffectiveCredential != null)
                 this._EffectiveCredential.DangerousRelease();
 
-            return Interop.SafeNetHandles_SECURITY.DeleteSecurityContext(ref _handle) == 0;
+            return Interop.Secur32.DeleteSecurityContext(ref _handle) == 0;
         }
     }
     //======================================================================
@@ -1455,7 +1455,7 @@ namespace System.Net.Security
             {
                 if (b)
                 {
-                    status = Interop.SafeNetHandles_SECURITY.QueryContextAttributesW(ref phContext._handle, contextAttribute, buffer);
+                    status = Interop.Secur32.QueryContextAttributesW(ref phContext._handle, contextAttribute, buffer);
                     phContext.DangerousRelease();
                 }
 
@@ -1479,39 +1479,7 @@ namespace System.Net.Security
     {
         override protected bool ReleaseHandle()
         {
-            return Interop.SafeNetHandles_SECURITY.FreeContextBuffer(handle) == 0;
-        }
-    }
-
-    ///////////////////////////////////////////////////////////////
-    //
-    // This is safe handle factory for any object that depends on
-    // KERNEL32 CloseHandle as the handle disposal method.
-    //
-    ///////////////////////////////////////////////////////////////
-#if DEBUG
-    internal sealed class SafeCloseHandle : DebugCriticalHandleZeroOrMinusOneIsInvalid
-    {
-#else
-    internal sealed class SafeCloseHandle : CriticalHandleZeroOrMinusOneIsInvalid
-    {
-#endif
-        private int _disposed;
-
-        private SafeCloseHandle() : base()
-        {
-        }
-
-        protected override bool ReleaseHandle()
-        {
-            if (!IsInvalid)
-            {
-                if (Interlocked.Increment(ref _disposed) == 1)
-                {
-                    return Interop.SafeNetHandles.CloseHandle(handle);
-                }
-            }
-            return true;
+            return Interop.Secur32.FreeContextBuffer(handle) == 0;
         }
     }
 }

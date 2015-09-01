@@ -38,7 +38,7 @@ namespace System.Net
         int QueryContextChannelBinding(SafeDeleteContext phContext, Interop.ContextAttribute attribute, out SafeFreeContextBufferChannelBinding refHandle);
         int QueryContextAttributes(SafeDeleteContext phContext, Interop.ContextAttribute attribute, byte[] buffer, Type handleType, out SafeHandle refHandle);
         int SetContextAttributes(SafeDeleteContext phContext, Interop.ContextAttribute attribute, byte[] buffer);
-        int QuerySecurityContextToken(SafeDeleteContext phContext, out SafeCloseHandle phToken);
+        int QuerySecurityContextToken(SafeDeleteContext phContext, out SecurityContextTokenHandle phToken);
         int CompleteAuthToken(ref SafeDeleteContext refContext, Interop.SecurityBuffer[] inputBuffers);
     }
 
@@ -212,7 +212,7 @@ namespace System.Net
             return SafeFreeContextBuffer.SetContextAttributes(phContext, attribute, buffer);
         }
 
-        public int QuerySecurityContextToken(SafeDeleteContext phContext, out SafeCloseHandle phToken)
+        public int QuerySecurityContextToken(SafeDeleteContext phContext, out SecurityContextTokenHandle phToken)
         {
             throw new NotSupportedException();
         }
@@ -458,7 +458,7 @@ namespace System.Net
             throw NotImplemented.ByDesignWithMessage(SR.net_MethodNotImplementedException);
         }
 
-        public int QuerySecurityContextToken(SafeDeleteContext phContext, out SafeCloseHandle phToken)
+        public int QuerySecurityContextToken(SafeDeleteContext phContext, out SecurityContextTokenHandle phToken)
         {
             return GetSecurityContextToken(phContext, out phToken);
         }
@@ -468,7 +468,7 @@ namespace System.Net
             return SafeDeleteContext.CompleteAuthToken(ref refContext, inputBuffers);
         }
 
-        private static int GetSecurityContextToken(SafeDeleteContext phContext, out SafeCloseHandle safeHandle)
+        private static int GetSecurityContextToken(SafeDeleteContext phContext, out SecurityContextTokenHandle safeHandle)
         {
             int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
@@ -492,7 +492,7 @@ namespace System.Net
             {
                 if (b)
                 {
-                    status = Interop.SafeNetHandles.QuerySecurityContextToken(ref phContext._handle, out safeHandle);
+                    status = Interop.Secur32.QuerySecurityContextToken(ref phContext._handle, out safeHandle);
                     phContext.DangerousRelease();
                 }
             }

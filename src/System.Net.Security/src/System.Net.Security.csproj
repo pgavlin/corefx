@@ -28,6 +28,7 @@
     <Compile Include="System\Net\_NativeSSPI.cs" />
     <Compile Include="System\Net\_StreamFramer.cs" />
     <Compile Include="System\Net\_SslSessionsCache.cs" />
+    <Compile Include="System\Net\SecurityContextTokenHandle.cs" />
     <Compile Include="System\Net\SecureProtocols\SslStream.cs" />
     <Compile Include="System\Net\SecureProtocols\AuthenticatedStream.cs" />
     <Compile Include="System\Net\SecureProtocols\_SslState.cs" />
@@ -139,6 +140,9 @@
     <!-- NativeSSPI -->
     <Compile Include="$(CommonPath)\Interop\Windows\secur32\Interop.SSPI.cs">
       <Link>Interop\Windows\secur32\Interop.SSPI.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\Interop\Windows\mincore\Interop.CloseHandle.cs">
+      <Link>Interop\Windows\mincore\Interop.CloseHandle.cs</Link>
     </Compile>
     
     <Compile Include="$(CommonPath)\Interop\Windows\SChannel\Interop.SchProtocols.cs">

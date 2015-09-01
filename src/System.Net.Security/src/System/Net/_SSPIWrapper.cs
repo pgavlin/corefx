@@ -266,7 +266,7 @@ namespace System.Net
             return errorCode;
         }
 
-        public static int QuerySecurityContextToken(SSPIInterface SecModule, SafeDeleteContext context, out SafeCloseHandle token)
+        public static int QuerySecurityContextToken(SSPIInterface SecModule, SafeDeleteContext context, out SecurityContextTokenHandle token)
         {
             return SecModule.QuerySecurityContextToken(context, out token);
         }
