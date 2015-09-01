@@ -407,6 +407,10 @@ namespace System.Net.Sockets
                             optName = Interop.libc.IPV6_V6ONLY;
                             break;
 
+                        case SocketOptionName.PacketInformation:
+                            optName = Interop.libc.IPV6_RECVPKTINFO;
+                            break;
+
                         default:
                             optName = (int)optionName;
                             return false;

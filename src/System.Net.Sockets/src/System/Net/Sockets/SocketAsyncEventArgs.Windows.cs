@@ -148,6 +148,28 @@ namespace System.Net.Sockets
             }
         }
 
+        internal unsafe SocketError DoOperationAccept(Socket socket, SafeCloseSocket handle, SafeCloseSocket acceptHandle, out int bytesTransferred)
+        {
+            PrepareIOCPOperation();
+
+            SocketError socketError = SocketError.Success;
+
+            if (!socket.AcceptEx(
+                    handle,
+                    acceptHandle,
+                    (m_PtrSingleBuffer != IntPtr.Zero) ? m_PtrSingleBuffer : m_PtrAcceptBuffer,
+                    (m_PtrSingleBuffer != IntPtr.Zero) ? Count - m_AcceptAddressBufferCount : 0,
+                    m_AcceptAddressBufferCount / 2,
+                    m_AcceptAddressBufferCount / 2,
+                    out bytesTransferred,
+                    m_PtrNativeOverlapped))
+            {
+                socketError = SocketPal.GetLastSocketError();
+            }
+
+            return socketError;
+        }
+
         private void InnerStartOperationConnect()
         {
             // ConnectEx uses a sockaddr buffer containing he remote address to which to connect.
@@ -160,9 +182,48 @@ namespace System.Net.Sockets
             CheckPinNoBuffer();
         }
 
+        internal unsafe SocketError DoOperationConnect(Socket socket, SafeCloseSocket handle, out int bytesTransferred)
+        {
+            PrepareIOCPOperation();
+
+            SocketError socketError = SocketError.Success;
+
+            if (!socket.ConnectEx(
+                    handle,
+                    m_PtrSocketAddressBuffer,
+                    m_SocketAddress.Size,
+                    m_PtrSingleBuffer,
+                    Count,
+                    out bytesTransferred,
+                    m_PtrNativeOverlapped))
+            {
+                socketError = SocketPal.GetLastSocketError();
+            }
+
+            return socketError;
+        }
+
         private void InnerStartOperationDisconnect()
         {
             CheckPinNoBuffer();
+        }
+
+        internal unsafe SocketError DoOperationDisconnect(Socket socket, SafeCloseSocket handle)
+        {
+            PrepareIOCPOperation();
+
+            SocketError socketError = SocketError.Success;
+
+            if (!socket.DisconnectEx(
+                    handle,
+                    m_PtrNativeOverlapped,
+                    (int)(DisconnectReuseSocket ? TransmitFileOptions.ReuseSocket : 0),
+                    0))
+            {
+                socketError = SocketPal.GetLastSocketError();
+            }
+
+            return socketError;
         }
 
         private void InnerStartOperationReceive()
@@ -177,6 +238,41 @@ namespace System.Net.Sockets
             //   The Overlapped.UnsafePack method is used that takes an array of objects to pin.
             //   An array to reference the multiple buffer is allocated.
             //   An array of WSABuffer descriptors is allocated.
+        }
+
+        internal unsafe SocketError DoOperationReceive(SafeCloseSocket handle, out SocketFlags flags, out int bytesTransferred)
+        {
+            PrepareIOCPOperation();
+
+            flags = m_SocketFlags;
+
+            SocketError socketError;
+            if (m_Buffer != null)
+            {
+                // Single buffer case
+                socketError = Interop.Winsock.WSARecv(
+                    handle,
+                    ref m_WSABuffer,
+                    1,
+                    out bytesTransferred,
+                    ref flags,
+                    m_PtrNativeOverlapped,
+                    IntPtr.Zero);
+            }
+            else
+            {
+                // Multi buffer case
+                socketError = Interop.Winsock.WSARecv(
+                    handle,
+                    m_WSABufferArray,
+                    m_WSABufferArray.Length,
+                    out bytesTransferred,
+                    ref flags,
+                    m_PtrNativeOverlapped,
+                    IntPtr.Zero);
+            }
+
+            return socketError;
         }
 
         private void InnerStartOperationReceiveFrom()
@@ -194,6 +290,43 @@ namespace System.Net.Sockets
             // WSARecvFrom and WSASendTo also uses a sockaddr buffer in which to store the address from which the data was received.
             // The sockaddr is pinned with a GCHandle to avoid having to use the object array form of UnsafePack.
             PinSocketAddressBuffer();
+        }
+
+        internal unsafe SocketError DoOperationReceiveFrom(SafeCloseSocket handle, out SocketFlags flags, out int bytesTransferred)
+        {
+            PrepareIOCPOperation();
+
+            flags = m_SocketFlags;
+
+            SocketError socketError;
+            if (m_Buffer != null)
+            {
+                socketError = Interop.Winsock.WSARecvFrom(
+                                handle,
+                                ref m_WSABuffer,
+                                1,
+                                out bytesTransferred,
+                                ref flags,
+                                m_PtrSocketAddressBuffer,
+                                m_PtrSocketAddressBufferSize,
+                                m_PtrNativeOverlapped,
+                                IntPtr.Zero);
+            }
+            else
+            {
+                socketError = Interop.Winsock.WSARecvFrom(
+                                handle,
+                                m_WSABufferArray,
+                                m_WSABufferArray.Length,
+                                out bytesTransferred,
+                                ref flags,
+                                m_PtrSocketAddressBuffer,
+                                m_PtrSocketAddressBufferSize,
+                                m_PtrNativeOverlapped,
+                                IntPtr.Zero);
+            }
+
+            return socketError;
         }
 
         private void InnerStartOperationReceiveMessageFrom()
@@ -287,6 +420,18 @@ namespace System.Net.Sockets
             }
         }
 
+        internal unsafe SocketError DoOperationReceiveMessageFrom(Socket socket, SafeCloseSocket handle, out int bytesTransferred)
+        {
+            PrepareIOCPOperation();
+
+            return socket.WSARecvMsg(
+                handle,
+                m_PtrWSAMessageBuffer,
+                out bytesTransferred,
+                m_PtrNativeOverlapped,
+                IntPtr.Zero);
+        }
+
         private void InnerStartOperationSend()
         {
             // WSASend uses a WSABuffer array describing buffers of data to send.
@@ -299,6 +444,39 @@ namespace System.Net.Sockets
             //   The Overlapped.UnsafePack method is used that takes an array of objects to pin.
             //   An array to reference the multiple buffer is allocated.
             //   An array of WSABuffer descriptors is allocated.
+        }
+
+        internal unsafe SocketError DoOperationSend(SafeCloseSocket handle, out int bytesTransferred)
+        {
+            PrepareIOCPOperation();
+
+            SocketError socketError;
+            if (m_Buffer != null)
+            {
+                // Single buffer case
+                socketError = Interop.Winsock.WSASend(
+                    handle,
+                    ref m_WSABuffer,
+                    1,
+                    out bytesTransferred,
+                    m_SocketFlags,
+                    m_PtrNativeOverlapped,
+                    IntPtr.Zero);
+            }
+            else
+            {
+                // Multi buffer case
+                socketError = Interop.Winsock.WSASend(
+                    handle,
+                    m_WSABufferArray,
+                    m_WSABufferArray.Length,
+                    out bytesTransferred,
+                    m_SocketFlags,
+                    m_PtrNativeOverlapped,
+                    IntPtr.Zero);
+            }
+
+            return socketError;
         }
 
         private void InnerStartOperationSendPackets()
@@ -389,6 +567,21 @@ namespace System.Net.Sockets
             CheckPinSendPackets();
         }
 
+        internal SocketError DoOperationSendPackets(Socket socket, SafeCloseSocket handle)
+        {
+            PrepareIOCPOperation();
+
+            bool result = socket.TransmitPackets(
+                        handle,
+                        m_PtrSendPacketsDescriptor,
+                        m_SendPacketsDescriptor.Length,
+                        m_SendPacketsSendSize,
+                        m_PtrNativeOverlapped,
+                        m_SendPacketsFlags);
+
+            return result ? SocketError.Success : SocketPal.GetLastSocketError();
+        }
+
         private void InnerStartOperationSendTo()
         {
             // WSASendTo uses a WSABuffer array describing buffers in which to 
@@ -404,6 +597,42 @@ namespace System.Net.Sockets
             // WSARecvFrom and WSASendTo also uses a sockaddr buffer in which to store the address from which the data was received.
             // The sockaddr is pinned with a GCHandle to avoid having to use the object array form of UnsafePack.
             PinSocketAddressBuffer();
+        }
+
+        internal SocketError DoOperationSendTo(SafeCloseSocket handle, out int bytesTransferred)
+        {
+            PrepareIOCPOperation();
+
+            SocketError socketError;
+            if (m_Buffer != null)
+            {
+                // Single buffer case
+                socketError = Interop.Winsock.WSASendTo(
+                                handle,
+                                ref m_WSABuffer,
+                                1,
+                                out bytesTransferred,
+                                m_SocketFlags,
+                                m_PtrSocketAddressBuffer,
+                                m_SocketAddress.Size,
+                                m_PtrNativeOverlapped,
+                                IntPtr.Zero);
+            }
+            else
+            {
+                socketError = Interop.Winsock.WSASendTo(
+                                handle,
+                                m_WSABufferArray,
+                                m_WSABufferArray.Length,
+                                out bytesTransferred,
+                                m_SocketFlags,
+                                m_PtrSocketAddressBuffer,
+                                m_SocketAddress.Size,
+                                m_PtrNativeOverlapped,
+                                IntPtr.Zero);
+            }
+
+            return socketError;
         }
 
         // Method to ensure Overlapped object exists for operations that need no data buffer.
@@ -828,7 +1057,7 @@ namespace System.Net.Sockets
             return socketError;
         }
 
-        private SocketError FinishConnectOperation()
+        private SocketError FinishOperationConnect()
         {
             SocketError socketError;
 
@@ -859,7 +1088,7 @@ namespace System.Net.Sockets
             return *(int*)m_PtrSocketAddressBufferSize;
         }
 
-        private unsafe void FinishReceiveMessageFromOperation()
+        private unsafe void FinishOperationReceiveMessageFrom()
         {
             IPAddress address = null;
             Interop.Winsock.WSAMsg* PtrMessage = (Interop.Winsock.WSAMsg*)Marshal.UnsafeAddrOfPinnedArrayElement(_WSAMessageBuffer, 0);
@@ -891,7 +1120,7 @@ namespace System.Net.Sockets
             }
         }
 
-        private void FinishSendPacketsOperation()
+        private void FinishOperationSendPackets()
         {
             // Close the files if open
             if (m_SendPacketsFileStreams != null)

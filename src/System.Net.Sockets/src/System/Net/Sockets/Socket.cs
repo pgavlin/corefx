@@ -4318,7 +4318,7 @@ namespace System.Net.Sockets
             }
 
             SafeCloseSocket acceptHandle;
-            asyncResult.AcceptSocket = GetOrCreateAcceptSocket(acceptSocket, out acceptHandle);
+            asyncResult.AcceptSocket = GetOrCreateAcceptSocket(acceptSocket, false, "acceptSocket", out acceptHandle);
 
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::DoBeginAccept() AcceptSocket:" + Logging.HashString(acceptSocket));
 
@@ -4601,24 +4601,12 @@ namespace System.Net.Sockets
             }
 
             // Handle AcceptSocket property.
-            if (e.AcceptSocket == null)
-            {
-                // Accept socket not specified - create it.
-                e.AcceptSocket = new Socket(_addressFamily, _socketType, _protocolType);
-            }
-            else
-            {
-                // Validate accept socket for use here.
-                if (e.AcceptSocket.m_RightEndPoint != null && !e.AcceptSocket._isDisconnected)
-                {
-                    throw new InvalidOperationException(SR.Format(SR.net_sockets_namedmustnotbebound, "AcceptSocket"));
-                }
-            }
+            SafeCloseSocket acceptHandle;
+            e.AcceptSocket = GetOrCreateAcceptSocket(e.AcceptSocket, true, "AcceptSocket", out acceptHandle);
 
             // Prepare for the native call.
             e.StartOperationCommon(this);
             e.StartOperationAccept();
-            e.PrepareIOCPOperation();
 
             // Local variables for sync completion.
             int bytesTransferred;
@@ -4627,18 +4615,7 @@ namespace System.Net.Sockets
             // Make the native call.
             try
             {
-                if (!AcceptEx(
-                        _handle,
-                        e.AcceptSocket._handle,
-                        (e.m_PtrSingleBuffer != IntPtr.Zero) ? e.m_PtrSingleBuffer : e.m_PtrAcceptBuffer,
-                        (e.m_PtrSingleBuffer != IntPtr.Zero) ? e.Count - e.m_AcceptAddressBufferCount : 0,
-                        e.m_AcceptAddressBufferCount / 2,
-                        e.m_AcceptAddressBufferCount / 2,
-                        out bytesTransferred,
-                        e.m_PtrNativeOverlapped))
-                {
-                    socketError = SocketPal.GetLastSocketError();
-                }
+                socketError = e.DoOperationAccept(this, _handle, acceptHandle, out bytesTransferred);
             }
             catch (Exception ex)
             {
@@ -4751,24 +4728,13 @@ namespace System.Net.Sockets
                 // Prepare for the native call.
                 e.StartOperationCommon(this);
                 e.StartOperationConnect();
-                e.PrepareIOCPOperation();
 
                 // Make the native call.
                 int bytesTransferred;
                 SocketError socketError = SocketError.Success;
                 try
                 {
-                    if (!ConnectEx(
-                            _handle,
-                            e.m_PtrSocketAddressBuffer,
-                            e.m_SocketAddress.Size,
-                            e.m_PtrSingleBuffer,
-                            e.Count,
-                            out bytesTransferred,
-                            e.m_PtrNativeOverlapped))
-                    {
-                        socketError = SocketPal.GetLastSocketError();
-                    }
+                    socketError = e.DoOperationConnect(this, _handle, out bytesTransferred);
                 }
                 catch (Exception ex)
                 {
@@ -4881,20 +4847,12 @@ namespace System.Net.Sockets
             // Prepare for the native call.
             e.StartOperationCommon(this);
             e.StartOperationDisconnect();
-            e.PrepareIOCPOperation();
 
             // Make the native call.
             SocketError socketError = SocketError.Success;
             try
             {
-                if (!DisconnectEx(
-                        _handle,
-                        e.m_PtrNativeOverlapped,
-                        (int)(e.DisconnectReuseSocket ? TransmitFileOptions.ReuseSocket : 0),
-                        0))
-                {
-                    socketError = SocketPal.GetLastSocketError();
-                }
+                socketError = e.DoOperationDisconnect(this, _handle);
             }
             catch (Exception ex)
             {
@@ -4942,40 +4900,16 @@ namespace System.Net.Sockets
             // Prepare for the native call.
             e.StartOperationCommon(this);
             e.StartOperationReceive();
-            e.PrepareIOCPOperation();
 
             // Local vars for sync completion of native call.
-            SocketFlags flags = e.m_SocketFlags;
+            SocketFlags flags;
             int bytesTransferred;
             SocketError socketError;
 
             // Wrap native methods with try/catch so event args object can be cleaned up
             try
             {
-                if (e.m_Buffer != null)
-                {
-                    // Single buffer case
-                    socketError = Interop.Winsock.WSARecv(
-                        _handle,
-                        ref e.m_WSABuffer,
-                        1,
-                        out bytesTransferred,
-                        ref flags,
-                        e.m_PtrNativeOverlapped,
-                        IntPtr.Zero);
-                }
-                else
-                {
-                    // Multi buffer case
-                    socketError = Interop.Winsock.WSARecv(
-                        _handle,
-                        e.m_WSABufferArray,
-                        e.m_WSABufferArray.Length,
-                        out bytesTransferred,
-                        ref flags,
-                        e.m_PtrNativeOverlapped,
-                        IntPtr.Zero);
-                }
+                socketError = e.DoOperationReceive(_handle, out flags, out bytesTransferred);
             }
             catch (Exception ex)
             {
@@ -5050,41 +4984,15 @@ namespace System.Net.Sockets
             // Prepare for the native call.
             e.StartOperationCommon(this);
             e.StartOperationReceiveFrom();
-            e.PrepareIOCPOperation();
 
             // Make the native call.
-            SocketFlags flags = e.m_SocketFlags;
+            SocketFlags flags;
             int bytesTransferred;
             SocketError socketError;
 
             try
             {
-                if (e.m_Buffer != null)
-                {
-                    socketError = Interop.Winsock.WSARecvFrom(
-                                    _handle,
-                                    ref e.m_WSABuffer,
-                                    1,
-                                    out bytesTransferred,
-                                    ref flags,
-                                    e.m_PtrSocketAddressBuffer,
-                                    e.m_PtrSocketAddressBufferSize,
-                                    e.m_PtrNativeOverlapped,
-                                    IntPtr.Zero);
-                }
-                else
-                {
-                    socketError = Interop.Winsock.WSARecvFrom(
-                                    _handle,
-                                    e.m_WSABufferArray,
-                                    e.m_WSABufferArray.Length,
-                                    out bytesTransferred,
-                                    ref flags,
-                                    e.m_PtrSocketAddressBuffer,
-                                    e.m_PtrSocketAddressBufferSize,
-                                    e.m_PtrNativeOverlapped,
-                                    IntPtr.Zero);
-                }
+                socketError = e.DoOperationReceiveFrom(_handle, out flags, out bytesTransferred);
             }
             catch (Exception ex)
             {
@@ -5161,7 +5069,6 @@ namespace System.Net.Sockets
             // Prepare for the native call.
             e.StartOperationCommon(this);
             e.StartOperationReceiveMessageFrom();
-            e.PrepareIOCPOperation();
 
             // Make the native call.
             int bytesTransferred;
@@ -5169,12 +5076,7 @@ namespace System.Net.Sockets
 
             try
             {
-                socketError = WSARecvMsg(
-                    _handle,
-                    e.m_PtrWSAMessageBuffer,
-                    out bytesTransferred,
-                    e.m_PtrNativeOverlapped,
-                    IntPtr.Zero);
+                socketError = e.DoOperationReceiveMessageFrom(this, _handle, out bytesTransferred);
             }
             catch (Exception ex)
             {
@@ -5229,7 +5131,6 @@ namespace System.Net.Sockets
             // Prepare for the native call.
             e.StartOperationCommon(this);
             e.StartOperationSend();
-            e.PrepareIOCPOperation();
 
             // Local vars for sync completion of native call.
             int bytesTransferred;
@@ -5238,30 +5139,7 @@ namespace System.Net.Sockets
             // Wrap native methods with try/catch so event args object can be cleaned up
             try
             {
-                if (e.m_Buffer != null)
-                {
-                    // Single buffer case
-                    socketError = Interop.Winsock.WSASend(
-                        _handle,
-                        ref e.m_WSABuffer,
-                        1,
-                        out bytesTransferred,
-                        e.m_SocketFlags,
-                        e.m_PtrNativeOverlapped,
-                        IntPtr.Zero);
-                }
-                else
-                {
-                    // Multi buffer case
-                    socketError = Interop.Winsock.WSASend(
-                        _handle,
-                        e.m_WSABufferArray,
-                        e.m_WSABufferArray.Length,
-                        out bytesTransferred,
-                        e.m_SocketFlags,
-                        e.m_PtrNativeOverlapped,
-                        IntPtr.Zero);
-                }
+                socketError = e.DoOperationSend(_handle, out bytesTransferred);
             }
             catch (Exception ex)
             {
@@ -5330,38 +5208,20 @@ namespace System.Net.Sockets
 
             // Make the native call.
             SocketError socketError;
-            bool result;
 
             Debug.Assert(e.m_SendPacketsDescriptor != null);
 
             if (e.m_SendPacketsDescriptor.Length > 0)
             {
-                e.PrepareIOCPOperation();
-
                 try
                 {
-                    result = TransmitPackets(
-                                _handle,
-                                e.m_PtrSendPacketsDescriptor,
-                                e.m_SendPacketsDescriptor.Length,
-                                e.m_SendPacketsSendSize,
-                                e.m_PtrNativeOverlapped,
-                                e.m_SendPacketsFlags);
+                    socketError = e.DoOperationSendPackets(this, _handle);
                 }
                 catch (Exception)
                 {
                     // clear in-use on event arg object 
                     e.Complete();
                     throw;
-                }
-
-                if (!result)
-                {
-                    socketError = SocketPal.GetLastSocketError();
-                }
-                else
-                {
-                    socketError = SocketError.Success;
                 }
 
                 // Handle completion when completion port is not posted.
@@ -5420,7 +5280,6 @@ namespace System.Net.Sockets
             // Prepare for the native call.
             e.StartOperationCommon(this);
             e.StartOperationSendTo();
-            e.PrepareIOCPOperation();
 
             // Make the native call.
             int bytesTransferred;
@@ -5429,33 +5288,7 @@ namespace System.Net.Sockets
             // Wrap native methods with try/catch so event args object can be cleaned up
             try
             {
-                if (e.m_Buffer != null)
-                {
-                    // Single buffer case
-                    socketError = Interop.Winsock.WSASendTo(
-                                    _handle,
-                                    ref e.m_WSABuffer,
-                                    1,
-                                    out bytesTransferred,
-                                    e.m_SocketFlags,
-                                    e.m_PtrSocketAddressBuffer,
-                                    e.m_SocketAddress.Size,
-                                    e.m_PtrNativeOverlapped,
-                                    IntPtr.Zero);
-                }
-                else
-                {
-                    socketError = Interop.Winsock.WSASendTo(
-                                    _handle,
-                                    e.m_WSABufferArray,
-                                    e.m_WSABufferArray.Length,
-                                    out bytesTransferred,
-                                    e.m_SocketFlags,
-                                    e.m_PtrSocketAddressBuffer,
-                                    e.m_SocketAddress.Size,
-                                    e.m_PtrNativeOverlapped,
-                                    IntPtr.Zero);
-                }
+                socketError = e.DoOperationSendTo(_handle, out bytesTransferred);
             }
             catch (Exception ex)
             {
@@ -5569,7 +5402,7 @@ namespace System.Net.Sockets
                                  out remoteSocketAddressLength);
         }
 
-        private bool DisconnectEx(SafeCloseSocket socketHandle, SafeHandle overlapped, int flags, int reserved)
+        internal bool DisconnectEx(SafeCloseSocket socketHandle, SafeHandle overlapped, int flags, int reserved)
         {
             EnsureDynamicWinsockMethods();
             DisconnectExDelegate disconnectEx = _dynamicWinsockMethods.GetDelegate<DisconnectExDelegate>(socketHandle);
@@ -5599,7 +5432,7 @@ namespace System.Net.Sockets
             return connectEx(socketHandle, socketAddress, socketAddressSize, buffer, dataLength, out bytesSent, overlapped);
         }
 
-        private SocketError WSARecvMsg(SafeCloseSocket socketHandle, IntPtr msg, out int bytesTransferred, SafeHandle overlapped, IntPtr completionRoutine)
+        internal SocketError WSARecvMsg(SafeCloseSocket socketHandle, IntPtr msg, out int bytesTransferred, SafeHandle overlapped, IntPtr completionRoutine)
         {
             EnsureDynamicWinsockMethods();
             WSARecvMsgDelegate recvMsg = _dynamicWinsockMethods.GetDelegate<WSARecvMsgDelegate>(socketHandle);
@@ -5615,7 +5448,7 @@ namespace System.Net.Sockets
             return recvMsg_Blocking(socketHandle, msg, out bytesTransferred, overlapped, completionRoutine);
         }
 
-        private bool TransmitPackets(SafeCloseSocket socketHandle, IntPtr packetArray, int elementCount, int sendSize, SafeNativeOverlapped overlapped, TransmitFileOptions flags)
+        internal bool TransmitPackets(SafeCloseSocket socketHandle, IntPtr packetArray, int elementCount, int sendSize, SafeNativeOverlapped overlapped, TransmitFileOptions flags)
         {
             EnsureDynamicWinsockMethods();
             TransmitPacketsDelegate transmitPackets = _dynamicWinsockMethods.GetDelegate<TransmitPacketsDelegate>(socketHandle);

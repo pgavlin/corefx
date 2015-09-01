@@ -39,6 +39,7 @@ internal static partial class Interop
         public const int IP_DROP_SOURCE_MEMBERSHIP = 40;
 
         public const int IPV6_V6ONLY = 26;
+        public const int IPV6_RECVPKTINFO = 49;
 
         public const int TCP_NODELAY = 1;
     }

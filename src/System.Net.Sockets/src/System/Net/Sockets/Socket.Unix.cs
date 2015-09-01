@@ -69,7 +69,7 @@ namespace System.Net.Sockets
             }
         }
 
-        private Socket GetOrCreateAcceptSocket(Socket acceptSocket, out SafeCloseSocket handle)
+        private Socket GetOrCreateAcceptSocket(Socket acceptSocket, bool unused, string propertyName, out SafeCloseSocket handle)
         {
             // AcceptSocket is not supported on Unix.
             if (acceptSocket != null)

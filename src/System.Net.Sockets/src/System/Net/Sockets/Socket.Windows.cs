@@ -79,7 +79,7 @@ namespace System.Net.Sockets
             }
         }
 
-        private Socket GetOrCreateAcceptSocket(Socket acceptSocket, out SafeCloseSocket handle)
+        private Socket GetOrCreateAcceptSocket(Socket acceptSocket, bool checkDisconnected, string propertyName, out SafeCloseSocket handle)
         {
             // if a acceptSocket isn't specified, then we need to create it.
             if (acceptSocket == null)
@@ -88,9 +88,9 @@ namespace System.Net.Sockets
             }
             else
             {
-                if (acceptSocket.m_RightEndPoint != null)
+                if (acceptSocket.m_RightEndPoint != null && (!checkDisconnected || !acceptSocket._isDisconnected))
                 {
-                    throw new InvalidOperationException(SR.Format(SR.net_sockets_namedmustnotbebound, "acceptSocket"));
+                    throw new InvalidOperationException(SR.Format(SR.net_sockets_namedmustnotbebound, propertyName));
                 }
             }
 

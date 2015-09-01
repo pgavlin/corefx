@@ -767,7 +767,7 @@ namespace System.Net.Sockets
                         if (Socket.s_PerfCountersEnabled) UpdatePerfCounters(bytesTransferred, true);
                     }
 
-                    socketError = FinishConnectOperation();
+                    socketError = FinishOperationConnect();
 
                     // Mark socket connected.
                     if (socketError == SocketError.Success)
@@ -845,7 +845,7 @@ namespace System.Net.Sockets
                         }
                     }
 
-                    FinishReceiveMessageFromOperation();
+                    FinishOperationReceiveMessageFrom();
                     break;
 
                 case SocketAsyncOperation.Send:
@@ -867,7 +867,7 @@ namespace System.Net.Sockets
                         if (Socket.s_PerfCountersEnabled) UpdatePerfCounters(bytesTransferred, true);
                     }
 
-                    FinishSendPacketsOperation();
+                    FinishOperationSendPackets();
                     break;
 
                 case SocketAsyncOperation.SendTo:
