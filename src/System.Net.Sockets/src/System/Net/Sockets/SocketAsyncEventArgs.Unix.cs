@@ -51,6 +51,8 @@ namespace System.Net.Sockets
 
         private void AcceptCompletionCallback(int acceptedFileDescriptor, byte[] socketAddress, int socketAddressSize, SocketError socketError)
         {
+            // TODO: receive bytes on socket if requested
+
             _acceptedFileDescriptor = acceptedFileDescriptor;
             Debug.Assert(socketAddress == null || socketAddress == m_AcceptBuffer);
             m_AcceptAddressBufferCount = socketAddressSize;

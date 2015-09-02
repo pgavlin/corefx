@@ -14,7 +14,7 @@ namespace System.Net.Sockets
         private static SocketAsyncEngine _engine;
         private static readonly object _initLock = new object();
 
-        readonly int _epollFd;
+        private readonly int _epollFd;
 
         public static SocketAsyncEngine Instance
         {
@@ -63,10 +63,12 @@ namespace System.Net.Sockets
                     // TODO: error handling + EINTR?
                     continue;
                 }
-                else if (numEvents == 0)
-                {
-                    continue;
-                }
+
+                // We should never see 0 events. Given an infinite timeout, epoll_ctl will never return
+                // 0 events even if there are no file descriptors registered with the epoll fd. In
+                // that case, the wait will block until a file descriptor is added and an event occurs
+                // on the added file descriptor.
+                Debug.Assert(numEvents != 0);
 
                 for (int i = 0; i < numEvents; i++)
                 {

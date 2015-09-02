@@ -9,11 +9,14 @@ using System.Threading;
 
 namespace System.Net.Sockets
 {
-    // TODO
+    // TODO:
     // - ReceiveMessageFrom
     // - Plumb status through async APIs to avoid callbacks on synchronous completion
     //     - NOTE: this will require refactoring in the *Async APIs to accommodate the lack
     //             of completion posting
+    // - Add support for unregistering + reregistering for events
+    //     - This will require a new state for each queue, unregistred, to track whether or
+    //       not the queue is currently registered to receive events
 
     sealed class SocketAsyncContext
     {
@@ -94,8 +97,8 @@ namespace System.Net.Sockets
         enum State
         {
             Stopped = -1,
-            Clear = 0,
-            Set = 1,
+            Set = 0,
+            Clear = 1,
         }
 
         struct Queue<TOperation>

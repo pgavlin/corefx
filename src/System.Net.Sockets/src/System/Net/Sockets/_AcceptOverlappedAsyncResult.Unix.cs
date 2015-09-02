@@ -27,7 +27,7 @@ namespace System.Net.Sockets
 
         public void CompletionCallback(int acceptedFileDescriptor, byte[] socketAddress, int socketAddressLen, SocketError errorCode)
         {
-            // TODO: receive bytes if necessary
+            // TODO: receive bytes on accepted socket if requested
 
             _buffer = null;
             _localBytesTransferred = 0;
