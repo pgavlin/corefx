@@ -358,8 +358,8 @@
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetsLinux)' == 'true' ">
-    <Compile Include="System\Net\Sockets\SocketAsyncContext.cs" />
-    <Compile Include="System\Net\Sockets\SocketAsyncEngine.cs" />
+    <Compile Include="System\Net\Sockets\SocketAsyncContext.Linux.cs" />
+    <Compile Include="System\Net\Sockets\SocketAsyncEngine.Linux.cs" />
 
     <Compile Include="$(CommonPath)\Interop\Linux\Interop.Libraries.cs">
       <Link>Interop\Linux\Interop.Libraries.cs</Link>

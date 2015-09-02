@@ -84,7 +84,7 @@ namespace System.Net.Sockets
         {
             get
             {
-                return m_SendPacketsDescriptor == null ? null : m_sendPacketsDescriptor.Length;
+                return m_SendPacketsDescriptor == null ? null : (int?)m_SendPacketsDescriptor.Length;
             }
         }
 
