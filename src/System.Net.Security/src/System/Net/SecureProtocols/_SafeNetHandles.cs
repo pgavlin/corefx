@@ -187,14 +187,14 @@ namespace System.Net.Security
         // This method switches between three non-interruptible helper methods.  (This method can't be both non-interruptible and
         // reference imports from all three DLLs - doing so would cause all three DLLs to try to be bound to.)
         //
-        public unsafe static int QueryContextAttributes(SafeDeleteContext phContext, Interop.ContextAttribute contextAttribute, byte* buffer, SafeHandle refHandle)
+        public unsafe static int QueryContextAttributes(SafeDeleteContext phContext, Interop.Secur32.ContextAttribute contextAttribute, byte* buffer, SafeHandle refHandle)
         {
             return QueryContextAttributes_SECURITY(phContext, contextAttribute, buffer, refHandle);
         }
 
         private unsafe static int QueryContextAttributes_SECURITY(
             SafeDeleteContext phContext,
-            Interop.ContextAttribute contextAttribute,
+            Interop.Secur32.ContextAttribute contextAttribute,
             byte* buffer,
             SafeHandle refHandle)
         {
@@ -247,14 +247,14 @@ namespace System.Net.Security
         }
 
         public static int SetContextAttributes(SafeDeleteContext phContext,
-            Interop.ContextAttribute contextAttribute, byte[] buffer)
+            Interop.Secur32.ContextAttribute contextAttribute, byte[] buffer)
         {
             return SetContextAttributes_SECURITY(phContext, contextAttribute, buffer);
         }
 
         private static int SetContextAttributes_SECURITY(
             SafeDeleteContext phContext,
-            Interop.ContextAttribute contextAttribute,
+            Interop.Secur32.ContextAttribute contextAttribute,
             byte[] buffer)
         {
             int status = (int)Interop.SecurityStatus.InvalidHandle;
@@ -376,7 +376,7 @@ namespace System.Net.Security
 
         public unsafe static int AcquireCredentialsHandle(
                                                     string package,
-                                                    Interop.CredentialUse intent,
+                                                    Interop.Secur32.CredentialUse intent,
                                                     ref Interop.AuthIdentity authdata,
                                                     out SafeFreeCredentials outCredential
                                                     )
@@ -419,7 +419,7 @@ namespace System.Net.Security
 
         public unsafe static int AcquireDefaultCredential(
                                                     string package,
-                                                    Interop.CredentialUse intent,
+                                                    Interop.Secur32.CredentialUse intent,
                                                     out SafeFreeCredentials outCredential
                                                     )
         {
@@ -463,7 +463,7 @@ namespace System.Net.Security
         // create the authData blob.
         public unsafe static int AcquireCredentialsHandle(
                                                     string package,
-                                                    Interop.CredentialUse intent,
+                                                    Interop.Secur32.CredentialUse intent,
                                                     ref SafeSspiAuthDataHandle authdata,
                                                     out SafeFreeCredentials outCredential
                                                     )
@@ -493,8 +493,8 @@ namespace System.Net.Security
 
         public unsafe static int AcquireCredentialsHandle(
                                                     string package,
-                                                    Interop.CredentialUse intent,
-                                                    ref Interop.SecureCredential authdata,
+                                                    Interop.Secur32.CredentialUse intent,
+                                                    ref Interop.Secur32.SecureCredential authdata,
                                                     out SafeFreeCredentials outCredential
                                                     )
         {
@@ -683,7 +683,7 @@ namespace System.Net.Security
                                                     ref SafeDeleteContext refContext,
                                                     string targetName,
                                                     Interop.ContextFlags inFlags,
-                                                    Interop.Endianness endianness,
+                                                    Interop.Secur32.Endianness endianness,
                                                     Interop.SecurityBuffer inSecBuffer,
                                                     Interop.SecurityBuffer[] inSecBuffers,
                                                     Interop.SecurityBuffer outSecBuffer,
@@ -721,16 +721,16 @@ namespace System.Net.Security
                 throw new ArgumentNullException("inCredentials");
             }
 
-            Interop.SecurityBufferDescriptor inSecurityBufferDescriptor = null;
+            Interop.Secur32.SecurityBufferDescriptor inSecurityBufferDescriptor = null;
             if (inSecBuffer != null)
             {
-                inSecurityBufferDescriptor = new Interop.SecurityBufferDescriptor(1);
+                inSecurityBufferDescriptor = new Interop.Secur32.SecurityBufferDescriptor(1);
             }
             else if (inSecBuffers != null)
             {
-                inSecurityBufferDescriptor = new Interop.SecurityBufferDescriptor(inSecBuffers.Length);
+                inSecurityBufferDescriptor = new Interop.Secur32.SecurityBufferDescriptor(inSecBuffers.Length);
             }
-            Interop.SecurityBufferDescriptor outSecurityBufferDescriptor = new Interop.SecurityBufferDescriptor(1);
+            Interop.Secur32.SecurityBufferDescriptor outSecurityBufferDescriptor = new Interop.Secur32.SecurityBufferDescriptor(1);
 
             // actually this is returned in outFlags
             bool isSspiAllocated = (inFlags & Interop.ContextFlags.AllocateMemory) != 0 ? true : false;
@@ -749,7 +749,7 @@ namespace System.Net.Security
             try
             {
                 pinnedOutBytes = GCHandle.Alloc(outSecBuffer.token, GCHandleType.Pinned);
-                Interop.SecurityBufferStruct[] inUnmanagedBuffer = new Interop.SecurityBufferStruct[inSecurityBufferDescriptor == null ? 1 : inSecurityBufferDescriptor.Count];
+                Interop.Secur32.SecurityBufferStruct[] inUnmanagedBuffer = new Interop.Secur32.SecurityBufferStruct[inSecurityBufferDescriptor == null ? 1 : inSecurityBufferDescriptor.Count];
                 fixed (void* inUnmanagedBufferPtr = inUnmanagedBuffer)
                 {
                     if (inSecurityBufferDescriptor != null)
@@ -788,7 +788,7 @@ namespace System.Net.Security
                         }
                     }
 
-                    Interop.SecurityBufferStruct[] outUnmanagedBuffer = new Interop.SecurityBufferStruct[1];
+                    Interop.Secur32.SecurityBufferStruct[] outUnmanagedBuffer = new Interop.Secur32.SecurityBufferStruct[1];
                     fixed (void* outUnmanagedBufferPtr = outUnmanagedBuffer)
                     {
                         // Fix Descriptor pointer that points to unmanaged SecurityBuffers
@@ -876,10 +876,10 @@ namespace System.Net.Security
                                                   void* inContextPtr,
                                                   byte* targetName,
                                                   Interop.ContextFlags inFlags,
-                                                  Interop.Endianness endianness,
-                                                  Interop.SecurityBufferDescriptor inputBuffer,
+                                                  Interop.Secur32.Endianness endianness,
+                                                  Interop.Secur32.SecurityBufferDescriptor inputBuffer,
                                                   SafeDeleteContext outContext,
-                                                  Interop.SecurityBufferDescriptor outputBuffer,
+                                                  Interop.Secur32.SecurityBufferDescriptor outputBuffer,
                                                   ref Interop.ContextFlags attributes,
                                                   SafeFreeContextBuffer handleTemplate)
         {
@@ -957,7 +957,7 @@ namespace System.Net.Security
                     // The idea is that SSPI has allocated a block and filled up outUnmanagedBuffer+8 slot with the pointer.
                     if (handleTemplate != null)
                     {
-                        handleTemplate.Set(((Interop.SecurityBufferStruct*)outputBuffer.UnmanagedPointer)->token); //ATTN: on 64 BIT that is still +8 cause of 2* c++ unsigned long == 8 bytes
+                        handleTemplate.Set(((Interop.Secur32.SecurityBufferStruct*)outputBuffer.UnmanagedPointer)->token); //ATTN: on 64 BIT that is still +8 cause of 2* c++ unsigned long == 8 bytes
                         if (handleTemplate.IsInvalid)
                             handleTemplate.SetHandleAsInvalid();
                     }
@@ -979,7 +979,7 @@ namespace System.Net.Security
             ref SafeFreeCredentials inCredentials,
             ref SafeDeleteContext refContext,
             Interop.ContextFlags inFlags,
-            Interop.Endianness endianness,
+            Interop.Secur32.Endianness endianness,
             Interop.SecurityBuffer inSecBuffer,
             Interop.SecurityBuffer[] inSecBuffers,
             Interop.SecurityBuffer outSecBuffer,
@@ -1016,16 +1016,16 @@ namespace System.Net.Security
                 throw new ArgumentNullException("inCredentials");
             }
 
-            Interop.SecurityBufferDescriptor inSecurityBufferDescriptor = null;
+            Interop.Secur32.SecurityBufferDescriptor inSecurityBufferDescriptor = null;
             if (inSecBuffer != null)
             {
-                inSecurityBufferDescriptor = new Interop.SecurityBufferDescriptor(1);
+                inSecurityBufferDescriptor = new Interop.Secur32.SecurityBufferDescriptor(1);
             }
             else if (inSecBuffers != null)
             {
-                inSecurityBufferDescriptor = new Interop.SecurityBufferDescriptor(inSecBuffers.Length);
+                inSecurityBufferDescriptor = new Interop.Secur32.SecurityBufferDescriptor(inSecBuffers.Length);
             }
-            Interop.SecurityBufferDescriptor outSecurityBufferDescriptor = new Interop.SecurityBufferDescriptor(1);
+            Interop.Secur32.SecurityBufferDescriptor outSecurityBufferDescriptor = new Interop.Secur32.SecurityBufferDescriptor(1);
 
             // actually this is returned in outFlags
             bool isSspiAllocated = (inFlags & Interop.ContextFlags.AllocateMemory) != 0 ? true : false;
@@ -1044,7 +1044,7 @@ namespace System.Net.Security
             try
             {
                 pinnedOutBytes = GCHandle.Alloc(outSecBuffer.token, GCHandleType.Pinned);
-                Interop.SecurityBufferStruct[] inUnmanagedBuffer = new Interop.SecurityBufferStruct[inSecurityBufferDescriptor == null ? 1 : inSecurityBufferDescriptor.Count];
+                var inUnmanagedBuffer = new Interop.Secur32.SecurityBufferStruct[inSecurityBufferDescriptor == null ? 1 : inSecurityBufferDescriptor.Count];
                 fixed (void* inUnmanagedBufferPtr = inUnmanagedBuffer)
                 {
                     if (inSecurityBufferDescriptor != null)
@@ -1082,7 +1082,8 @@ namespace System.Net.Security
                             }
                         }
                     }
-                    Interop.SecurityBufferStruct[] outUnmanagedBuffer = new Interop.SecurityBufferStruct[1];
+
+                    var outUnmanagedBuffer = new Interop.Secur32.SecurityBufferStruct[1];
                     fixed (void* outUnmanagedBufferPtr = outUnmanagedBuffer)
                     {
                         // Fix Descriptor pointer that points to unmanaged SecurityBuffers
@@ -1168,11 +1169,11 @@ namespace System.Net.Security
         private static unsafe int MustRunAcceptSecurityContext_SECURITY(
                                                   ref SafeFreeCredentials inCredentials,
                                                   void* inContextPtr,
-                                                  Interop.SecurityBufferDescriptor inputBuffer,
+                                                  Interop.Secur32.SecurityBufferDescriptor inputBuffer,
                                                   Interop.ContextFlags inFlags,
-                                                  Interop.Endianness endianness,
+                                                  Interop.Secur32.Endianness endianness,
                                                   SafeDeleteContext outContext,
-                                                  Interop.SecurityBufferDescriptor outputBuffer,
+                                                  Interop.Secur32.SecurityBufferDescriptor outputBuffer,
                                                   ref Interop.ContextFlags outFlags,
                                                   SafeFreeContextBuffer handleTemplate)
         {
@@ -1246,7 +1247,7 @@ namespace System.Net.Security
                     // The idea is that SSPI has allocated a block and filled up outUnmanagedBuffer+8 slot with the pointer.
                     if (handleTemplate != null)
                     {
-                        handleTemplate.Set(((Interop.SecurityBufferStruct*)outputBuffer.UnmanagedPointer)->token); //ATTN: on 64 BIT that is still +8 cause of 2* c++ unsigned long == 8 bytes
+                        handleTemplate.Set(((Interop.Secur32.SecurityBufferStruct*)outputBuffer.UnmanagedPointer)->token); //ATTN: on 64 BIT that is still +8 cause of 2* c++ unsigned long == 8 bytes
                         if (handleTemplate.IsInvalid)
                         {
                             handleTemplate.SetHandleAsInvalid();
@@ -1278,14 +1279,14 @@ namespace System.Net.Security
             //            for (int index=0; index<inSecBuffers.Length; index++) { GlobalLog.Print("    inSecBuffers[" + index + "]   = " + Interop.SecurityBuffer.ToString(inSecBuffers[index])); }
 #endif
             GlobalLog.Assert(inSecBuffers != null, "SafeDeleteContext::CompleteAuthToken()|inSecBuffers == null");
-            Interop.SecurityBufferDescriptor inSecurityBufferDescriptor = new Interop.SecurityBufferDescriptor(inSecBuffers.Length);
+            var inSecurityBufferDescriptor = new Interop.Secur32.SecurityBufferDescriptor(inSecBuffers.Length);
 
             int errorCode = (int)Interop.SecurityStatus.InvalidHandle;
 
             // these are pinned user byte arrays passed along with SecurityBuffers
             GCHandle[] pinnedInBytes = null;
 
-            Interop.SecurityBufferStruct[] inUnmanagedBuffer = new Interop.SecurityBufferStruct[inSecurityBufferDescriptor.Count];
+            var inUnmanagedBuffer = new Interop.Secur32.SecurityBufferStruct[inSecurityBufferDescriptor.Count];
             fixed (void* inUnmanagedBufferPtr = inUnmanagedBuffer)
             {
                 // Fix Descriptor pointer that points to unmanaged SecurityBuffers
@@ -1316,7 +1317,6 @@ namespace System.Net.Security
                         }
 #if TRAVE
                         GlobalLog.Print("SecBuffer: cbBuffer:" + securityBuffer.size + " BufferType:" + securityBuffer.type);
-                        //                        securityBuffer.DebugDump();
 #endif
                     }
                 }
@@ -1418,19 +1418,20 @@ namespace System.Net.Security
             return new SafeFreeContextBufferChannelBinding_SECURITY();
         }
 
-        public unsafe static int QueryContextChannelBinding(SafeDeleteContext phContext, Interop.ContextAttribute contextAttribute, Bindings* buffer, SafeFreeContextBufferChannelBinding refHandle)
+        public unsafe static int QueryContextChannelBinding(SafeDeleteContext phContext, Interop.Secur32.ContextAttribute contextAttribute, Bindings* buffer, SafeFreeContextBufferChannelBinding refHandle)
         {
             return QueryContextChannelBinding_SECURITY(phContext, contextAttribute, buffer, refHandle);
         }
 
-        private unsafe static int QueryContextChannelBinding_SECURITY(SafeDeleteContext phContext, Interop.ContextAttribute contextAttribute, Bindings* buffer, SafeFreeContextBufferChannelBinding refHandle)
+        private unsafe static int QueryContextChannelBinding_SECURITY(SafeDeleteContext phContext, Interop.Secur32.ContextAttribute contextAttribute, Bindings* buffer, SafeFreeContextBufferChannelBinding refHandle)
         {
             int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
 
             // SCHANNEL only supports SECPKG_ATTR_ENDPOINT_BINDINGS and SECPKG_ATTR_UNIQUE_BINDINGS which
             // map to our enum ChannelBindingKind.Endpoint and ChannelBindingKind.Unique.
-            if (contextAttribute != Interop.ContextAttribute.EndpointBindings && contextAttribute != Interop.ContextAttribute.UniqueBindings)
+            if (contextAttribute != Interop.Secur32.ContextAttribute.EndpointBindings && 
+                contextAttribute != Interop.Secur32.ContextAttribute.UniqueBindings)
             {
                 return status;
             }

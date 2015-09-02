@@ -200,7 +200,7 @@ namespace System.Net.Security
             SafeFreeCertContext remoteContext = null;
             try
             {
-                remoteContext = SSPIWrapper.QueryContextAttributes(GlobalSSPI.SSPISecureChannel, m_SecurityContext, Interop.ContextAttribute.RemoteCertificate) as SafeFreeCertContext;
+                remoteContext = SSPIWrapper.QueryContextAttributes(GlobalSSPI.SSPISecureChannel, m_SecurityContext, Interop.Secur32.ContextAttribute.RemoteCertificate) as SafeFreeCertContext;
                 if (remoteContext != null && !remoteContext.IsInvalid)
                 {
                     result = new X509Certificate2(remoteContext.DangerousGetHandle());
@@ -229,7 +229,7 @@ namespace System.Net.Security
             ChannelBinding result = null;
             if (m_SecurityContext != null)
             {
-                result = SSPIWrapper.QueryContextChannelBinding(GlobalSSPI.SSPISecureChannel, m_SecurityContext, (Interop.ContextAttribute)kind);
+                result = SSPIWrapper.QueryContextChannelBinding(GlobalSSPI.SSPISecureChannel, m_SecurityContext, (Interop.Secur32.ContextAttribute)kind);
             }
 
             GlobalLog.Leave("SecureChannel#" + Logging.HashString(this) + "::GetChannelBindingToken", Logging.HashString(result));
@@ -487,7 +487,7 @@ namespace System.Net.Security
 
             if (IsValidContext)
             {
-                Interop.IssuerListInfoEx issuerList = (Interop.IssuerListInfoEx)SSPIWrapper.QueryContextAttributes(GlobalSSPI.SSPISecureChannel, m_SecurityContext, Interop.ContextAttribute.IssuerListInfoEx);
+                Interop.Secur32.IssuerListInfoEx issuerList = (Interop.Secur32.IssuerListInfoEx)SSPIWrapper.QueryContextAttributes(GlobalSSPI.SSPISecureChannel, m_SecurityContext, Interop.Secur32.ContextAttribute.IssuerListInfoEx);
                 try
                 {
                     if (issuerList.cIssuers > 0)
@@ -496,11 +496,11 @@ namespace System.Net.Security
                         {
                             uint count = issuerList.cIssuers;
                             issuers = new string[issuerList.cIssuers];
-                            Interop._CERT_CHAIN_ELEMENT* pIL = (Interop._CERT_CHAIN_ELEMENT*)issuerList.aIssuers.DangerousGetHandle();
+                            Interop.Secur32._CERT_CHAIN_ELEMENT* pIL = (Interop.Secur32._CERT_CHAIN_ELEMENT*)issuerList.aIssuers.DangerousGetHandle();
                             for (int i = 0; i < count; ++i)
                             {
-                                Interop._CERT_CHAIN_ELEMENT* pIL2 = pIL + i;
-                                GlobalLog.Assert(pIL2->cbSize > 0, "SecureChannel::GetIssuers()", "Interop._CERT_CHAIN_ELEMENT size is not positive: " + pIL2->cbSize.ToString());
+                                Interop.Secur32._CERT_CHAIN_ELEMENT* pIL2 = pIL + i;
+                                GlobalLog.Assert(pIL2->cbSize > 0, "SecureChannel::GetIssuers()", "Interop.Secur32._CERT_CHAIN_ELEMENT size is not positive: " + pIL2->cbSize.ToString());
                                 if (pIL2->cbSize > 0)
                                 {
                                     uint size = pIL2->cbSize;
@@ -784,17 +784,23 @@ namespace System.Net.Security
                 }
                 else
                 {
-                    Interop.SecureCredential.Flags flags = Interop.SecureCredential.Flags.ValidateManual | Interop.SecureCredential.Flags.NoDefaultCred;
+                    Interop.Secur32.SecureCredential.Flags flags = Interop.Secur32.SecureCredential.Flags.ValidateManual | Interop.Secur32.SecureCredential.Flags.NoDefaultCred;
 
                     // ProjectK: always opt-in SCH_USE_STRONG_CRYPTO except for weak protocols or crypto
                     if (((m_ProtocolFlags & (Interop.SChannel.SP_PROT_TLS1_0| Interop.SChannel.SP_PROT_TLS1_1 | Interop.SChannel.SP_PROT_TLS1_2)) != 0)
                          && (m_EncryptionPolicy != EncryptionPolicy.AllowNoEncryption) && (m_EncryptionPolicy != EncryptionPolicy.NoEncryption))
                     {
-                        flags |= Interop.SecureCredential.Flags.UseStrongCrypto;
+                        flags |= Interop.Secur32.SecureCredential.Flags.UseStrongCrypto;
                     }
 
-                    Interop.SecureCredential secureCredential = new Interop.SecureCredential(Interop.SecureCredential.CurrentVersion, selectedCert, flags, m_ProtocolFlags, m_EncryptionPolicy);
-                    m_CredentialsHandle = AcquireCredentialsHandle(Interop.CredentialUse.Outbound, secureCredential);
+                    Interop.Secur32.SecureCredential secureCredential = CreateSecureCredential(
+                        Interop.Secur32.SecureCredential.CurrentVersion, 
+                        selectedCert, 
+                        flags, 
+                        m_ProtocolFlags, 
+                        m_EncryptionPolicy);
+
+                    m_CredentialsHandle = AcquireCredentialsHandle(Interop.Secur32.CredentialUse.Outbound, secureCredential);
                     thumbPrint = guessedThumbPrint; //delay it until here in case something above threw
                     m_SelectedClientCertificate = clientCertificate;
                 }
@@ -869,8 +875,14 @@ namespace System.Net.Security
                 }
                 else
                 {
-                    Interop.SecureCredential secureCredential = new Interop.SecureCredential(Interop.SecureCredential.CurrentVersion, selectedCert, Interop.SecureCredential.Flags.Zero, m_ProtocolFlags, m_EncryptionPolicy);
-                    m_CredentialsHandle = AcquireCredentialsHandle(Interop.CredentialUse.Inbound, secureCredential);
+                    Interop.Secur32.SecureCredential secureCredential = CreateSecureCredential(
+                        Interop.Secur32.SecureCredential.CurrentVersion, 
+                        selectedCert, 
+                        Interop.Secur32.SecureCredential.Flags.Zero, 
+                        m_ProtocolFlags, 
+                        m_EncryptionPolicy);
+
+                    m_CredentialsHandle = AcquireCredentialsHandle(Interop.Secur32.CredentialUse.Inbound, secureCredential);
                     thumbPrint = guessedThumbPrint;
                     m_ServerCertificate = localCertificate;
                 }
@@ -893,7 +905,7 @@ namespace System.Net.Security
         // ProjectK porting note: secureCredential was previously passed by reference (using the ref keyword). 
         // The keyword was removed to allow passing secureCredential as an anonymous parameter to RunUnimpersonated
         //
-        SafeFreeCredentials AcquireCredentialsHandle(Interop.CredentialUse credUsage, Interop.SecureCredential secureCredential)
+        SafeFreeCredentials AcquireCredentialsHandle(Interop.Secur32.CredentialUse credUsage, Interop.Secur32.SecureCredential secureCredential)
         {
             // First try without impersonation, if it fails, then try the process account.
             // I.E. We don't know which account the certificate context was created under.
@@ -1007,7 +1019,7 @@ namespace System.Net.Security
                                         ref m_CredentialsHandle,
                                         ref m_SecurityContext,
                                         ServerRequiredFlags | (m_RemoteCertRequired ? Interop.ContextFlags.MutualAuth : Interop.ContextFlags.Zero),
-                                        Interop.Endianness.Native,
+                                        Interop.Secur32.Endianness.Native,
                                         incomingSecurity,
                                         outgoingSecurity,
                                         ref m_Attributes
@@ -1023,12 +1035,15 @@ namespace System.Net.Security
                                             ref m_SecurityContext,
                                             m_Destination,
                                             RequiredFlags | Interop.ContextFlags.InitManualCredValidation,
-                                            Interop.Endianness.Native,
+                                            Interop.Secur32.Endianness.Native,
                                             incomingSecurity,
                                             outgoingSecurity,
                                             ref m_Attributes
                                             );
-#if PROJECTN
+
+#if false
+                            // TODO: NetNative future implementation will require handling for pop-up prompts:
+
                             // This only needs to happen the first time per context.
                             if ((errorCode == (int)SecurityStatus.OK || errorCode == (int)SecurityStatus.ContinueNeeded)
                                 && ComNetOS.IsWin8orLater && Microsoft.Win32.UnsafeNativeMethods.IsPackagedProcess.Value)
@@ -1037,7 +1052,7 @@ namespace System.Net.Security
                                 // when it asks for permission to use a client certificate.
                                 int setError = SSPIWrapper.SetContextAttributes(GlobalSSPI.SSPISecureChannel,
                                                 m_SecurityContext,
-                                                Interop.ContextAttribute.UiInfo,
+                                                Interop.Secur32.ContextAttribute.UiInfo,
                                                 UnsafeNclNativeMethods.AppXHelper.PrimaryWindowHandle.Value);
                                 Debug.Assert(setError == 0, "SetContextAttributes error: " + setError);
                             }
@@ -1052,7 +1067,7 @@ namespace System.Net.Security
                                             ref m_SecurityContext,
                                             m_Destination,
                                             RequiredFlags | Interop.ContextFlags.InitManualCredValidation,
-                                            Interop.Endianness.Native,
+                                            Interop.Secur32.Endianness.Native,
                                             incomingSecurityBuffers,
                                             outgoingSecurity,
                                             ref m_Attributes
@@ -1104,7 +1119,7 @@ namespace System.Net.Security
         internal void ProcessHandshakeSuccess()
         {
             GlobalLog.Enter("SecureChannel#" + Logging.HashString(this) + "::ProcessHandshakeSuccess");
-            StreamSizes streamSizes = SSPIWrapper.QueryContextAttributes(GlobalSSPI.SSPISecureChannel, m_SecurityContext, Interop.ContextAttribute.StreamSizes) as StreamSizes;
+            StreamSizes streamSizes = SSPIWrapper.QueryContextAttributes(GlobalSSPI.SSPISecureChannel, m_SecurityContext, Interop.Secur32.ContextAttribute.StreamSizes) as StreamSizes;
             if (streamSizes != null)
             {
                 try
@@ -1122,7 +1137,7 @@ namespace System.Net.Security
                     throw;
                 }
             }
-            m_ConnectionInfo = SSPIWrapper.QueryContextAttributes(GlobalSSPI.SSPISecureChannel, m_SecurityContext, Interop.ContextAttribute.ConnectionInfo) as SslConnectionInfo;
+            m_ConnectionInfo = SSPIWrapper.QueryContextAttributes(GlobalSSPI.SSPISecureChannel, m_SecurityContext, Interop.Secur32.ContextAttribute.ConnectionInfo) as SslConnectionInfo;
             GlobalLog.Leave("SecureChannel#" + Logging.HashString(this) + "::ProcessHandshakeSuccess");
         }
 
@@ -1318,10 +1333,12 @@ namespace System.Net.Security
                             fixed (char* namePtr = m_HostName)
                             {
                                 eppStruct.pwszServerName = namePtr;
-                                cppStruct.dwFlags |= (int)(Interop.IgnoreCertProblem.none & ~Interop.IgnoreCertProblem.invalid_name);
+                                cppStruct.dwFlags |= 
+                                    (Interop.Crypt32.CertChainPolicyIgnoreFlags.CERT_CHAIN_POLICY_IGNORE_ALL & 
+                                     ~Interop.Crypt32.CertChainPolicyIgnoreFlags.CERT_CHAIN_POLICY_IGNORE_INVALID_NAME_FLAG);
 
                                 SafeX509ChainHandle chainContext = chain.SafeHandle;
-                                status = Interop.CertificateChainPolicy.Verify(chainContext, ref cppStruct);
+                                status = Verify(chainContext, ref cppStruct);
                                 if ((Interop.CertificateProblem)status == Interop.CertificateProblem.CertCN_NO_MATCH)
                                     sslPolicyErrors |= SslPolicyErrors.RemoteCertificateNameMismatch;
                             }
@@ -1387,66 +1404,81 @@ namespace System.Net.Security
             GlobalLog.Leave("SecureChannel#" + Logging.HashString(this) + "::VerifyRemoteCertificate", success.ToString());
             return success;
         }
-        /*
-            From wincrypt.h
 
-        typedef void *HCERTSTORE;
+        internal static uint Verify(SafeX509ChainHandle chainContext, ref Interop.Crypt32.CERT_CHAIN_POLICY_PARA cpp)
+        {
+            GlobalLog.Enter("SecureChannel::VerifyChainPolicy", "chainContext=" + chainContext + ", options=" + String.Format("0x{0:x}", cpp.dwFlags));
+            var status = new Interop.Crypt32.CERT_CHAIN_POLICY_STATUS();
+            status.cbSize = (uint)Marshal.SizeOf<Interop.Crypt32.CERT_CHAIN_POLICY_STATUS>();
 
-        //+-------------------------------------------------------------------------
-        //  Certificate context.
-        //
-        //  A certificate context contains both the encoded and decoded representation
-        //  of a certificate. A certificate context returned by a cert store function
-        //  must be freed by calling the CertFreeCertificateContext function. The
-        //  CertDuplicateCertificateContext function can be called to make a duplicate
-        //  copy (which also must be freed by calling CertFreeCertificateContext).
-        //--------------------------------------------------------------------------
-        */
-        /*
-        // Consider removing.
-        unsafe class CertificateContext {
+            bool errorCode =
+                Interop.Crypt32.CertVerifyCertificateChainPolicy(
+                    (IntPtr)Interop.Crypt32.CertChainPolicy.CERT_CHAIN_POLICY_SSL,
+                    chainContext,
+                    ref cpp,
+                    ref status);
 
-            [StructLayout(LayoutKind.Sequential)]
-            private struct _CERT_CONTEXT {
-                internal Int32     dwCertEncodingType;
-                internal IntPtr    pbCertEncoded;
-                internal Int32     cbCertEncoded;
-                internal IntPtr    pCertInfo;
-                internal   IntPtr    hCertStore;
-            };
-
-            internal static SafeCloseStore GetShallowHStoreHandler(SafeFreeCertContext certContext) {
-                if (certContext.IsInvalid) {
-                    return SafeCloseStore.CreateShallowHandle(IntPtr.Zero);
-                }
-                _CERT_CONTEXT context = (_CERT_CONTEXT)Marshal.PtrToStructure(certContext.DangerousGetHandle(), typeof(_CERT_CONTEXT));
-                return SafeCloseStore.CreateShallowHandle(context.hCertStore);
-            }
-
-
-#if DEBUG
-            _CERT_CONTEXT dbgTemplate;
-
-            // ctors
-            internal CertificateContext(SafeFreeCertContext context) {
-                GlobalLog.Enter("CertificateContext#" + Logging.HashString(this) + "::CertificateContext", context.DangerousGetHandle().ToString("x"));
-                dbgTemplate = (_CERT_CONTEXT)Marshal.PtrToStructure(context.DangerousGetHandle(), typeof(_CERT_CONTEXT));
-                GlobalLog.Leave("CertificateContext#" + Logging.HashString(this) + "::CertificateContext");
-            }
-
-            // methods
-            [Conditional("TRAVE")]
-            internal void DebugDump() {
-                GlobalLog.Print("CertificateContext#" + Logging.HashString(this) + "::CertificateContext()");
-                GlobalLog.PrintHex("    dwCertEncodingType = ", dbgTemplate.dwCertEncodingType);
-                GlobalLog.PrintHex("    pbCertEncoded      = ", dbgTemplate.pbCertEncoded);
-                GlobalLog.PrintHex("    cbCertEncoded      = ", dbgTemplate.cbCertEncoded);
-                GlobalLog.PrintHex("    pCertInfo          = ", dbgTemplate.pCertInfo);
-                GlobalLog.PrintHex("    hCertStore         = ", dbgTemplate.hCertStore);
-            }
+            GlobalLog.Print("SecureChannel::VerifyChainPolicy() CertVerifyCertificateChainPolicy returned: " + errorCode);
+#if TRAVE
+            GlobalLog.Print("SecureChannel::VerifyChainPolicy() error code: " + status.dwError + String.Format(" [0x{0:x8}", status.dwError) + " " + SecureChannel.MapSecurityStatus(status.dwError) + "]");
 #endif
+            GlobalLog.Leave("SecureChannel::VerifyChainPolicy", status.dwError.ToString());
+            return status.dwError;
         }
-        */
+
+        public Interop.Secur32.SecureCredential CreateSecureCredential(
+            int version, 
+            X509Certificate certificate,
+            Interop.Secur32.SecureCredential.Flags flags, 
+            int protocols, EncryptionPolicy policy)
+        {
+            var credential = new Interop.Secur32.SecureCredential() {
+                // default values required for a struct
+                rootStore = IntPtr.Zero,
+                phMappers = IntPtr.Zero,
+                palgSupportedAlgs = IntPtr.Zero,
+                certContextArray = IntPtr.Zero,
+                cCreds = 0,
+                cMappers = 0,
+                cSupportedAlgs = 0,
+                dwSessionLifespan = 0,
+                reserved = 0
+            };
+            
+            if (policy == EncryptionPolicy.RequireEncryption)
+            {
+                // Prohibit null encryption cipher
+                credential.dwMinimumCipherStrength = 0;
+                credential.dwMaximumCipherStrength = 0;
+            }
+            else if (policy == EncryptionPolicy.AllowNoEncryption)
+            {
+                // Allow null encryption cipher in addition to other ciphers
+                credential.dwMinimumCipherStrength = -1;
+                credential.dwMaximumCipherStrength = 0;
+            }
+            else if (policy == EncryptionPolicy.NoEncryption)
+            {
+                // Suppress all encryption and require null encryption cipher only
+                credential.dwMinimumCipherStrength = -1;
+                credential.dwMaximumCipherStrength = -1;
+            }
+            else
+            {
+                throw new ArgumentException(SR.Format(SR.net_invalid_enum, "EncryptionPolicy"), "policy");
+            }
+                        
+            credential.version = version;
+            credential.dwFlags = flags;
+            credential.grbitEnabledProtocols = protocols;
+            if (certificate != null)
+            {
+                credential.certContextArray = certificate.Handle;
+                credential.cCreds = 1;
+            }
+
+            return credential;
+        }
 
 #if TRAVE
         internal static string MapSecurityStatus(uint statusCode)
