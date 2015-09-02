@@ -19,10 +19,9 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Windows_Release|AnyCPU' " />
 
   <ItemGroup>
-    <!-- TODO: break into proper Interop -->
-    <Compile Include="Interop.TODO.cs" />
-    
     <Compile Include="System\PinnableBufferCache.cs" />
+    <Compile Include="System\Net\_SecurityBuffer.cs" />
+    <Compile Include="System\Net\_SecurityBufferType.cs" />
     <Compile Include="System\Net\_SecureChannel.cs" />
     <Compile Include="System\Net\_SSPIWrapper.cs" />
     <Compile Include="System\Net\_NativeSSPI.cs" />

@@ -31,17 +31,17 @@ namespace System.Net.Security
         internal const string SecurityPackage = "Microsoft Unified Security Protocol Provider";
         private static readonly object s_SyncObject = new object();
 
-        private const Interop.ContextFlags RequiredFlags =
-            Interop.ContextFlags.ReplayDetect |
-            Interop.ContextFlags.SequenceDetect |
-            Interop.ContextFlags.Confidentiality |
-            Interop.ContextFlags.AllocateMemory;
+        private const Interop.Secur32.ContextFlags RequiredFlags =
+            Interop.Secur32.ContextFlags.ReplayDetect |
+            Interop.Secur32.ContextFlags.SequenceDetect |
+            Interop.Secur32.ContextFlags.Confidentiality |
+            Interop.Secur32.ContextFlags.AllocateMemory;
 
 
-        private const Interop.ContextFlags ServerRequiredFlags =
+        private const Interop.Secur32.ContextFlags ServerRequiredFlags =
             RequiredFlags
-            | Interop.ContextFlags.AcceptStream
-            // | Interop.ContextFlags.AcceptExtendedError
+            | Interop.Secur32.ContextFlags.AcceptStream
+            // | Interop.Secur32.ContextFlags.AcceptExtendedError
             ;
 
         private const int ChainRevocationCheckExcludeRoot = 0x40000000;
@@ -54,7 +54,7 @@ namespace System.Net.Security
 
         private SafeFreeCredentials m_CredentialsHandle;
         private SafeDeleteContext m_SecurityContext;
-        private Interop.ContextFlags m_Attributes;
+        private Interop.Secur32.ContextFlags m_Attributes;
         private readonly string m_Destination;
         private readonly string m_HostName;
 
@@ -977,20 +977,20 @@ namespace System.Net.Security
                 throw new ArgumentOutOfRangeException("count");
             }
 
-            Interop.SecurityBuffer incomingSecurity = null;
-            Interop.SecurityBuffer[] incomingSecurityBuffers = null;
+            SecurityBuffer incomingSecurity = null;
+            SecurityBuffer[] incomingSecurityBuffers = null;
 
             if (input != null)
             {
-                incomingSecurity = new Interop.SecurityBuffer(input, offset, count, Interop.BufferType.Token);
-                incomingSecurityBuffers = new Interop.SecurityBuffer[]
+                incomingSecurity = new SecurityBuffer(input, offset, count, SecurityBufferType.Token);
+                incomingSecurityBuffers = new SecurityBuffer[]
                 {
                     incomingSecurity,
-                    new Interop.SecurityBuffer(null, 0, 0, Interop.BufferType.Empty)
+                    new SecurityBuffer(null, 0, 0, SecurityBufferType.Empty)
                 };
             }
 
-            Interop.SecurityBuffer outgoingSecurity = new Interop.SecurityBuffer(null, Interop.BufferType.Token);
+            SecurityBuffer outgoingSecurity = new SecurityBuffer(null, SecurityBufferType.Token);
 
             int errorCode = 0;
 
@@ -1018,7 +1018,7 @@ namespace System.Net.Security
                                         GlobalSSPI.SSPISecureChannel,
                                         ref m_CredentialsHandle,
                                         ref m_SecurityContext,
-                                        ServerRequiredFlags | (m_RemoteCertRequired ? Interop.ContextFlags.MutualAuth : Interop.ContextFlags.Zero),
+                                        ServerRequiredFlags | (m_RemoteCertRequired ? Interop.Secur32.ContextFlags.MutualAuth : Interop.Secur32.ContextFlags.Zero),
                                         Interop.Secur32.Endianness.Native,
                                         incomingSecurity,
                                         outgoingSecurity,
@@ -1034,7 +1034,7 @@ namespace System.Net.Security
                                             ref m_CredentialsHandle,
                                             ref m_SecurityContext,
                                             m_Destination,
-                                            RequiredFlags | Interop.ContextFlags.InitManualCredValidation,
+                                            RequiredFlags | Interop.Secur32.ContextFlags.InitManualCredValidation,
                                             Interop.Secur32.Endianness.Native,
                                             incomingSecurity,
                                             outgoingSecurity,
@@ -1066,7 +1066,7 @@ namespace System.Net.Security
                                             m_CredentialsHandle,
                                             ref m_SecurityContext,
                                             m_Destination,
-                                            RequiredFlags | Interop.ContextFlags.InitManualCredValidation,
+                                            RequiredFlags | Interop.Secur32.ContextFlags.InitManualCredValidation,
                                             Interop.Secur32.Endianness.Native,
                                             incomingSecurityBuffers,
                                             outgoingSecurity,
@@ -1199,12 +1199,12 @@ namespace System.Net.Security
 
             // encryption using SCHANNEL requires 4 buffers: header, payload, trailer, empty
 
-            Interop.SecurityBuffer[] securityBuffer = new Interop.SecurityBuffer[4];
+            SecurityBuffer[] securityBuffer = new SecurityBuffer[4];
 
-            securityBuffer[0] = new Interop.SecurityBuffer(e_writeBuffer, 0, m_HeaderSize, Interop.BufferType.Header);
-            securityBuffer[1] = new Interop.SecurityBuffer(e_writeBuffer, m_HeaderSize, size, Interop.BufferType.Data);
-            securityBuffer[2] = new Interop.SecurityBuffer(e_writeBuffer, m_HeaderSize + size, m_TrailerSize, Interop.BufferType.Trailer);
-            securityBuffer[3] = new Interop.SecurityBuffer(null, Interop.BufferType.Empty);
+            securityBuffer[0] = new SecurityBuffer(e_writeBuffer, 0, m_HeaderSize, SecurityBufferType.Header);
+            securityBuffer[1] = new SecurityBuffer(e_writeBuffer, m_HeaderSize, size, SecurityBufferType.Data);
+            securityBuffer[2] = new SecurityBuffer(e_writeBuffer, m_HeaderSize + size, m_TrailerSize, SecurityBufferType.Trailer);
+            securityBuffer[3] = new SecurityBuffer(null, SecurityBufferType.Empty);
 
             int errorCode = SSPIWrapper.EncryptMessage(GlobalSSPI.SSPISecureChannel, m_SecurityContext, securityBuffer, 0);
 
@@ -1239,11 +1239,11 @@ namespace System.Net.Security
             }
 
             // decryption using SCHANNEL requires four buffers
-            Interop.SecurityBuffer[] decspc = new Interop.SecurityBuffer[4];
-            decspc[0] = new Interop.SecurityBuffer(payload, offset, count, Interop.BufferType.Data);
-            decspc[1] = new Interop.SecurityBuffer(null, Interop.BufferType.Empty);
-            decspc[2] = new Interop.SecurityBuffer(null, Interop.BufferType.Empty);
-            decspc[3] = new Interop.SecurityBuffer(null, Interop.BufferType.Empty);
+            SecurityBuffer[] decspc = new SecurityBuffer[4];
+            decspc[0] = new SecurityBuffer(payload, offset, count, SecurityBufferType.Data);
+            decspc[1] = new SecurityBuffer(null, SecurityBufferType.Empty);
+            decspc[2] = new SecurityBuffer(null, SecurityBufferType.Empty);
+            decspc[3] = new SecurityBuffer(null, SecurityBufferType.Empty);
 
             Interop.SecurityStatus errorCode = (Interop.SecurityStatus)SSPIWrapper.DecryptMessage(GlobalSSPI.SSPISecureChannel, m_SecurityContext, decspc, 0);
 
@@ -1251,9 +1251,9 @@ namespace System.Net.Security
             for (int i = 0; i < decspc.Length; i++)
             {
                 // Sucessfully decoded data and placed it at the following position in the buffer.
-                if ((errorCode == Interop.SecurityStatus.OK && decspc[i].type == Interop.BufferType.Data)
+                if ((errorCode == Interop.SecurityStatus.OK && decspc[i].type == SecurityBufferType.Data)
                     // or we failed to decode the data, here is the encoded data
-                    || (errorCode != Interop.SecurityStatus.OK && decspc[i].type == Interop.BufferType.Extra))
+                    || (errorCode != Interop.SecurityStatus.OK && decspc[i].type == SecurityBufferType.Extra))
                 {
                     offset = decspc[i].offset;
                     count = decspc[i].size;

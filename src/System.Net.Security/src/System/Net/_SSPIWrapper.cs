@@ -109,7 +109,7 @@ namespace System.Net
             return outCredential;
         }
 
-        public static SafeFreeCredentials AcquireCredentialsHandle(SSPIInterface SecModule, string package, Interop.Secur32.CredentialUse intent, ref Interop.AuthIdentity authdata)
+        public static SafeFreeCredentials AcquireCredentialsHandle(SSPIInterface SecModule, string package, Interop.Secur32.CredentialUse intent, ref Interop.Secur32.AuthIdentity authdata)
         {
             GlobalLog.Print("SSPIWrapper::AcquireCredentialsHandle#2(): using " + package);
 
@@ -191,7 +191,7 @@ namespace System.Net
             return outCredential;
         }
 
-        internal static int InitializeSecurityContext(SSPIInterface SecModule, ref SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.ContextFlags inFlags, Interop.Secur32.Endianness datarep, Interop.SecurityBuffer inputBuffer, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags)
+        internal static int InitializeSecurityContext(SSPIInterface SecModule, ref SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness datarep, SecurityBuffer inputBuffer, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             if (Logging.On)
                 Logging.PrintInfo(Logging.Web,
@@ -208,7 +208,7 @@ namespace System.Net
             return errorCode;
         }
 
-        internal static int InitializeSecurityContext(SSPIInterface SecModule, SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.ContextFlags inFlags, Interop.Secur32.Endianness datarep, Interop.SecurityBuffer[] inputBuffers, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags)
+        internal static int InitializeSecurityContext(SSPIInterface SecModule, SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness datarep, SecurityBuffer[] inputBuffers, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             if (Logging.On)
                 Logging.PrintInfo(Logging.Web,
@@ -225,7 +225,7 @@ namespace System.Net
             return errorCode;
         }
 
-        internal static int AcceptSecurityContext(SSPIInterface SecModule, ref SafeFreeCredentials credential, ref SafeDeleteContext context, Interop.ContextFlags inFlags, Interop.Secur32.Endianness datarep, Interop.SecurityBuffer inputBuffer, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags)
+        internal static int AcceptSecurityContext(SSPIInterface SecModule, ref SafeFreeCredentials credential, ref SafeDeleteContext context, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness datarep, SecurityBuffer inputBuffer, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             if (Logging.On)
                 Logging.PrintInfo(Logging.Web,
@@ -241,7 +241,7 @@ namespace System.Net
             return errorCode;
         }
 
-        internal static int AcceptSecurityContext(SSPIInterface SecModule, SafeFreeCredentials credential, ref SafeDeleteContext context, Interop.ContextFlags inFlags, Interop.Secur32.Endianness datarep, Interop.SecurityBuffer[] inputBuffers, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags)
+        internal static int AcceptSecurityContext(SSPIInterface SecModule, SafeFreeCredentials credential, ref SafeDeleteContext context, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness datarep, SecurityBuffer[] inputBuffers, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             if (Logging.On)
                 Logging.PrintInfo(Logging.Web,
@@ -257,7 +257,7 @@ namespace System.Net
             return errorCode;
         }
 
-        internal static int CompleteAuthToken(SSPIInterface SecModule, ref SafeDeleteContext context, Interop.SecurityBuffer[] inputBuffers)
+        internal static int CompleteAuthToken(SSPIInterface SecModule, ref SafeDeleteContext context, SecurityBuffer[] inputBuffers)
         {
             int errorCode = SecModule.CompleteAuthToken(ref context, inputBuffers);
 
@@ -271,22 +271,22 @@ namespace System.Net
             return SecModule.QuerySecurityContextToken(context, out token);
         }
 
-        public static int EncryptMessage(SSPIInterface secModule, SafeDeleteContext context, Interop.SecurityBuffer[] input, uint sequenceNumber)
+        public static int EncryptMessage(SSPIInterface secModule, SafeDeleteContext context, SecurityBuffer[] input, uint sequenceNumber)
         {
             return EncryptDecryptHelper(OP.Encrypt, secModule, context, input, sequenceNumber);
         }
 
-        public static int DecryptMessage(SSPIInterface secModule, SafeDeleteContext context, Interop.SecurityBuffer[] input, uint sequenceNumber)
+        public static int DecryptMessage(SSPIInterface secModule, SafeDeleteContext context, SecurityBuffer[] input, uint sequenceNumber)
         {
             return EncryptDecryptHelper(OP.Decrypt, secModule, context, input, sequenceNumber);
         }
 
-        internal static int MakeSignature(SSPIInterface secModule, SafeDeleteContext context, Interop.SecurityBuffer[] input, uint sequenceNumber)
+        internal static int MakeSignature(SSPIInterface secModule, SafeDeleteContext context, SecurityBuffer[] input, uint sequenceNumber)
         {
             return EncryptDecryptHelper(OP.MakeSignature, secModule, context, input, sequenceNumber);
         }
 
-        public static int VerifySignature(SSPIInterface secModule, SafeDeleteContext context, Interop.SecurityBuffer[] input, uint sequenceNumber)
+        public static int VerifySignature(SSPIInterface secModule, SafeDeleteContext context, SecurityBuffer[] input, uint sequenceNumber)
         {
             return EncryptDecryptHelper(OP.VerifySignature, secModule, context, input, sequenceNumber);
         }
@@ -299,7 +299,7 @@ namespace System.Net
             VerifySignature
         }
         //
-        private unsafe static int EncryptDecryptHelper(OP op, SSPIInterface SecModule, SafeDeleteContext context, Interop.SecurityBuffer[] input, uint sequenceNumber)
+        private unsafe static int EncryptDecryptHelper(OP op, SSPIInterface SecModule, SafeDeleteContext context, SecurityBuffer[] input, uint sequenceNumber)
         {
             Interop.Secur32.SecurityBufferDescriptor sdcInOut = new Interop.Secur32.SecurityBufferDescriptor(input.Length);
             var unmanagedBuffer = new Interop.Secur32.SecurityBufferStruct[input.Length];
@@ -313,7 +313,7 @@ namespace System.Net
                 {
                     for (int i = 0; i < input.Length; i++)
                     {
-                        Interop.SecurityBuffer iBuffer = input[i];
+                        SecurityBuffer iBuffer = input[i];
                         unmanagedBuffer[i].count = iBuffer.size;
                         unmanagedBuffer[i].type = iBuffer.type;
                         if (iBuffer.token == null || iBuffer.token.Length == 0)
@@ -354,7 +354,7 @@ namespace System.Net
                     // Marshalling back returned sizes / data.
                     for (int i = 0; i < input.Length; i++)
                     {
-                        Interop.SecurityBuffer iBuffer = input[i];
+                        SecurityBuffer iBuffer = input[i];
                         iBuffer.size = unmanagedBuffer[i].count;
                         iBuffer.type = unmanagedBuffer[i].type;
 
