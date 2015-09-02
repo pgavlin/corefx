@@ -12,46 +12,6 @@ using System.Security.Cryptography.X509Certificates;
 
 internal static partial class Interop
 {
-
-
-
-    internal enum CertificateProblem
-    {
-        OK = 0x00000000,
-        TrustNOSIGNATURE = unchecked((int)0x800B0100),
-        CertEXPIRED = unchecked((int)0x800B0101),
-        CertVALIDITYPERIODNESTING = unchecked((int)0x800B0102),
-        CertROLE = unchecked((int)0x800B0103),
-        CertPATHLENCONST = unchecked((int)0x800B0104),
-        CertCRITICAL = unchecked((int)0x800B0105),
-        CertPURPOSE = unchecked((int)0x800B0106),
-        CertISSUERCHAINING = unchecked((int)0x800B0107),
-        CertMALFORMED = unchecked((int)0x800B0108),
-        CertUNTRUSTEDROOT = unchecked((int)0x800B0109),
-        CertCHAINING = unchecked((int)0x800B010A),
-        CertREVOKED = unchecked((int)0x800B010C),
-        CertUNTRUSTEDTESTROOT = unchecked((int)0x800B010D),
-        CertREVOCATION_FAILURE = unchecked((int)0x800B010E),
-        CertCN_NO_MATCH = unchecked((int)0x800B010F),
-        CertWRONG_USAGE = unchecked((int)0x800B0110),
-        TrustEXPLICITDISTRUST = unchecked((int)0x800B0111),
-        CertUNTRUSTEDCA = unchecked((int)0x800B0112),
-        CertINVALIDPOLICY = unchecked((int)0x800B0113),
-        CertINVALIDNAME = unchecked((int)0x800B0114),
-
-        CryptNOREVOCATIONCHECK = unchecked((int)0x80092012),
-        CryptREVOCATIONOFFLINE = unchecked((int)0x80092013),
-
-        TrustSYSTEMERROR = unchecked((int)0x80096001),
-        TrustNOSIGNERCERT = unchecked((int)0x80096002),
-        TrustCOUNTERSIGNER = unchecked((int)0x80096003),
-        TrustCERTSIGNATURE = unchecked((int)0x80096004),
-        TrustTIMESTAMP = unchecked((int)0x80096005),
-        TrustBADDIGEST = unchecked((int)0x80096010),
-        TrustBASICCONSTRAINTS = unchecked((int)0x80096019),
-        TrustFINANCIALCRITERIA = unchecked((int)0x8009601E),
-    }
-
     // #define ISC_REQ_DELEGATE                0x00000001
     // #define ISC_REQ_MUTUAL_AUTH             0x00000002
     // #define ISC_REQ_REPLAY_DETECT           0x00000004

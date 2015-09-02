@@ -1339,7 +1339,7 @@ namespace System.Net.Security
 
                                 SafeX509ChainHandle chainContext = chain.SafeHandle;
                                 status = Verify(chainContext, ref cppStruct);
-                                if ((Interop.CertificateProblem)status == Interop.CertificateProblem.CertCN_NO_MATCH)
+                                if (status == Interop.Crypt32.CertChainPolicyErrors.CERT_E_CN_NO_MATCH)
                                     sslPolicyErrors |= SslPolicyErrors.RemoteCertificateNameMismatch;
                             }
                         }
