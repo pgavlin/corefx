@@ -14,17 +14,23 @@ namespace System.Net.Sockets
     //
     internal partial class ConnectOverlappedAsyncResult : BaseOverlappedAsyncResult
     {
-        private EndPoint _endPoint;
-
-        internal ConnectOverlappedAsyncResult(Socket socket, EndPoint endPoint, Object asyncState, AsyncCallback asyncCallback) :
-            base(socket, asyncState, asyncCallback)
+        public void CompletionCallback(SocketError errorCode)
         {
-            _endPoint = endPoint;
+            CompletionCallback(0, errorCode);
         }
 
-        internal EndPoint RemoteEndPoint
+        //
+        // This method is called by base.CompletionPortCallback base.OverlappedCallback as part of IO completion
+        //
+        internal override object PostCompletion(int numBytes)
         {
-            get { return _endPoint; }
+            var errorCode = (SocketError)ErrorCode;
+            if (errorCode == SocketError.Success)
+            {
+                return (Socket)AsyncObject;
+            }
+
+            return null;
         }
     }
 }

@@ -9,6 +9,6 @@ internal static partial class Interop
     internal static partial class libc
     {
         [DllImport(Libraries.Libc, SetLastError = true)]
-        internal static extern int socket(int domain, int type, int protocol);
+        public static extern unsafe int epoll_wait(int epfd, epoll_event* events, int maxevents, int timeout);
     }
 }

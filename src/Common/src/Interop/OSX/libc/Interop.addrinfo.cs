@@ -25,6 +25,8 @@ internal static partial class Interop
         public const int EAI_FAMILY = 5;   // 'ai_family' not supported.
         public const int EAI_NONAME = 8;   // NAME or SERVICE is unknown.
 
+        public const int SOCK_DGRAM = 2;
+
         public unsafe struct addrinfo
         {
             public int ai_flags;

@@ -53,6 +53,11 @@ namespace System.Net.Sockets
             return Marshal.UnsafeAddrOfPinnedArrayElement(m_SocketAddress.Buffer, m_SocketAddress.GetAddressSizeOffset());
         }
 
+        internal unsafe int GetSocketAddressSize()
+        {
+            return *(int*)GetSocketAddressSizePtr();
+        }
+
         internal Internals.SocketAddress SocketAddress
         {
             get

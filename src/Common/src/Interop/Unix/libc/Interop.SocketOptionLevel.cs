@@ -1,14 +1,15 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Runtime.InteropServices;
-
 internal static partial class Interop
 {
     internal static partial class libc
     {
-        [DllImport(Libraries.Libc, SetLastError = true)]
-        internal static extern int socket(int domain, int type, int protocol);
+        public const int SOL_SOCKET = 1;
+
+        public const int IPPROTO_IP = 0;
+        public const int IPPROTO_TCP = 6;
+        public const int IPPROTO_UDP = 17;
+        public const int IPPROTO_IPV6 = 41;
     }
 }
