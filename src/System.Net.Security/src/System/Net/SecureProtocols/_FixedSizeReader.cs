@@ -1,28 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-/*++
-Copyright (c) 2000 Microsoft Corporation
 
-Module Name:
-
-    _FixedSizeReader.cs
-
-Abstract:
-    The class is a simple wrapper on top of a read stream.
-    It will read the exact number of bytes requested.
-    It operates either sync or async.
-
-Author:
-
-    Alexei Vopilov  Aug 18 2003
-
-Revision History:
-
---*/
-
-using System;
 using System.IO;
-using System.Threading;
 
 namespace System.Net
 {
@@ -33,6 +12,7 @@ namespace System.Net
     {
         private static readonly AsyncCallback _ReadCallback = new AsyncCallback(ReadCallback);
 
+        // TODO: Implement this using TPL instead of APM.
         private readonly StreamAsyncHelper _TransportAPM;
         private readonly Stream _Transport;
         private AsyncProtocolRequest _Request;

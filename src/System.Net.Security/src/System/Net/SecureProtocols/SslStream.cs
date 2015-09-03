@@ -1,31 +1,11 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-/*++
-Copyright (c) 2003 Microsoft Corporation
 
-Module Name:
-
-    SslStream.cs
-
-Abstract:
-
-    A public implementation of authenticated stream using SSL protocol
-
-Author:
-    Alexei Vopilov    Sept 28-2003
-
-Revision History:
-
---*/
-
-using System;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Security.Authentication;
 using System.Security.Authentication.ExtendedProtection;
 using System.Security.Cryptography.X509Certificates;
-using System.Diagnostics;
 
 namespace System.Net.Security
 {
@@ -50,9 +30,7 @@ namespace System.Net.Security
     // Internal versions of the above delegates
     internal delegate bool RemoteCertValidationCallback(string host, X509Certificate2 certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors);
     internal delegate X509Certificate LocalCertSelectionCallback(string targetHost, X509CertificateCollection localCertificates, X509Certificate2 remoteCertificate, string[] acceptableIssuers);
-    //
-    //
-    //
+
     public class SslStream : AuthenticatedStream
     {
         private SslState _SslState;
@@ -124,20 +102,18 @@ namespace System.Net.Security
         {
             AuthenticateAsClient(targetHost, new X509CertificateCollection(), DefaultProtocols(), false);
         }
-        //
+
         public virtual void AuthenticateAsClient(string targetHost, X509CertificateCollection clientCertificates, SslProtocols enabledSslProtocols, bool checkCertificateRevocation)
         {
             _SslState.ValidateCreateContext(false, targetHost, enabledSslProtocols, null, clientCertificates, true, checkCertificateRevocation);
             _SslState.ProcessAuthentication(null);
         }
-        //
 
         internal virtual IAsyncResult BeginAuthenticateAsClient(string targetHost, AsyncCallback asyncCallback, object asyncState)
         {
             return BeginAuthenticateAsClient(targetHost, new X509CertificateCollection(), DefaultProtocols(), false,
                                            asyncCallback, asyncState);
         }
-        //
 
         internal virtual IAsyncResult BeginAuthenticateAsClient(string targetHost, X509CertificateCollection clientCertificates,
                                                             SslProtocols enabledSslProtocols, bool checkCertificateRevocation,
@@ -149,15 +125,11 @@ namespace System.Net.Security
             _SslState.ProcessAuthentication(result);
             return result;
         }
-        //
-
 
         internal virtual void EndAuthenticateAsClient(IAsyncResult asyncResult)
         {
             _SslState.EndProcessAuthentication(asyncResult);
         }
-        //
-
 
         //
         //server side auth
@@ -166,14 +138,14 @@ namespace System.Net.Security
         {
             AuthenticateAsServer(serverCertificate, false, DefaultProtocols(), false);
         }
-        //
+
         public virtual void AuthenticateAsServer(X509Certificate serverCertificate, bool clientCertificateRequired,
                                                SslProtocols enabledSslProtocols, bool checkCertificateRevocation)
         {
             _SslState.ValidateCreateContext(true, string.Empty, enabledSslProtocols, serverCertificate, null, clientCertificateRequired, checkCertificateRevocation);
             _SslState.ProcessAuthentication(null);
         }
-        //
+
         internal virtual IAsyncResult BeginAuthenticateAsServer(X509Certificate serverCertificate, AsyncCallback asyncCallback, object asyncState)
 
         {
@@ -181,7 +153,7 @@ namespace System.Net.Security
                                                           asyncCallback,
                                                             asyncState);
         }
-        //
+
         internal virtual IAsyncResult BeginAuthenticateAsServer(X509Certificate serverCertificate, bool clientCertificateRequired,
                                                             SslProtocols enabledSslProtocols, bool checkCertificateRevocation,
                                                             AsyncCallback asyncCallback,
@@ -192,7 +164,6 @@ namespace System.Net.Security
             _SslState.ProcessAuthentication(result);
             return result;
         }
-        //
 
         internal virtual void EndAuthenticateAsServer(IAsyncResult asyncResult)
         {
@@ -212,7 +183,7 @@ namespace System.Net.Security
             return _SslState.GetChannelBinding(kind);
         }
 
-        //************* Task-based async public methods *************************
+        #region Task-based async public methods
         public virtual Task AuthenticateAsClientAsync(string targetHost)
         {
             return Task.Factory.FromAsync(BeginAuthenticateAsClient, EndAuthenticateAsClient, targetHost, null);
@@ -232,12 +203,8 @@ namespace System.Net.Security
         {
             return Task.Factory.FromAsync((callback, state) => BeginAuthenticateAsServer(serverCertificate, clientCertificateRequired, enabledSslProtocols, checkCertificateRevocation, callback, state), EndAuthenticateAsServer, null);
         }
+        #endregion
 
-
-        //
-        //
-        // Base class properties
-        //
         public override bool IsAuthenticated
         {
             get
@@ -245,7 +212,7 @@ namespace System.Net.Security
                 return _SslState.IsAuthenticated;
             }
         }
-        //
+
         public override bool IsMutuallyAuthenticated
         {
             get
@@ -253,7 +220,7 @@ namespace System.Net.Security
                 return _SslState.IsMutuallyAuthenticated;
             }
         }
-        //
+
         public override bool IsEncrypted
         {
             get
@@ -261,7 +228,7 @@ namespace System.Net.Security
                 return IsAuthenticated;
             }
         }
-        //
+
         public override bool IsSigned
         {
             get
@@ -269,7 +236,7 @@ namespace System.Net.Security
                 return IsAuthenticated;
             }
         }
-        //
+
         public override bool IsServer
         {
             get
@@ -277,11 +244,7 @@ namespace System.Net.Security
                 return _SslState.IsServer;
             }
         }
-        //
-        //
-        //SSL specific properties
-        //
-        //
+
         public virtual SslProtocols SslProtocol
         {
             get
@@ -289,7 +252,7 @@ namespace System.Net.Security
                 return _SslState.SslProtocol;
             }
         }
-        //
+
         public virtual bool CheckCertRevocationStatus
         {
             get
@@ -297,7 +260,7 @@ namespace System.Net.Security
                 return _SslState.CheckCertRevocationStatus;
             }
         }
-        //
+
         public virtual X509Certificate LocalCertificate
         {
             get
@@ -305,7 +268,7 @@ namespace System.Net.Security
                 return _SslState.LocalCertificate;
             }
         }
-        //
+
         public virtual X509Certificate RemoteCertificate
         {
             get
@@ -319,9 +282,7 @@ namespace System.Net.Security
                     return chkCertificateOrBytes as X509Certificate;
             }
         }
-        //
-        // More informational properties
-        //
+
         public virtual CipherAlgorithmType CipherAlgorithm
         {
             get
@@ -329,7 +290,7 @@ namespace System.Net.Security
                 return _SslState.CipherAlgorithm;
             }
         }
-        //
+
         public virtual int CipherStrength
         {
             get
@@ -337,7 +298,7 @@ namespace System.Net.Security
                 return _SslState.CipherStrength;
             }
         }
-        //
+
         public virtual HashAlgorithmType HashAlgorithm
         {
             get
@@ -345,7 +306,7 @@ namespace System.Net.Security
                 return _SslState.HashAlgorithm;
             }
         }
-        //
+
         public virtual int HashStrength
         {
             get
@@ -353,7 +314,7 @@ namespace System.Net.Security
                 return _SslState.HashStrength;
             }
         }
-        //
+
         public virtual ExchangeAlgorithmType KeyExchangeAlgorithm
         {
             get
@@ -361,7 +322,7 @@ namespace System.Net.Security
                 return _SslState.KeyExchangeAlgorithm;
             }
         }
-        //
+
         public virtual int KeyExchangeStrength
         {
             get
@@ -369,11 +330,9 @@ namespace System.Net.Security
                 return _SslState.KeyExchangeStrength;
             }
         }
-        //
+
         //
         // Stream contract implementation
-        //
-        //
         //
         public override bool CanSeek
         {
@@ -382,7 +341,7 @@ namespace System.Net.Security
                 return false;
             }
         }
-        //
+
         public override bool CanRead
         {
             get
@@ -390,7 +349,7 @@ namespace System.Net.Security
                 return _SslState.IsAuthenticated && InnerStream.CanRead;
             }
         }
-        //
+
         public override bool CanTimeout
         {
             get
@@ -398,7 +357,7 @@ namespace System.Net.Security
                 return InnerStream.CanTimeout;
             }
         }
-        //
+
         public override bool CanWrite
         {
             get
@@ -406,8 +365,7 @@ namespace System.Net.Security
                 return _SslState.IsAuthenticated && InnerStream.CanWrite;
             }
         }
-        //
-        //
+
         public override int ReadTimeout
         {
             get
@@ -419,8 +377,7 @@ namespace System.Net.Security
                 InnerStream.ReadTimeout = value;
             }
         }
-        //
-        //
+
         public override int WriteTimeout
         {
             get
@@ -432,7 +389,7 @@ namespace System.Net.Security
                 InnerStream.WriteTimeout = value;
             }
         }
-        //
+
         public override long Length
         {
             get
@@ -440,7 +397,7 @@ namespace System.Net.Security
                 return InnerStream.Length;
             }
         }
-        //
+
         public override long Position
         {
             get
@@ -452,23 +409,22 @@ namespace System.Net.Security
                 throw new NotSupportedException(SR.net_noseek);
             }
         }
-        //
+
         public override void SetLength(long value)
         {
             InnerStream.SetLength(value);
         }
-        //
+
         public override long Seek(long offset, SeekOrigin origin)
         {
             throw new NotSupportedException(SR.net_noseek);
         }
-        //
+
         public override void Flush()
         {
             _SslState.Flush();
         }
-        //
-        //
+
         protected override void Dispose(bool disposing)
         {
             try
@@ -480,25 +436,20 @@ namespace System.Net.Security
                 base.Dispose(disposing);
             }
         }
-        //
+
         public override int Read(byte[] buffer, int offset, int count)
         {
             return _SslState.SecureStream.Read(buffer, offset, count);
         }
 
-        //
         public void Write(byte[] buffer)
         {
             _SslState.SecureStream.Write(buffer, 0, buffer.Length);
         }
 
-        //
         public override void Write(byte[] buffer, int offset, int count)
         {
             _SslState.SecureStream.Write(buffer, offset, count);
         }
     }
 }
-
-
-

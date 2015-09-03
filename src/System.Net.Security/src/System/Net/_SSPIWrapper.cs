@@ -89,11 +89,12 @@ namespace System.Net
         {
             GlobalLog.Print("SSPIWrapper::AcquireDefaultCredential(): using " + package);
             if (Logging.On)
+            {
                 Logging.PrintInfo(Logging.Web,
-    "AcquireDefaultCredential(" +
-    "package = " + package + ", " +
-    "intent  = " + intent + ")");
-
+                    "AcquireDefaultCredential(" +
+                    "package = " + package + ", " +
+                    "intent  = " + intent + ")");
+            }
 
             SafeFreeCredentials outCredential = null;
             int errorCode = SecModule.AcquireDefaultCredential(package, intent, out outCredential);
@@ -114,11 +115,13 @@ namespace System.Net
             GlobalLog.Print("SSPIWrapper::AcquireCredentialsHandle#2(): using " + package);
 
             if (Logging.On)
+            {
                 Logging.PrintInfo(Logging.Web,
-    "AcquireCredentialsHandle(" +
-    "package  = " + package + ", " +
-    "intent   = " + intent + ", " +
-    "authdata = " + authdata + ")");
+                    "AcquireCredentialsHandle(" +
+                    "package  = " + package + ", " +
+                    "intent   = " + intent + ", " +
+                    "authdata = " + authdata + ")");
+            }
 
             SafeFreeCredentials credentialsHandle = null;
             int errorCode = SecModule.AcquireCredentialsHandle(package,
@@ -141,11 +144,13 @@ namespace System.Net
         public static SafeFreeCredentials AcquireCredentialsHandle(SSPIInterface SecModule, string package, Interop.Secur32.CredentialUse intent, ref SafeSspiAuthDataHandle authdata)
         {
             if (Logging.On)
+            {
                 Logging.PrintInfo(Logging.Web,
-    "AcquireCredentialsHandle(" +
-    "package  = " + package + ", " +
-    "intent   = " + intent + ", " +
-    "authdata = " + authdata + ")");
+                    "AcquireCredentialsHandle(" +
+                    "package  = " + package + ", " +
+                    "intent   = " + intent + ", " +
+                    "authdata = " + authdata + ")");
+            }
 
             SafeFreeCredentials credentialsHandle = null;
             int errorCode = SecModule.AcquireCredentialsHandle(package, intent, ref authdata, out credentialsHandle);
@@ -163,11 +168,13 @@ namespace System.Net
             GlobalLog.Print("SSPIWrapper::AcquireCredentialsHandle#3(): using " + package);
 
             if (Logging.On)
+            {
                 Logging.PrintInfo(Logging.Web,
-    "AcquireCredentialsHandle(" +
-    "package = " + package + ", " +
-    "intent  = " + intent + ", " +
-    "scc     = " + scc + ")");
+                    "AcquireCredentialsHandle(" +
+                    "package = " + package + ", " +
+                    "intent  = " + intent + ", " +
+                    "scc     = " + scc + ")");
+            }
 
             SafeFreeCredentials outCredential = null;
             int errorCode = SecModule.AcquireCredentialsHandle(
@@ -194,12 +201,14 @@ namespace System.Net
         internal static int InitializeSecurityContext(SSPIInterface SecModule, ref SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness datarep, SecurityBuffer inputBuffer, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             if (Logging.On)
+            {
                 Logging.PrintInfo(Logging.Web,
-    "InitializeSecurityContext(" +
-    "credential = " + credential.ToString() + ", " +
-    "context = " + Logging.ObjectToString(context) + ", " +
-    "targetName = " + targetName + ", " +
-    "inFlags = " + inFlags + ")");
+                    "InitializeSecurityContext(" +
+                    "credential = " + credential.ToString() + ", " +
+                    "context = " + Logging.ObjectToString(context) + ", " +
+                    "targetName = " + targetName + ", " +
+                    "inFlags = " + inFlags + ")");
+            }
 
             int errorCode = SecModule.InitializeSecurityContext(ref credential, ref context, targetName, inFlags, datarep, inputBuffer, outputBuffer, ref outFlags);
 
@@ -211,12 +220,14 @@ namespace System.Net
         internal static int InitializeSecurityContext(SSPIInterface SecModule, SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness datarep, SecurityBuffer[] inputBuffers, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             if (Logging.On)
+            {
                 Logging.PrintInfo(Logging.Web,
-    "InitializeSecurityContext(" +
-    "credential = " + credential.ToString() + ", " +
-    "context = " + Logging.ObjectToString(context) + ", " +
-    "targetName = " + targetName + ", " +
-    "inFlags = " + inFlags + ")");
+                    "InitializeSecurityContext(" +
+                    "credential = " + credential.ToString() + ", " +
+                    "context = " + Logging.ObjectToString(context) + ", " +
+                    "targetName = " + targetName + ", " +
+                    "inFlags = " + inFlags + ")");
+            }
 
             int errorCode = SecModule.InitializeSecurityContext(credential, ref context, targetName, inFlags, datarep, inputBuffers, outputBuffer, ref outFlags);
 
@@ -228,11 +239,13 @@ namespace System.Net
         internal static int AcceptSecurityContext(SSPIInterface SecModule, ref SafeFreeCredentials credential, ref SafeDeleteContext context, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness datarep, SecurityBuffer inputBuffer, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             if (Logging.On)
+            {
                 Logging.PrintInfo(Logging.Web,
-    "AcceptSecurityContext(" +
-    "credential = " + credential.ToString() + ", " +
-    "context = " + Logging.ObjectToString(context) + ", " +
-    "inFlags = " + inFlags + ")");
+                    "AcceptSecurityContext(" +
+                    "credential = " + credential.ToString() + ", " +
+                    "context = " + Logging.ObjectToString(context) + ", " +
+                    "inFlags = " + inFlags + ")");
+            }
 
             int errorCode = SecModule.AcceptSecurityContext(ref credential, ref context, inputBuffer, inFlags, datarep, outputBuffer, ref outFlags);
 
@@ -244,11 +257,13 @@ namespace System.Net
         internal static int AcceptSecurityContext(SSPIInterface SecModule, SafeFreeCredentials credential, ref SafeDeleteContext context, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness datarep, SecurityBuffer[] inputBuffers, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             if (Logging.On)
+            {
                 Logging.PrintInfo(Logging.Web,
-    "AcceptSecurityContext(" +
-    "credential = " + credential.ToString() + ", " +
-    "context = " + Logging.ObjectToString(context) + ", " +
-    "inFlags = " + inFlags + ")");
+                    "AcceptSecurityContext(" +
+                    "credential = " + credential.ToString() + ", " +
+                    "context = " + Logging.ObjectToString(context) + ", " +
+                    "inFlags = " + inFlags + ")");
+            }
 
             int errorCode = SecModule.AcceptSecurityContext(credential, ref context, inputBuffers, inFlags, datarep, outputBuffer, ref outFlags);
 
@@ -298,7 +313,7 @@ namespace System.Net
             MakeSignature,
             VerifySignature
         }
-        //
+
         private unsafe static int EncryptDecryptHelper(OP op, SSPIInterface SecModule, SafeDeleteContext context, SecurityBuffer[] input, uint sequenceNumber)
         {
             Interop.Secur32.SecurityBufferDescriptor sdcInOut = new Interop.Secur32.SecurityBufferDescriptor(input.Length);
@@ -572,47 +587,6 @@ namespace System.Net
             }
             GlobalLog.Leave("QueryContextAttributes", Logging.ObjectToString(attribute));
             return attribute;
-        }
-
-        public static int SetContextAttributes(SSPIInterface SecModule, SafeDeleteContext securityContext, Interop.Secur32.ContextAttribute contextAttribute, object value)
-        {
-            GlobalLog.Enter("SetContextAttributes", contextAttribute.ToString());
-
-            byte[] nativeBuffer;
-
-            switch (contextAttribute)
-            {
-                case Interop.Secur32.ContextAttribute.UiInfo:
-                    Debug.Assert(value is IntPtr, "Type Mismatch");
-                    IntPtr hwnd = (IntPtr)value; // A window handle
-                    nativeBuffer = new byte[IntPtr.Size];
-                    if (IntPtr.Size == 4) // 32bit
-                    {
-                        int ptr = hwnd.ToInt32();
-                        nativeBuffer[0] = (byte)(ptr);
-                        nativeBuffer[1] = (byte)(ptr >> 8);
-                        nativeBuffer[2] = (byte)(ptr >> 16);
-                        nativeBuffer[3] = (byte)(ptr >> 24);
-                    }
-                    else // 64bit
-                    {
-                        long ptr = hwnd.ToInt64();
-                        nativeBuffer[0] = (byte)(ptr);
-                        nativeBuffer[1] = (byte)(ptr >> 8);
-                        nativeBuffer[2] = (byte)(ptr >> 16);
-                        nativeBuffer[3] = (byte)(ptr >> 24);
-                        nativeBuffer[4] = (byte)(ptr >> 32);
-                        nativeBuffer[5] = (byte)(ptr >> 40);
-                        nativeBuffer[6] = (byte)(ptr >> 48);
-                        nativeBuffer[7] = (byte)(ptr >> 56);
-                    }
-                    break;
-
-                default:
-                    throw new ArgumentException(SR.Format(SR.net_invalid_enum, "ContextAttribute"), "contextAttribute");
-            }
-
-            return SecModule.SetContextAttributes(securityContext, contextAttribute, nativeBuffer);
         }
 
         public static string ErrorDescription(int errorCode)

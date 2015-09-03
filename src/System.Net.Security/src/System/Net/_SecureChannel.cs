@@ -1,15 +1,10 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Diagnostics;
-using System.Net;
-using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Authentication.ExtendedProtection;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading;
 using System.Globalization;
 using System.ComponentModel;
 using System.Security.Principal;
@@ -20,11 +15,9 @@ using Microsoft.Win32.SafeHandles;
 namespace System.Net.Security
 {
     //
-    // SecureChannel - a wrapper on SSPI based functionality,
-    //  provides an additional abstraction layer over SSPI
-    //  for the SSL Stream to utilize.
+    // SecureChannel - a wrapper on SSPI based functionality. 
+    // Provides an additional abstraction layer over SSPI for SslStream.
     //
-
     internal class SecureChannel
     {
         //also used as a lock object
@@ -37,12 +30,8 @@ namespace System.Net.Security
             Interop.Secur32.ContextFlags.Confidentiality |
             Interop.Secur32.ContextFlags.AllocateMemory;
 
-
         private const Interop.Secur32.ContextFlags ServerRequiredFlags =
-            RequiredFlags
-            | Interop.Secur32.ContextFlags.AcceptStream
-            // | Interop.Secur32.ContextFlags.AcceptExtendedError
-            ;
+            RequiredFlags | Interop.Secur32.ContextFlags.AcceptStream;
 
         private const int ChainRevocationCheckExcludeRoot = 0x40000000;
 
@@ -184,9 +173,9 @@ namespace System.Net.Security
                 return result;
             }
         }
+
         //
         //This code extracts a remote certificate upon request.
-        //SECURITY: The scenario is allowed in semitrust
         //
         internal X509Certificate2 GetRemoteCertificate(out X509Certificate2Collection remoteCertificateStore)
         {
@@ -417,7 +406,7 @@ namespace System.Net.Security
                             //
                             try
                             {
-                                WindowsIdentity.RunImpersonated(Microsoft.Win32.SafeHandles.SafeAccessTokenHandle.InvalidHandle, () =>
+                                WindowsIdentity.RunImpersonated(SafeAccessTokenHandle.InvalidHandle, () =>
                                 {
                                     store.Open(OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
                                     GlobalLog.Print("SecureChannel::EnsureStoreOpened() storeLocation:" + storeLocation + " returned store:" + store.GetHashCode().ToString("x"));
@@ -510,8 +499,7 @@ namespace System.Net.Security
                                     {
                                         x[j] = *(ptr + j);
                                     }
-                                    // Oid oid = new Oid();
-                                    // oid.Value = "1.3.6.1.5.5.7.3.2";
+
                                     X500DistinguishedName x500DistinguishedName = new X500DistinguishedName(x);
                                     issuers[i] = x500DistinguishedName.Name;
                                     GlobalLog.Print("SecureChannel#" + Logging.HashString(this) + "::GetIssuers() IssuerListEx[" + i + "]:" + issuers[i]);
@@ -530,6 +518,7 @@ namespace System.Net.Security
             }
             return issuers;
         }
+
         /*++
             AcquireCredentials - Attempts to find Client Credential
             Information, that can be sent to the server.  In our case,
@@ -566,13 +555,7 @@ namespace System.Net.Security
             Returns: True if cached creds were used, false otherwise
 
         --*/
-        //
-        //SECURITY: The permission assert is needed for Chain.Build and for certs enumeration.
-        //          The user will see KeyContainerPermission demand in the case where the client
-        //          cert as about to be used.
-        //          Note: We call a user certificate selection delegate under permission
-        //          assert but the signature of the delegate is unique so it's safe
-        //
+
         private bool AcquireClientCredentials(ref byte[] thumbPrint)
         {
             GlobalLog.Enter("SecureChannel#" + Logging.HashString(this) + "::AcquireClientCredentials");
@@ -580,7 +563,6 @@ namespace System.Net.Security
             //
             // Acquire possible Client Certificate information and set it on the handle
             //
-
             X509Certificate clientCertificate = null;   // This is a candidate that can come from the user callback or be guessed when targeting a session restart
             ArrayList filteredCerts = new ArrayList();  // This is an intermediate client certs collection that try to use if no selectedCert is available yet.
             string[] issuers = null;                    // This is a list of issuers sent by the server, only valid is we do know what the server cert is.
@@ -617,7 +599,6 @@ namespace System.Net.Security
                 }
                 else
                 {
-                    // If ClientCertificates.Count != 0, how come we don't try to go through them and add them to the filtered certs, just like when there is no delegate????
                     if (ClientCertificates.Count == 0)
                     {
                         if (Logging.On) Logging.PrintInfo(Logging.Web, this, SR.net_log_no_delegate_and_have_no_client_cert);
@@ -764,7 +745,7 @@ namespace System.Net.Security
                 {
                     GlobalLog.Print("SecureChannel#" + Logging.HashString(this) + "::AcquireClientCredentials() Reset to anonymous session.");
 
-                    // (see VsWhidbey#363953) For some (probably good) reason IIS does not renegotiate a restarted session if client cert is needed.
+                    // IIS does not renegotiate a restarted session if client cert is needed.
                     // So we don't want to reuse **anonymous** cached credential for a new SSL connection if the client has passed some certificate.
                     // The following block happens if client did specify a certificate but no cached creds were found in the cache
                     // Since we don't restart a session the server side can still challenge for a client cert.
@@ -786,7 +767,7 @@ namespace System.Net.Security
                 {
                     Interop.Secur32.SecureCredential.Flags flags = Interop.Secur32.SecureCredential.Flags.ValidateManual | Interop.Secur32.SecureCredential.Flags.NoDefaultCred;
 
-                    // ProjectK: always opt-in SCH_USE_STRONG_CRYPTO except for weak protocols or crypto
+                    // CoreFX: always opt-in SCH_USE_STRONG_CRYPTO except for weak protocols or crypto
                     if (((m_ProtocolFlags & (Interop.SChannel.SP_PROT_TLS1_0| Interop.SChannel.SP_PROT_TLS1_1 | Interop.SChannel.SP_PROT_TLS1_2)) != 0)
                          && (m_EncryptionPolicy != EncryptionPolicy.AllowNoEncryption) && (m_EncryptionPolicy != EncryptionPolicy.NoEncryption))
                     {
@@ -819,13 +800,6 @@ namespace System.Net.Security
 
         //
         // Acquire Server Side Certificate information and set it on the class
-        //
-        //
-        //SECURITY: The permission assert is needed for Chain.Build and for certs enumeration.
-        //          The user will see KeyContainerPermission demand in the case where the server
-        //          cert as about to be used.
-        //          Note: We call a user certificate selection delegate under permission
-        //          assert but the signature of the delegate is unique so it's safe
         //
         private bool AcquireServerCredentials(ref byte[] thumbPrint)
         {
@@ -902,20 +876,16 @@ namespace System.Net.Security
         //
         // Security: we temporarily reset thread token to open the handle under process acount
         //
-        // ProjectK porting note: secureCredential was previously passed by reference (using the ref keyword). 
-        // The keyword was removed to allow passing secureCredential as an anonymous parameter to RunUnimpersonated
-        //
         SafeFreeCredentials AcquireCredentialsHandle(Interop.Secur32.CredentialUse credUsage, Interop.Secur32.SecureCredential secureCredential)
         {
             // First try without impersonation, if it fails, then try the process account.
             // I.E. We don't know which account the certificate context was created under.
-
             try
             {
                 //
                 // For v 1.1 compat We want to ensure the credential are accessed under >>process<< acount.
                 //
-                return WindowsIdentity.RunImpersonated<SafeFreeCredentials>(Microsoft.Win32.SafeHandles.SafeAccessTokenHandle.InvalidHandle, () =>
+                return WindowsIdentity.RunImpersonated<SafeFreeCredentials>(SafeAccessTokenHandle.InvalidHandle, () =>
                    {
                        return SSPIWrapper.AcquireCredentialsHandle(GlobalSSPI.SSPISecureChannel, SecurityPackage, credUsage, secureCredential);
                    });
@@ -1040,24 +1010,6 @@ namespace System.Net.Security
                                             outgoingSecurity,
                                             ref m_Attributes
                                             );
-
-#if false
-                            // TODO: NetNative future implementation will require handling for pop-up prompts:
-
-                            // This only needs to happen the first time per context.
-                            if ((errorCode == (int)SecurityStatus.OK || errorCode == (int)SecurityStatus.ContinueNeeded)
-                                && ComNetOS.IsWin8orLater && Microsoft.Win32.UnsafeNativeMethods.IsPackagedProcess.Value)
-                            {
-                                // Windows Store app. Specify a window handle in case SChannel needs to pop-up prompts, like 
-                                // when it asks for permission to use a client certificate.
-                                int setError = SSPIWrapper.SetContextAttributes(GlobalSSPI.SSPISecureChannel,
-                                                m_SecurityContext,
-                                                Interop.Secur32.ContextAttribute.UiInfo,
-                                                UnsafeNclNativeMethods.AppXHelper.PrimaryWindowHandle.Value);
-                                Debug.Assert(setError == 0, "SetContextAttributes error: " + setError);
-                            }
-#endif
-
                         }
                         else
                         {
@@ -1154,8 +1106,6 @@ namespace System.Net.Security
                 output - Encrypted bytes
 
         --*/
-
-
         internal Interop.SecurityStatus Encrypt(byte[] buffer, int offset, int size, ref byte[] output, out int resultSize)
         {
             GlobalLog.Enter("SecureChannel#" + Logging.HashString(this) + "::Encrypt");
@@ -1198,7 +1148,6 @@ namespace System.Net.Security
             }
 
             // encryption using SCHANNEL requires 4 buffers: header, payload, trailer, empty
-
             SecurityBuffer[] securityBuffer = new SecurityBuffer[4];
 
             securityBuffer[0] = new SecurityBuffer(e_writeBuffer, 0, m_HeaderSize, SecurityBufferType.Header);

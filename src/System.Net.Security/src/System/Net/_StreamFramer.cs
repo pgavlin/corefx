@@ -34,6 +34,8 @@ namespace System.Net
     internal class StreamFramer
     {
         private Stream m_Transport;
+
+        // TODO: Implement this using TPL instead of APM.
         private StreamAsyncHelper m_TransportAPM;
         private bool m_Eof;
 

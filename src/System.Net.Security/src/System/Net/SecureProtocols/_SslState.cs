@@ -1,35 +1,10 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-/*++
-Copyright (c) 2000 Microsoft Corporation
 
-Module Name:
-
-    _SslState.cs
-
-Abstract:
-
-
-Author:
-
-    Mauro Ottaviani   07-Nov-2001
-    Arthur Bierer     16-Nov-2001
-    Alexei Vopilov    26-Jun-2002
-
-Revision History:
-    22-Aug-2003     Adopted for new Ssl feature design.
-    15-Sept-2003    Implemented concurent rehanshake
-
---*/
-
-using System;
 using System.IO;
 using System.Threading;
 using System.Security.Cryptography.X509Certificates;
-using System.Collections;
-using System.Runtime.InteropServices;
 using System.Globalization;
-using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Authentication.ExtendedProtection;
 using System.ComponentModel;
@@ -44,11 +19,12 @@ namespace System.Net.Security
         static AsyncProtocolCallback _ReadFrameCallback = new AsyncProtocolCallback(ReadFrameCallback);
         static AsyncCallback _WriteCallback = new AsyncCallback(WriteCallback);
 
-
         private RemoteCertValidationCallback _CertValidationDelegate;
         private LocalCertSelectionCallback _CertSelectionDelegate;
 
         private Stream _InnerStream;
+
+        // TODO: Implement using TPL instead of APM.
         private StreamAsyncHelper _InnerStreamAPM;
 
         private _SslStream _SecureStream;

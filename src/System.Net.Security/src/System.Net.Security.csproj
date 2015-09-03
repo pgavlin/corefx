@@ -6,7 +6,7 @@
     <OutputType>Library</OutputType>
     <ProjectGuid>{89F37791-6254-4D60-AB96-ACD3CCA0E771}</ProjectGuid>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefineConstants>$(DefineConstants);FEATURE_CORECLR;TRAVE</DefineConstants>
+    <DefineConstants>$(DefineConstants);FEATURE_CORECLR</DefineConstants>
   </PropertyGroup>
   <!-- Help VS understand available configurations -->
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'FreeBSD_Debug|AnyCPU' " />
@@ -33,7 +33,6 @@
     <Compile Include="System\Net\SecureProtocols\_SslState.cs" />
     <Compile Include="System\Net\SecureProtocols\_SslStream.cs" />
     <Compile Include="System\Net\SecureProtocols\_HelperAsyncResults.cs" />
-    <Compile Include="System\Net\SecureProtocols\_SafeNetHandles.cs" />
     <Compile Include="System\Net\SecureProtocols\SslStreamContext.cs" />
     <Compile Include="System\Net\SecureProtocols\AuthenticationException.cs" />
     <Compile Include="System\Net\SecureProtocols\_FixedSizeReader.cs" />
@@ -41,6 +40,10 @@
     <Compile Include="System\Security\Authentication\ExtendedProtection\PolicyEnforcement.cs" />
     <Compile Include="System\Security\Authentication\ExtendedProtection\ProtectionScenario.cs" />
     <Compile Include="System\Security\Authentication\ExtendedProtection\ServiceNameCollection.cs" />
+
+    <!-- TODO: Move to Windows-->
+    <Compile Include="System\Net\SecureProtocols\_SecuritySafeHandles.Windows.cs" />
+
 
     <!-- TODO: Shims -->
     <Compile Include="Shims\X509CertificateExtensions.cs" />

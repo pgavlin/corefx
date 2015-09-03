@@ -1,31 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-/*++
-Copyright (c) Microsoft Corporation
 
-Module Name:
-
-    _SslStream.cs
-
-Abstract:
-    Internal helper to support public SslStream class.
-    It would be nice to make it a partial class file once compiler gets this supported
-
-Author:
-    Alexei Vopilov    22-Aug-2003
-
-Revision History:
-    22-Aug-2003 New design that has obsoleted SslClientStream and SslServerStream class
-
---*/
-
-using System;
 using System.IO;
-using System.Security;
-using System.Security.Principal;
 using System.Threading;
-using System.Collections.Generic;
-using System.Net.Sockets;
 
 namespace System.Net.Security
 {
@@ -59,7 +36,7 @@ namespace System.Net.Security
         private int _InternalOffset;
         private int _InternalBufferCount;
 
-        FixedSizeReader _Reader;
+        private FixedSizeReader _Reader;
 
         internal _SslStream(SslState sslState)
         {
@@ -102,35 +79,21 @@ namespace System.Net.Security
             }
         }
 
-        //
-        // Some of the Public Stream class contract
-        //
-        //
-        //
         internal int Read(byte[] buffer, int offset, int count)
         {
             return ProcessRead(buffer, offset, count, null);
         }
-        //
-        //
+
         internal void Write(byte[] buffer, int offset, int count)
         {
             ProcessWrite(buffer, offset, count, null);
         }
-        //
-        //
-        //
-        // Internal implemenation
-        //
 
-        //
-        //
         internal bool DataAvailable
         {
             get { return InternalBufferCount != 0; }
         }
-        //
-        //
+
         private byte[] InternalBuffer
         {
             get
@@ -138,8 +101,7 @@ namespace System.Net.Security
                 return _InternalBuffer;
             }
         }
-        //
-        //
+
         private int InternalOffset
         {
             get
@@ -147,8 +109,7 @@ namespace System.Net.Security
                 return _InternalOffset;
             }
         }
-        //
-        //
+
         private int InternalBufferCount
         {
             get
@@ -156,13 +117,13 @@ namespace System.Net.Security
                 return _InternalBufferCount;
             }
         }
-        //
-        //
+
         private void DecrementInternalBufferCount(int decrCount)
         {
             _InternalOffset += decrCount;
             _InternalBufferCount -= decrCount;
         }
+
         //
         // This will set the internal offset to "curOffset" and ensure internal buffer.
         // If not enough, reallocate and copy up to "curOffset"
@@ -207,6 +168,7 @@ namespace System.Net.Security
             _InternalOffset = curOffset;
             _InternalBufferCount = curOffset + addSize;
         }
+
         //
         // Validates user parameteres for all Read/Write methods
         //
@@ -224,6 +186,7 @@ namespace System.Net.Security
             if (count > buffer.Length - offset)
                 throw new ArgumentOutOfRangeException("count", SR.net_offset_plus_count);
         }
+
         //
         // Combined sync/async write method. For sync case asyncRequest==null
         //
@@ -261,7 +224,6 @@ namespace System.Net.Security
             }
         }
 
-        //
         private void StartWriting(byte[] buffer, int offset, int count, AsyncProtocolRequest asyncRequest)
         {
             if (asyncRequest != null)
@@ -448,6 +410,7 @@ namespace System.Net.Security
 
             return result;
         }
+
         //
         // Need read frame size first
         //
@@ -479,9 +442,7 @@ namespace System.Net.Security
             }
             return StartFrameBody(readBytes, buffer, offset, count, asyncRequest);
         }
-        //
-        //
-        //
+
         private int StartFrameBody(int readBytes, byte[] buffer, int offset, int count, AsyncProtocolRequest asyncRequest)
         {
             if (readBytes == 0)
@@ -526,6 +487,7 @@ namespace System.Net.Security
             }
             return ProcessFrameBody(readBytes, buffer, offset, count, asyncRequest);
         }
+
         //
         // readBytes == SSL Data Payload size on input or 0 on EOF
         //
@@ -587,10 +549,9 @@ namespace System.Net.Security
 
             return readBytes;
         }
+
         //
-        // Codes we process (Anything else - fail)
-        //
-        // - SEC_I_RENEGOTIATE
+        // Only processing SEC_I_RENEGOTIATE
         //
         private int ProcessReadErrorCode(Interop.SecurityStatus errorCode, byte[] buffer, int offset, int count, AsyncProtocolRequest asyncRequest, byte[] extraBuffer)
         {
@@ -617,9 +578,7 @@ namespace System.Net.Security
             // Otherwise bail out.
             throw new IOException(SR.net_io_decrypt, message.GetException());
         }
-        //
-        //
-        //
+
         private static void WriteCallback(IAsyncResult transportResult)
         {
             if (transportResult.CompletedSynchronously)
@@ -701,8 +660,6 @@ namespace System.Net.Security
             }
         }
 
-        //
-        //
         private static void ReadHeaderCallback(AsyncProtocolRequest asyncRequest)
         {
             // Async ONLY completion
@@ -726,8 +683,7 @@ namespace System.Net.Security
                 asyncRequest.CompleteWithError(e);
             }
         }
-        //
-        //
+
         private static void ReadFrameCallback(AsyncProtocolRequest asyncRequest)
         {
             // Async ONLY completion

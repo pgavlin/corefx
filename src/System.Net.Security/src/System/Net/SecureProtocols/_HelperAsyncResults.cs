@@ -1,26 +1,6 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-/*++
-Copyright (c) 2000 Microsoft Corporation
 
-Module Name:
-
-    _HelperAsyncResults.cs
-
-Abstract:
-
-    These are simple helpers to keep track of protocol IO requests
-
-Author:
-
-    Alexei Vopilov  Aug 18 2003
-
-Revision History:
-
---*/
-
-using System;
-using System.IO;
 using System.Threading;
 
 namespace System.Net

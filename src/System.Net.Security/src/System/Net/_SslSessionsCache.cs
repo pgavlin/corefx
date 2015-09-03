@@ -1,31 +1,11 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-/*++
-Copyright (c) Microsoft Corporation
 
-Module Name:
-
-    _SslSessionsCache.cs
-
-Abstract:
-    The file implements SSL session caching mechanism based on a static table of SSL credentials
-
-
-Author:
-
-    Alexei Vopilov    20-Jul-2004
-
-Revision History:
-
-
---*/
-
-using System.Net;
-using System.Security.Cryptography.X509Certificates;
 using System.Collections;
 
 namespace System.Net.Security
 {
+    // The class implements SSL session caching mechanism based on a static table of SSL credentials
     internal static class SslSessionsCache
     {
         private const int c_CheckExpiredModulo = 32;
@@ -40,6 +20,7 @@ namespace System.Net.Security
             private int _AllowedProtocols;
             private EncryptionPolicy _EncryptionPolicy;
             private int _HashCode;
+
             //
             // SECURITY: X509Certificate.GetCertHash() is virtual hence before going here
             //           the caller of this ctor has to ensure that a user cert object was inspected and
@@ -64,12 +45,12 @@ namespace System.Net.Security
                 _AllowedProtocols = allowedProtocols;
                 _EncryptionPolicy = encryptionPolicy;
             }
-            //
+
             public override int GetHashCode()
             {
                 return _HashCode;
             }
-            //
+
             public static bool operator ==(SslCredKey sslCredKey1,
                                             SslCredKey sslCredKey2)
             {
@@ -83,7 +64,7 @@ namespace System.Net.Security
                 }
                 return sslCredKey1.Equals(sslCredKey2);
             }
-            //
+
             public static bool operator !=(SslCredKey sslCredKey1,
                                             SslCredKey sslCredKey2)
             {
@@ -97,7 +78,7 @@ namespace System.Net.Security
                 }
                 return !sslCredKey1.Equals(sslCredKey2);
             }
-            //
+
             public override bool Equals(Object y)
             {
                 SslCredKey she = (SslCredKey)y;
@@ -121,7 +102,6 @@ namespace System.Net.Security
                 return true;
             }
         }
-
 
         //
         // Returns null or previously cached cred handle
@@ -153,6 +133,7 @@ namespace System.Net.Security
 
             return cached._Target;
         }
+
         //
         // The app is calling this method after starting an SSL handshake.
         //
@@ -198,7 +179,7 @@ namespace System.Net.Security
                         //     security sessions, i.e. ssl connections.
                         //     So we will try to shrink cache to the number of active creds once in a while.
                         //
-                        //    Just to make clear we won't shrink cache in the case when NO new handles are coming to it.
+                        //    We won't shrink cache in the case when NO new handles are coming to it.
                         //
                         if ((s_CachedCreds.Count % c_CheckExpiredModulo) == 0)
                         {
