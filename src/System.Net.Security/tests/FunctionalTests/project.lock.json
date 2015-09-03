@@ -642,7 +642,7 @@
           "lib/portable-net45+aspnetcore50+win+wpa81+wp80/xunit.core.dll": {}
         }
       },
-      "xunit.netcore.extensions/1.0.0-prerelease-00081": {
+      "xunit.netcore.extensions/1.0.0-prerelease-00083": {
         "dependencies": {
           "System.Diagnostics.Debug": "4.0.10",
           "System.IO": "4.0.10",
@@ -942,33 +942,34 @@
     "System.Globalization.Calendars/4.0.0": {
       "sha512": "cL6WrdGKnNBx9W/iTr+jbffsEO4RLjEtOYcpVSzPNDoli6X5Q6bAfWtJYbJNOPi8Q0fXgBEvKK1ncFL/3FTqlA==",
       "files": [
-        "System.Globalization.Calendars.4.0.0.nupkg",
-        "System.Globalization.Calendars.4.0.0.nupkg.sha512",
+        "_rels/.rels",
         "System.Globalization.Calendars.nuspec",
+        "lib/netcore50/System.Globalization.Calendars.dll",
         "lib/DNXCore50/System.Globalization.Calendars.dll",
+        "lib/net46/System.Globalization.Calendars.dll",
         "lib/MonoAndroid10/_._",
         "lib/MonoTouch10/_._",
-        "lib/net46/System.Globalization.Calendars.dll",
-        "lib/netcore50/System.Globalization.Calendars.dll",
         "lib/xamarinios10/_._",
         "lib/xamarinmac20/_._",
         "ref/dotnet/System.Globalization.Calendars.dll",
         "ref/dotnet/System.Globalization.Calendars.xml",
+        "ref/dotnet/zh-hant/System.Globalization.Calendars.xml",
         "ref/dotnet/de/System.Globalization.Calendars.xml",
-        "ref/dotnet/es/System.Globalization.Calendars.xml",
         "ref/dotnet/fr/System.Globalization.Calendars.xml",
         "ref/dotnet/it/System.Globalization.Calendars.xml",
         "ref/dotnet/ja/System.Globalization.Calendars.xml",
         "ref/dotnet/ko/System.Globalization.Calendars.xml",
         "ref/dotnet/ru/System.Globalization.Calendars.xml",
         "ref/dotnet/zh-hans/System.Globalization.Calendars.xml",
-        "ref/dotnet/zh-hant/System.Globalization.Calendars.xml",
+        "ref/dotnet/es/System.Globalization.Calendars.xml",
+        "runtimes/win8-aot/lib/netcore50/System.Globalization.Calendars.dll",
+        "ref/net46/System.Globalization.Calendars.dll",
         "ref/MonoAndroid10/_._",
         "ref/MonoTouch10/_._",
-        "ref/net46/System.Globalization.Calendars.dll",
         "ref/xamarinios10/_._",
         "ref/xamarinmac20/_._",
-        "runtimes/win8-aot/lib/netcore50/System.Globalization.Calendars.dll"
+        "package/services/metadata/core-properties/95fc8eb4808e4f31a967f407c94eba0f.psmdcp",
+        "[Content_Types].xml"
       ]
     },
     "System.IO/4.0.10-beta-23127": {
@@ -1436,33 +1437,33 @@
       ]
     },
     "System.Runtime.Numerics/4.0.0": {
-      "serviceable": true,
       "sha512": "aAYGEOE01nabQLufQ4YO8WuSyZzOqGcksi8m1BRW8ppkmssR7en8TqiXcBkB2gTkCnKG/Ai2NQY8CgdmgZw/fw==",
       "files": [
-        "System.Runtime.Numerics.4.0.0.nupkg",
-        "System.Runtime.Numerics.4.0.0.nupkg.sha512",
+        "_rels/.rels",
         "System.Runtime.Numerics.nuspec",
         "lib/dotnet/System.Runtime.Numerics.dll",
         "lib/net45/_._",
-        "lib/netcore50/System.Runtime.Numerics.dll",
         "lib/win8/_._",
+        "lib/netcore50/System.Runtime.Numerics.dll",
         "lib/wpa81/_._",
         "ref/dotnet/System.Runtime.Numerics.dll",
         "ref/dotnet/System.Runtime.Numerics.xml",
+        "ref/dotnet/zh-hant/System.Runtime.Numerics.xml",
         "ref/dotnet/de/System.Runtime.Numerics.xml",
-        "ref/dotnet/es/System.Runtime.Numerics.xml",
         "ref/dotnet/fr/System.Runtime.Numerics.xml",
         "ref/dotnet/it/System.Runtime.Numerics.xml",
         "ref/dotnet/ja/System.Runtime.Numerics.xml",
         "ref/dotnet/ko/System.Runtime.Numerics.xml",
         "ref/dotnet/ru/System.Runtime.Numerics.xml",
         "ref/dotnet/zh-hans/System.Runtime.Numerics.xml",
-        "ref/dotnet/zh-hant/System.Runtime.Numerics.xml",
+        "ref/dotnet/es/System.Runtime.Numerics.xml",
         "ref/net45/_._",
+        "ref/win8/_._",
         "ref/netcore50/System.Runtime.Numerics.dll",
         "ref/netcore50/System.Runtime.Numerics.xml",
-        "ref/win8/_._",
-        "ref/wpa81/_._"
+        "ref/wpa81/_._",
+        "package/services/metadata/core-properties/2e43dbd3dfbf4af5bb74bedaf3a67bd5.psmdcp",
+        "[Content_Types].xml"
       ]
     },
     "System.Security.Claims/4.0.0": {
@@ -2045,12 +2046,12 @@
         "lib/portable-net45+aspnetcore50+win+wpa81+wp80/xunit.runner.utility.xml"
       ]
     },
-    "xunit.netcore.extensions/1.0.0-prerelease-00081": {
+    "xunit.netcore.extensions/1.0.0-prerelease-00083": {
       "serviceable": true,
-      "sha512": "BzioU7GIbHHiICQLk8q92YeHHaJLA9InRyveaN3QrtwLsoQOToNBJSBHuu2P7YIONkjsQUR1tJYdyDI6p7aX9Q==",
+      "sha512": "pwALz6w4vZODaK8KreC5z7t1yrkbqObeUPdTjn/FyClrmwTVCL73IvsnROYp+KA7neGUPOFsUwQ6QL7MOWzTlg==",
       "files": [
-        "xunit.netcore.extensions.1.0.0-prerelease-00081.nupkg",
-        "xunit.netcore.extensions.1.0.0-prerelease-00081.nupkg.sha512",
+        "xunit.netcore.extensions.1.0.0-prerelease-00083.nupkg",
+        "xunit.netcore.extensions.1.0.0-prerelease-00083.nupkg.sha512",
         "xunit.netcore.extensions.nuspec",
         "lib/dotnet/Xunit.NetCore.Extensions.dll"
       ]
