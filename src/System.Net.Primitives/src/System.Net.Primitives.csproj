@@ -188,12 +188,12 @@
     </Compile>
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetsUnix)' == 'true' and '$(TargetsOSX)' != 'true' ">
-    <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.addrinfo.cs" >
-      <Link>Common\Interop\Unix\libc\Interop.addrinfo.cs</Link>
+  <ItemGroup Condition=" '$(TargetsLinux)' == 'true' ">
+    <Compile Include="$(CommonPath)\Interop\Linux\libc\Interop.addrinfo.cs" >
+      <Link>Common\Interop\Linux\libc\Interop.addrinfo.cs</Link>
     </Compile>
-    <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.sockaddr.cs" >
-      <Link>Common\Interop\Unix\libc\Interop.sockaddr.cs</Link>
+    <Compile Include="$(CommonPath)\Interop\Linux\libc\Interop.sockaddr.cs" >
+      <Link>Common\Interop\Linux\libc\Interop.sockaddr.cs</Link>
     </Compile>
   </ItemGroup>
 

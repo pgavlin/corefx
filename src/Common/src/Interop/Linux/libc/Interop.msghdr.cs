@@ -20,6 +20,17 @@ internal static partial class Interop
             public void* msg_control;
             public IntPtr msg_controllen;
             public int msg_flags;
+
+            public msghdr(void* name, uint namelen, iovec* iov, int iovlen, void* control, int controllen, int flags)
+            {
+                msg_name = name;
+                msg_namelen = (socklen_t)namelen;
+                msg_iov = iov;
+                msg_iovlen = (IntPtr)iovlen;
+                msg_control = control;
+                msg_controllen = (IntPtr)controllen;
+                msg_flags = flags;
+            }
         }
     }
 }

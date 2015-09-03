@@ -97,8 +97,8 @@ namespace System.Net.Sockets
         enum State
         {
             Stopped = -1,
-            Set = 0,
-            Clear = 1,
+            Clear = 0,
+            Set = 1,
         }
 
         struct Queue<TOperation>
@@ -174,22 +174,26 @@ namespace System.Net.Sockets
         object _closeLock = new object();
         object _queueLock = new object();
         SocketAsyncEngine _engine;
-        uint _registeredEvents;
+        bool _registered;
 
         public SocketAsyncContext(int fileDescriptor, SocketAsyncEngine engine)
         {
             _fileDescriptor = fileDescriptor;
             _engine = engine;
 
-            var events = Interop.libc.EPOLLIN | Interop.libc.EPOLLOUT | Interop.libc.EPOLLRDHUP | Interop.libc.EPOLLET;
+            _handle = GCHandle.Alloc(this, GCHandleType.Normal);
 
             Interop.Error errorCode;
-            if (!_engine.TryRegister(this, _fileDescriptor, events, 0, ref _handle, out errorCode))
+            if (!_engine.TryRegister(_fileDescriptor, Interop.libc.EVFILT_READ, _handle, out errorCode))
             {
+                _handle.Free();
                 throw new Exception(string.Format("SocketAsyncContext: {0}", errorCode));
             }
-
-            _registeredEvents = events;
+            if (!_engine.TryRegister(_fileDescriptor, Interop.libc.EVFILT_WRITE, _handle, out errorCode))
+            {
+                _handle.Free();
+            }
+            _registered = true;
         }
 
         public void Close()
@@ -198,7 +202,8 @@ namespace System.Net.Sockets
             lock (_queueLock)
             {
                 // Force a HUP event in order to drain the queues.
-                HandleEvents(Interop.libc.EPOLLHUP);
+                HandleEvents(Interop.libc.EVFILT_READ, Interop.libc.EV_EOF);
+                HandleEvents(Interop.libc.EVFILT_WRITE, Interop.libc.EV_EOF);
             }
         }
 
@@ -946,11 +951,16 @@ namespace System.Net.Sockets
             ThreadPool.QueueUserWorkItem(o => ((AsyncOperation)o).Complete(), operation);
         }
 
-        public unsafe void HandleEvents(uint events)
+        public unsafe void HandleEvents(short filter, ushort flags)
         {
             lock (_closeLock)
             {
-                if ((events & Interop.libc.EPOLLERR) != 0)
+                // TODO: optimize locking and completions:
+                // - Dequeues (and therefore locking) for multiple contiguous operations can be combined
+                // - Contiguous completions can happen in a single thread
+                // - Rethink ordering of EV_EOF/RDHUP w.r.t. IN/OUT.
+
+                if ((flags & Interop.libc.EV_ERROR) != 0)
                 {
                     int errno;
                     uint optLen = (uint)sizeof(int);
@@ -964,211 +974,216 @@ namespace System.Net.Sockets
                     // TODO: error handling
                 }
 
-                // TODO: rethink ordering of HUP/RDHUP w.r.t. IN/OUT.
-
-                if ((events & Interop.libc.EPOLLHUP) != 0)
+                switch (filter)
                 {
-                    // Drain queues and unregister fd
-
-                    Queue<AcceptOrConnectOperation> acceptOrConnectQueue;
-                    Queue<TransferOperation> sendQueue;
-                    Queue<TransferOperation> receiveQueue;
-                    lock (_queueLock)
-                    {
-                        acceptOrConnectQueue = _acceptOrConnectQueue.Stop();
-                        sendQueue = _sendQueue.Stop();
-                        receiveQueue = _receiveQueue.Stop();
-
-                        if (_registeredEvents != 0)
+                    case Interop.libc.EVFILT_READ:
+                        if ((flags & Interop.libc.EV_EOF) != 0)
                         {
-                            Interop.Error errorCode;
-                            if (!_engine.TryUnregister(ref _handle, _fileDescriptor, 0, out errorCode))
+                            // Drain read queue and unregister read operations
+                            Debug.Assert(_acceptOrConnectQueue.IsEmpty);
+
+                            Queue<TransferOperation> receiveQueue;
+                            lock (_queueLock)
                             {
-                                if (errorCode != Interop.Error.EBADF)
-                                {
-                                    // TODO: throw an appropiate exception
-                                    throw new Exception(string.Format("HandleEvents HUP: {0}", errorCode));
-                                }
-                                _handle.Free();
+                                receiveQueue = _receiveQueue.Stop();
                             }
 
-                            _registeredEvents = 0;
-                        }
+                            while (!receiveQueue.IsEmpty)
+                            {
+                                TransferOperation op = receiveQueue.Head;
+                                bool completed = TryCompleteReceiveFrom(_fileDescriptor, op);
+                                Debug.Assert(completed);
+                                receiveQueue.Dequeue();
+                                QueueCompletion(op);
+                            }
 
-                        // TODO: assert that queues are all empty if _registeredEvents was zero?
-
-                        Debug.Assert(!_handle.IsAllocated);
-                    }
-
-                    while (!acceptOrConnectQueue.IsEmpty)
-                    {
-                        AcceptOrConnectOperation op = acceptOrConnectQueue.Head;
-
-                        bool completed;
-
-                        var acceptOp = op as AcceptOperation;
-                        if (acceptOp != null)
-                        {
-                            completed = TryCompleteAccept(_fileDescriptor, acceptOp);
+                            lock (_queueLock)
+                            {
+                                Interop.Error errorCode;
+                                if (!_engine.TryUnregister(_fileDescriptor, Interop.libc.EVFILT_READ, _handle, out errorCode))
+                                {
+                                    // TODO: throw an appropiate exception
+                                    throw new Exception(string.Format("HandleEvents RDHUP: {0}", errorCode));
+                                }
+                            }
                         }
                         else
                         {
-                            completed = TryCompleteConnect(_fileDescriptor, (ConnectOperation)op);
+                            AcceptOrConnectOperation acceptTail;
+                            TransferOperation receiveTail;
+                            lock (_queueLock)
+                            {
+                                acceptTail = _acceptOrConnectQueue.Tail;
+                                _acceptOrConnectQueue.State = State.Set;
+
+                                receiveTail = _receiveQueue.Tail;
+                                _receiveQueue.State = State.Set;
+                            }
+
+                            if (acceptTail != null)
+                            {
+                                AcceptOperation op;
+                                do
+                                {
+                                    op = (AcceptOperation)_acceptOrConnectQueue.Head;
+                                    if (TryCompleteAccept(_fileDescriptor, op))
+                                    {
+                                        EndOperation(ref _acceptOrConnectQueue);
+                                        QueueCompletion(op);
+                                    }
+                                    break;
+                                } while (op != acceptTail);
+                            }
+
+                            if (receiveTail != null)
+                            {
+                                TransferOperation op;
+                                do
+                                {
+                                    op = _receiveQueue.Head;
+                                    if (TryCompleteReceiveFrom(_fileDescriptor, op))
+                                    {
+                                        EndOperation(ref _receiveQueue);
+                                        QueueCompletion(op);
+                                    }
+                                    break;
+                                } while (op != receiveTail);
+                            }
                         }
+                        break;
 
-                        Debug.Assert(completed);
-                        acceptOrConnectQueue.Dequeue();
-                        QueueCompletion(op);
-                    }
-
-                    while (!sendQueue.IsEmpty)
-                    {
-                        TransferOperation op = sendQueue.Head;
-                        bool completed = TryCompleteSendTo(_fileDescriptor, op);
-                        Debug.Assert(completed);
-                        sendQueue.Dequeue();
-                        QueueCompletion(op);
-                    }
-
-                    while (!receiveQueue.IsEmpty)
-                    {
-                        TransferOperation op = receiveQueue.Head;
-                        bool completed = TryCompleteReceiveFrom(_fileDescriptor, op);
-                        Debug.Assert(completed);
-                        receiveQueue.Dequeue();
-                        QueueCompletion(op);
-                    }
-
-                    return;
-                }
-
-                if ((events & Interop.libc.EPOLLRDHUP) != 0)
-                {
-                    // Drain read queue and unregister read operations
-                    Debug.Assert(_acceptOrConnectQueue.IsEmpty);
-
-                    Queue<TransferOperation> receiveQueue;
-                    lock (_queueLock)
-                    {
-                        receiveQueue = _receiveQueue.Stop();
-                    }
-
-                    while (!receiveQueue.IsEmpty)
-                    {
-                        TransferOperation op = receiveQueue.Head;
-                        bool completed = TryCompleteReceiveFrom(_fileDescriptor, op);
-                        Debug.Assert(completed);
-                        receiveQueue.Dequeue();
-                        QueueCompletion(op);
-                    }
-
-                    lock (_queueLock)
-                    {
-                        Interop.Error errorCode;
-                        uint evts = _registeredEvents & ~(Interop.libc.EPOLLIN | Interop.libc.EPOLLRDHUP);
-                        if (!_engine.TryUnregister(ref _handle, _fileDescriptor, evts, out errorCode))
+                    case Interop.libc.EVFILT_WRITE:
+                        if ((flags & Interop.libc.EV_EOF) != 0)
                         {
-                            // TODO: throw an appropiate exception
-                            throw new Exception(string.Format("HandleEvents RDHUP: {0}", errorCode));
+                            // Drain queues and unregister fd
+
+                            Queue<AcceptOrConnectOperation> acceptOrConnectQueue;
+                            Queue<TransferOperation> sendQueue;
+                            Queue<TransferOperation> receiveQueue;
+                            lock (_queueLock)
+                            {
+                                acceptOrConnectQueue = _acceptOrConnectQueue.Stop();
+                                sendQueue = _sendQueue.Stop();
+                                receiveQueue = _receiveQueue.Stop();
+
+                                if (_registered)
+                                {
+                                    Interop.Error errorCode;
+                                    if (!_engine.TryUnregister(_fileDescriptor, Interop.libc.EVFILT_READ, _handle, out errorCode))
+                                    {
+                                        // TODO: throw an appropiate exception
+                                        throw new Exception(string.Format("HandleEvents HUP: {0}", errorCode));
+                                    }
+                                    if (!_engine.TryUnregister(_fileDescriptor, Interop.libc.EVFILT_WRITE, _handle, out errorCode))
+                                    {
+                                        // TODO: throw an appropiate exception
+                                        throw new Exception(string.Format("HandleEvents HUP: {0}", errorCode));
+                                    }
+
+                                    _handle.Free();
+                                    _registered = false;
+                                }
+
+                                // TODO: assert that queues are all empty if _registeredEvents was zero?
+
+                                Debug.Assert(!_handle.IsAllocated);
+                            }
+
+                            while (!acceptOrConnectQueue.IsEmpty)
+                            {
+                                AcceptOrConnectOperation op = acceptOrConnectQueue.Head;
+
+                                bool completed;
+
+                                var acceptOp = op as AcceptOperation;
+                                if (acceptOp != null)
+                                {
+                                    completed = TryCompleteAccept(_fileDescriptor, acceptOp);
+                                }
+                                else
+                                {
+                                    completed = TryCompleteConnect(_fileDescriptor, (ConnectOperation)op);
+                                }
+
+                                Debug.Assert(completed);
+                                acceptOrConnectQueue.Dequeue();
+                                QueueCompletion(op);
+                            }
+
+                            while (!sendQueue.IsEmpty)
+                            {
+                                TransferOperation op = sendQueue.Head;
+                                bool completed = TryCompleteSendTo(_fileDescriptor, op);
+                                Debug.Assert(completed);
+                                sendQueue.Dequeue();
+                                QueueCompletion(op);
+                            }
+
+                            while (!receiveQueue.IsEmpty)
+                            {
+                                TransferOperation op = receiveQueue.Head;
+                                bool completed = TryCompleteReceiveFrom(_fileDescriptor, op);
+                                Debug.Assert(completed);
+                                receiveQueue.Dequeue();
+                                QueueCompletion(op);
+                            }
                         }
-
-                        _registeredEvents = evts;
-                    }
-
-                    // Don't process received data if we saw a RDHUP.
-                    events &= ~Interop.libc.EPOLLIN;
-                }
-
-                // TODO: optimize locking and completions:
-                // - Dequeues (and therefore locking) for multiple contiguous operations can be combined
-                // - Contiguous completions can happen in a single thread
-
-                if ((events & Interop.libc.EPOLLIN) != 0)
-                {
-                    AcceptOrConnectOperation acceptTail;
-                    TransferOperation receiveTail;
-                    lock (_queueLock)
-                    {
-                        acceptTail = _acceptOrConnectQueue.Tail;
-                        _acceptOrConnectQueue.State = State.Set;
-
-                        receiveTail = _receiveQueue.Tail;
-                        _receiveQueue.State = State.Set;
-                    }
-
-                    if (acceptTail != null)
-                    {
-                        AcceptOperation op;
-                        do
+                        else
                         {
-                            op = (AcceptOperation)_acceptOrConnectQueue.Head;
-                            if (TryCompleteAccept(_fileDescriptor, op))
+                            AcceptOrConnectOperation connectTail;
+                            TransferOperation sendTail;
+                            lock (_queueLock)
                             {
-                                EndOperation(ref _acceptOrConnectQueue);
-                                QueueCompletion(op);
-                            }
-                            break;
-                        } while (op != acceptTail);
-                    }
+                                connectTail = _acceptOrConnectQueue.Tail;
+                                _acceptOrConnectQueue.State = State.Set;
 
-                    if (receiveTail != null)
-                    {
-                        TransferOperation op;
-                        do
-                        {
-                            op = _receiveQueue.Head;
-                            if (TryCompleteReceiveFrom(_fileDescriptor, op))
+                                sendTail = _sendQueue.Tail;
+                                _sendQueue.State = State.Set;
+                            }
+
+                            if (connectTail != null)
                             {
-                                EndOperation(ref _receiveQueue);
-                                QueueCompletion(op);
+                                ConnectOperation op;
+                                do
+                                {
+                                    op = (ConnectOperation)_acceptOrConnectQueue.Head;
+                                    if (TryCompleteConnect(_fileDescriptor, op))
+                                    {
+                                        EndOperation(ref _acceptOrConnectQueue);
+
+                                        // The only situation in which we should see EISCONN when completing an
+                                        // async connect is if this earlier connect completed successfully:
+                                        // POSIX does not allow more than one outstanding async connect.
+                                        if (op.ErrorCode == SocketError.IsConnected)
+                                        {
+                                            op.ErrorCode = SocketError.Success;
+                                        }
+                                        QueueCompletion(op);
+                                    }
+                                    break;
+                                } while (op != connectTail);
                             }
-                            break;
-                        } while (op != receiveTail);
-                    }
-                }
 
-                if ((events & Interop.libc.EPOLLOUT) != 0)
-                {
-                    AcceptOrConnectOperation connectTail;
-                    TransferOperation sendTail;
-                    lock (_queueLock)
-                    {
-                        connectTail = _acceptOrConnectQueue.Tail;
-                        _acceptOrConnectQueue.State = State.Set;
-
-                        sendTail = _sendQueue.Tail;
-                        _sendQueue.State = State.Set;
-                    }
-
-                    if (connectTail != null)
-                    {
-                        ConnectOperation op;
-                        do
-                        {
-                            op = (ConnectOperation)_acceptOrConnectQueue.Head;
-                            if (TryCompleteConnect(_fileDescriptor, op))
+                            if (sendTail != null)
                             {
-                                EndOperation(ref _acceptOrConnectQueue);
-                                QueueCompletion(op);
+                                TransferOperation op;
+                                do
+                                {
+                                    op = _sendQueue.Head;
+                                    if (TryCompleteSendTo(_fileDescriptor, op))
+                                    {
+                                        EndOperation(ref _sendQueue);
+                                        QueueCompletion(op);
+                                    }
+                                    break;
+                                } while (op != sendTail);
                             }
-                            break;
-                        } while (op != connectTail);
-                    }
+                        }
+                        break;
 
-                    if (sendTail != null)
-                    {
-                        TransferOperation op;
-                        do
-                        {
-                            op = _sendQueue.Head;
-                            if (TryCompleteSendTo(_fileDescriptor, op))
-                            {
-                                EndOperation(ref _sendQueue);
-                                QueueCompletion(op);
-                            }
-                            break;
-                        } while (op != sendTail);
-                    }
+                    default:
+                        Debug.Fail("Unexpected kqueue filter");
+                        break;
                 }
             }
         }
