@@ -6672,7 +6672,7 @@ namespace System.Net.Sockets
             //
             _isConnected = true;
             _isDisconnected = false;
-            GlobalLog.Print("Socket#" + Logging.HashString(this) + "::SetToConnected() now connected SRC:" + Logging.ObjectToString(LocalEndPoint) + " DST:" + Logging.ObjectToString(RemoteEndPoint));
+            GlobalLog.Print("Socket#" + Logging.HashString(this) + "::SetToConnected() now connected.");
 #if !FEATURE_PAL // perfcounter
             if (s_PerfCountersEnabled)
             {

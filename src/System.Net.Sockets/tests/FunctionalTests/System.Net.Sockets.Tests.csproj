@@ -18,6 +18,7 @@
     <Compile Include="DnsEndPointTest.cs" />
     <Compile Include="DualModeSocketTest.cs" />
     <Compile Include="SocketTestServerAPMMock.cs" />
+    <Compile Include="UdpClientTest.cs" />
     
     <!-- Common Sockets files -->
     <Compile Include="$(CommonTestPath)\System.Net\Sockets\SocketTestServer.DefaultAsyncFactoryConfiguration.cs">
