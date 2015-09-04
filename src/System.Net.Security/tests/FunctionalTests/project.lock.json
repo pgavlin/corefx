@@ -443,6 +443,7 @@
           "lib/DNXCore50/System.Security.Cryptography.X509Certificates.dll": {}
         }
       },
+      "System.Security.Cryptography.X509Certificates.TestData/1.0.0-prerelease": {},
       "System.Security.Principal/4.0.0-beta-23127": {
         "dependencies": {
           "System.Runtime": "4.0.0-beta-23127"
@@ -1562,6 +1563,22 @@
         "ref/xamarinmac20/_._"
       ]
     },
+    "System.Security.Cryptography.X509Certificates.TestData/1.0.0-prerelease": {
+      "sha512": "UbpXPyovZcwfKhYg/O85pLjFEO3hkrEjCLGus7P9y45Peoqrfc8XKzdCW5k5WIDCtLw9M1PJHGlOFV/U0D1tkg==",
+      "files": [
+        "System.Security.Cryptography.X509Certificates.TestData.1.0.0-prerelease.nupkg",
+        "System.Security.Cryptography.X509Certificates.TestData.1.0.0-prerelease.nupkg.sha512",
+        "System.Security.Cryptography.X509Certificates.TestData.nuspec",
+        "content/TestData/DummyTcpServer.pfx",
+        "content/TestData/microsoft.cer",
+        "content/TestData/MS.cer",
+        "content/TestData/My.cer",
+        "content/TestData/My.pfx",
+        "content/TestData/test.cer",
+        "content/TestData/test.pfx",
+        "content/TestData/Windows6.1-KB3004361-x64.msu"
+      ]
+    },
     "System.Security.Principal/4.0.0-beta-23127": {
       "serviceable": true,
       "sha512": "XiETY0hBbuL6VCgE/jyTiMuZpBRi/iv1irzWVRiXfsyPxD/iww7gCcepot9XD0lKiLq/H4F0dVh0EX7lib1Mxg==",
@@ -1941,6 +1958,7 @@
   "projectFileDependencyGroups": {
     "": [
       "System.Net.Primitives >= 4.0.10-beta-*",
+      "System.Security.Cryptography.X509Certificates.TestData >= 1.0.0-prerelease",
       "xunit >= 2.0.0-beta5-build2785",
       "xunit.abstractions.netcore >= 1.0.0-prerelease",
       "xunit.assert >= 2.0.0-beta5-build2785",

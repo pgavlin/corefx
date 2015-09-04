@@ -147,8 +147,19 @@ namespace System.Net.Security.Tests
 
 
                     SslStream sslStream = null;
-                    X509Certificate2 certificate;
-                    certificate = new X509Certificate2("DummyTcpServer.pfx");
+                    X509Certificate2 certificate = null;
+
+                    var certCollection = new X509Certificate2Collection();
+                    certCollection.Import(Path.Combine("TestData", "DummyTcpServer.pfx"));
+                    
+                    foreach (X509Certificate2 c in certCollection)
+                    {
+                        if (c.HasPrivateKey)
+                        {
+                            certificate = c;
+                            break;
+                        }
+                    }
 
                     Assert.NotNull(certificate);
 
