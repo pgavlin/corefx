@@ -97,8 +97,8 @@ namespace System.Net.Sockets
         enum State
         {
             Stopped = -1,
-            Set = 0,
-            Clear = 1,
+            Clear = 0,
+            Set = 1,
         }
 
         struct Queue<TOperation>
@@ -174,18 +174,20 @@ namespace System.Net.Sockets
         object _closeLock = new object();
         object _queueLock = new object();
         SocketAsyncEngine _engine;
-        uint _registeredEvents;
+        SocketAsyncEvents _registeredEvents;
 
         public SocketAsyncContext(int fileDescriptor, SocketAsyncEngine engine)
         {
             _fileDescriptor = fileDescriptor;
             _engine = engine;
+            _handle = GCHandle.Alloc(this, GCHandleType.Normal);
 
-            var events = Interop.libc.EPOLLIN | Interop.libc.EPOLLOUT | Interop.libc.EPOLLRDHUP | Interop.libc.EPOLLET;
+            var events = SocketAsyncEvents.Read | SocketAsyncEvents.Write;
 
             Interop.Error errorCode;
-            if (!_engine.TryRegister(this, _fileDescriptor, events, 0, ref _handle, out errorCode))
+            if (!_engine.TryRegister(_fileDescriptor, SocketAsyncEvents.None, events, _handle, out errorCode))
             {
+                _handle.Free();
                 throw new Exception(string.Format("SocketAsyncContext: {0}", errorCode));
             }
 
@@ -197,8 +199,8 @@ namespace System.Net.Sockets
             lock (_closeLock)
             lock (_queueLock)
             {
-                // Force a HUP event in order to drain the queues.
-                HandleEvents(Interop.libc.EPOLLHUP);
+                // Force a close event in order to drain the queues.
+                HandleEvents(SocketAsyncEvents.Close);
             }
         }
 
@@ -946,11 +948,11 @@ namespace System.Net.Sockets
             ThreadPool.QueueUserWorkItem(o => ((AsyncOperation)o).Complete(), operation);
         }
 
-        public unsafe void HandleEvents(uint events)
+        public unsafe void HandleEvents(SocketAsyncEvents events)
         {
             lock (_closeLock)
             {
-                if ((events & Interop.libc.EPOLLERR) != 0)
+                if ((events & SocketAsyncEvents.Error) != 0)
                 {
                     int errno;
                     uint optLen = (uint)sizeof(int);
@@ -964,11 +966,9 @@ namespace System.Net.Sockets
                     // TODO: error handling
                 }
 
-                // TODO: rethink ordering of HUP/RDHUP w.r.t. IN/OUT.
-
-                if ((events & Interop.libc.EPOLLHUP) != 0)
+                if ((events & SocketAsyncEvents.Close) != 0)
                 {
-                    // Drain queues and unregister fd
+                    // Drain queues and unregister events
 
                     Queue<AcceptOrConnectOperation> acceptOrConnectQueue;
                     Queue<TransferOperation> sendQueue;
@@ -979,23 +979,23 @@ namespace System.Net.Sockets
                         sendQueue = _sendQueue.Stop();
                         receiveQueue = _receiveQueue.Stop();
 
-                        if (_registeredEvents != 0)
+                        if (_registeredEvents != SocketAsyncEvents.None)
                         {
                             Interop.Error errorCode;
-                            if (!_engine.TryUnregister(ref _handle, _fileDescriptor, 0, out errorCode))
+                            if (!_engine.TryRegister(_fileDescriptor, _registeredEvents, SocketAsyncEvents.None, _handle, out errorCode))
                             {
                                 if (errorCode != Interop.Error.EBADF)
                                 {
                                     // TODO: throw an appropiate exception
-                                    throw new Exception(string.Format("HandleEvents HUP: {0}", errorCode));
+                                    throw new Exception(string.Format("HandleEvents Close: {0}", errorCode));
                                 }
-                                _handle.Free();
                             }
+                            _handle.Free();
 
-                            _registeredEvents = 0;
+                            _registeredEvents = SocketAsyncEvents.None;
                         }
 
-                        // TODO: assert that queues are all empty if _registeredEvents was zero?
+                        // TODO: assert that queues are all empty if _registeredEvents was SocketAsyncEvents.None?
 
                         Debug.Assert(!_handle.IsAllocated);
                     }
@@ -1042,7 +1042,7 @@ namespace System.Net.Sockets
                     return;
                 }
 
-                if ((events & Interop.libc.EPOLLRDHUP) != 0)
+                if ((events & SocketAsyncEvents.ReadClose) != 0)
                 {
                     // Drain read queue and unregister read operations
                     Debug.Assert(_acceptOrConnectQueue.IsEmpty);
@@ -1064,26 +1064,28 @@ namespace System.Net.Sockets
 
                     lock (_queueLock)
                     {
+                        SocketAsyncEvents evts = _registeredEvents & ~SocketAsyncEvents.Read;
+                        Debug.Assert(evts != SocketAsyncEvents.None);
+
                         Interop.Error errorCode;
-                        uint evts = _registeredEvents & ~(Interop.libc.EPOLLIN | Interop.libc.EPOLLRDHUP);
-                        if (!_engine.TryUnregister(ref _handle, _fileDescriptor, evts, out errorCode))
+                        if (!_engine.TryRegister(_fileDescriptor, _registeredEvents, evts, _handle, out errorCode))
                         {
                             // TODO: throw an appropiate exception
-                            throw new Exception(string.Format("HandleEvents RDHUP: {0}", errorCode));
+                            throw new Exception(string.Format("HandleEvents ReadClose: {0}", errorCode));
                         }
 
                         _registeredEvents = evts;
                     }
 
-                    // Don't process received data if we saw a RDHUP.
-                    events &= ~Interop.libc.EPOLLIN;
+                    // Any data left in the socket has been received above; skip further processing.
+                    events &= ~SocketAsyncEvents.Read;
                 }
 
                 // TODO: optimize locking and completions:
                 // - Dequeues (and therefore locking) for multiple contiguous operations can be combined
                 // - Contiguous completions can happen in a single thread
 
-                if ((events & Interop.libc.EPOLLIN) != 0)
+                if ((events & SocketAsyncEvents.Read) != 0)
                 {
                     AcceptOrConnectOperation acceptTail;
                     TransferOperation receiveTail;
@@ -1127,7 +1129,7 @@ namespace System.Net.Sockets
                     }
                 }
 
-                if ((events & Interop.libc.EPOLLOUT) != 0)
+                if ((events & SocketAsyncEvents.Write) != 0)
                 {
                     AcceptOrConnectOperation connectTail;
                     TransferOperation sendTail;
@@ -1149,6 +1151,14 @@ namespace System.Net.Sockets
                             if (TryCompleteConnect(_fileDescriptor, op))
                             {
                                 EndOperation(ref _acceptOrConnectQueue);
+
+                                // The only situation in which we should see EISCONN when completing an
+                                // async connect is if this earlier connect completed successfully:
+                                // POSIX does not allow more than one outstanding async connect.
+                                if (op.ErrorCode == SocketError.IsConnected)
+                                {
+                                    op.ErrorCode = SocketError.Success;
+                                }
                                 QueueCompletion(op);
                             }
                             break;
