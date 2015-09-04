@@ -3,13 +3,11 @@
 
 using System.Collections;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Net;
 
 namespace System.Security.Authentication.ExtendedProtection
 {
-    // derived from ReadOnlyCollectionBase because it needs to be back ported to .Net 1.x
-    [SuppressMessage("Microsoft.Design", "CA1058:TypesShouldNotExtendCertainBaseTypes", Justification = "changing this would be a breaking change; this code has already shipped")]
     public class ServiceNameCollection : ReadOnlyCollectionBase
     {
         public ServiceNameCollection(ICollection items)
@@ -177,7 +175,7 @@ namespace System.Security.Authentication.ExtendedProtection
 
             Uri constructedUri;
             // This shouldn't fail, but we need to avoid any unexpected exceptions on this code path.
-            if (!Uri.TryCreate(UriShim.UriSchemeHttp + UriShim.SchemeDelimiter + host, UriKind.Absolute, out constructedUri))
+            if (!Uri.TryCreate(UriScheme.Http + UriScheme.SchemeDelimiter + host, UriKind.Absolute, out constructedUri))
             {
                 return inputServiceName;
             }

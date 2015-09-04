@@ -1,30 +1,11 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-/*++
-Copyright (c) 2003 Microsoft Corporation
 
-Module Name:
-
-    AuthenticatedStream.cs
-
-Abstract:
-
-    A public contact for a base abstract authenticated stream.
-
-Author:
-    Alexei Vopilov    Sept 28-2003
-
-Revision History:
-
---*/
-
-using System;
 using System.IO;
-using System.Threading;
-using System.Security.Principal;
 
 namespace System.Net.Security
 {
+    // A public contact for a base abstract authenticated stream.
     public abstract class AuthenticatedStream : Stream
     {
         private Stream _InnerStream;
@@ -53,8 +34,7 @@ namespace System.Net.Security
                 return _LeaveStreamOpen;
             }
         }
-        //
-        //
+
         protected Stream InnerStream
         {
             get
@@ -62,8 +42,7 @@ namespace System.Net.Security
                 return _InnerStream;
             }
         }
-        //
-        //
+
         protected override void Dispose(bool disposing)
         {
 #if DEBUG
@@ -93,9 +72,6 @@ namespace System.Net.Security
 #endif
         }
 
-        //
-        // General informational properties
-        //
         public abstract bool IsAuthenticated { get; }
         public abstract bool IsMutuallyAuthenticated { get; }
         public abstract bool IsEncrypted { get; }

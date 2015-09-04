@@ -1,35 +1,10 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
-/*++
-Copyright (c) 2000 Microsoft Corporation
 
-Module Name:
-
-    _SslState.cs
-
-Abstract:
-
-
-Author:
-
-    Mauro Ottaviani   07-Nov-2001
-    Arthur Bierer     16-Nov-2001
-    Alexei Vopilov    26-Jun-2002
-
-Revision History:
-    22-Aug-2003     Adopted for new Ssl feature design.
-    15-Sept-2003    Implemented concurent rehanshake
-
---*/
-
-using System;
 using System.IO;
 using System.Threading;
 using System.Security.Cryptography.X509Certificates;
-using System.Collections;
-using System.Runtime.InteropServices;
 using System.Globalization;
-using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Authentication.ExtendedProtection;
 using System.ComponentModel;
@@ -44,11 +19,12 @@ namespace System.Net.Security
         static AsyncProtocolCallback _ReadFrameCallback = new AsyncProtocolCallback(ReadFrameCallback);
         static AsyncCallback _WriteCallback = new AsyncCallback(WriteCallback);
 
-
         private RemoteCertValidationCallback _CertValidationDelegate;
         private LocalCertSelectionCallback _CertSelectionDelegate;
 
         private Stream _InnerStream;
+
+        // TODO: Implement using TPL instead of APM.
         private StreamAsyncHelper _InnerStreamAPM;
 
         private _SslStream _SecureStream;
@@ -60,7 +36,7 @@ namespace System.Net.Security
 
         private bool _HandshakeCompleted;
         private bool _CertValidationFailed;
-        private SecurityStatus _SecurityStatus;
+        private Interop.SecurityStatus _SecurityStatus;
         private Exception _Exception;
 
         enum CachedSessionStatus : byte
@@ -94,22 +70,8 @@ namespace System.Net.Security
         private int _LockReadState;
         private object _QueuedReadStateRequest;
 
-        // This is a perf trick ONLY for HTTPS TlsStream.
-        // CONSIDER: Always buffer the last handshake payload and then flush it on a subsequent write (in worst case on read/flush/close)
-        // However internal TlsStream class will want to post a read sooner then a write.
-        // We *know* that a write will happen immediatelly after the handshake so we will delay flushing the last payload until then.
-        private bool _ForceBufferingLastHandshakePayload;
-        private byte[] _LastPayload;
-
         private readonly EncryptionPolicy _EncryptionPolicy;
 
-        //
-        // This .ctor is only for internal TlsStream class, used only from client side ssl and it also has some special requirements.
-        //
-        internal SslState(Stream innerStream, bool isHTTP, EncryptionPolicy encryptionPolicy) : this(innerStream, null, null, encryptionPolicy)
-        {
-            _ForceBufferingLastHandshakePayload = isHTTP;
-        }
         //
         //  The public Client and Server classes enforce the parameters rules  before
         //  calling into this .ctor.
@@ -160,13 +122,13 @@ namespace System.Net.Security
 
             if (isServer)
             {
-                enabledSslProtocols &= (SslProtocols)Interop.SchProtocols.ServerMask;
+                enabledSslProtocols &= (SslProtocols)Interop.SChannel.ServerProtocolMask;
                 if (serverCertificate == null)
                     throw new ArgumentNullException("serverCertificate");
             }
             else
             {
-                enabledSslProtocols &= (SslProtocols)Interop.SchProtocols.ClientMask;
+                enabledSslProtocols &= (SslProtocols)Interop.SChannel.ClientProtocolMask;
             }
 
             if ((int)enabledSslProtocols == 0)
@@ -187,7 +149,7 @@ namespace System.Net.Security
             _Exception = null;
             try
             {
-                _Context = new SecureChannel(targetHost, isServer, (Interop.SchProtocols)((int)enabledSslProtocols), serverCertificate, clientCertificates, remoteCertRequired,
+                _Context = new SecureChannel(targetHost, isServer, (int)enabledSslProtocols, serverCertificate, clientCertificates, remoteCertRequired,
                                                                checkCertName, checkCertRevocationStatus, _EncryptionPolicy, _CertSelectionDelegate);
             }
             catch (Win32Exception e)
@@ -279,7 +241,7 @@ namespace System.Net.Security
             }
         }
         //
-        internal SecurityStatus LastSecurityStatus
+        internal Interop.SecurityStatus LastSecurityStatus
         {
             get { return _SecurityStatus; }
         }
@@ -470,17 +432,7 @@ namespace System.Net.Security
                 return Context.MaxDataSize;
             }
         }
-        internal byte[] LastPayload
-        {
-            get
-            {
-                return _LastPayload;
-            }
-        }
-        internal void LastPayloadConsumed()
-        {
-            _LastPayload = null;
-        }
+
         //
         private Exception SetException(Exception e)
         {
@@ -548,7 +500,7 @@ namespace System.Net.Security
         //
         //
         //
-        internal SecurityStatus EncryptData(byte[] buffer, int offset, int count, ref byte[] outBuffer, out int outSize)
+        internal Interop.SecurityStatus EncryptData(byte[] buffer, int offset, int count, ref byte[] outBuffer, out int outSize)
         {
             CheckThrow(true);
             return Context.Encrypt(buffer, offset, count, ref outBuffer, out outSize);
@@ -556,14 +508,14 @@ namespace System.Net.Security
         //
         //
         //
-        internal SecurityStatus DecryptData(byte[] buffer, ref int offset, ref int count)
+        internal Interop.SecurityStatus DecryptData(byte[] buffer, ref int offset, ref int count)
         {
             CheckThrow(true);
             return PrivateDecryptData(buffer, ref offset, ref count);
         }
         //
         //
-        private SecurityStatus PrivateDecryptData(byte[] buffer, ref int offset, ref int count)
+        private Interop.SecurityStatus PrivateDecryptData(byte[] buffer, ref int offset, ref int count)
         {
             return Context.Decrypt(buffer, ref offset, ref count);
         }
@@ -828,34 +780,25 @@ namespace System.Net.Security
                     _Framing = DetectFraming(message.Payload, message.Payload.Length);
                 }
 
-                // Even if we are comleted, there could be a blob for sending.
-                // ONLY for TlsStream we want to delay it if the underlined stream is a NetworkStream that is subject to Nagle algorithm
-                // CONSIDER: Always buffer the last handshake payload and then flush it on a subsequent write (in worst case on read/flush/close)
-                if (message.Done && _ForceBufferingLastHandshakePayload && InnerStream.GetType() == typeof(NetworkStream) && !_PendingReHandshake)
+                if (asyncRequest == null)
                 {
-                    _LastPayload = message.Payload;
+                    InnerStream.Write(message.Payload, 0, message.Size);
                 }
                 else
                 {
-                    if (asyncRequest == null)
+                    asyncRequest.AsyncState = message;
+                    IAsyncResult ar = InnerStreamAPM.BeginWrite(message.Payload, 0, message.Size, _WriteCallback, asyncRequest);
+                    if (!ar.CompletedSynchronously)
                     {
-                        InnerStream.Write(message.Payload, 0, message.Size);
-                    }
-                    else
-                    {
-                        asyncRequest.AsyncState = message;
-                        IAsyncResult ar = InnerStreamAPM.BeginWrite(message.Payload, 0, message.Size, _WriteCallback, asyncRequest);
-                        if (!ar.CompletedSynchronously)
-                        {
 #if DEBUG
-                            asyncRequest._DebugAsyncChain = ar;
+                        asyncRequest._DebugAsyncChain = ar;
 #endif
-                            return;
-                        }
-                        InnerStreamAPM.EndWrite(ar);
+                        return;
                     }
+                    InnerStreamAPM.EndWrite(ar);
                 }
             }
+
             CheckCompletionBeforeNextReceive(message, asyncRequest);
         }
         //
@@ -986,9 +929,9 @@ namespace System.Net.Security
             if (_PendingReHandshake)
             {
                 int offset = 0;
-                SecurityStatus status = PrivateDecryptData(buffer, ref offset, ref count);
+                Interop.SecurityStatus status = PrivateDecryptData(buffer, ref offset, ref count);
 
-                if (status == SecurityStatus.OK)
+                if (status == Interop.SecurityStatus.OK)
                 {
                     Exception e = EnqueueOldKeyDecryptedData(buffer, offset, count);
                     if (e != null)
@@ -1001,7 +944,7 @@ namespace System.Net.Security
                     StartReceiveBlob(buffer, asyncRequest);
                     return;
                 }
-                else if (status != SecurityStatus.Renegotiate)
+                else if (status != Interop.SecurityStatus.Renegotiate)
                 {
                     // fail re-handshake
                     ProtocolToken message = new ProtocolToken(null, status);
@@ -1099,7 +1042,7 @@ namespace System.Net.Security
             }
             catch (Exception exception)
             {
-                if (!NclUtilities.IsFatal(exception))
+                if (!ExceptionCheck.IsFatal(exception))
                 {
                     GlobalLog.Assert("SslState::WriteCallback", "Exception while decoding context. type:" + exception.GetType().ToString() + " message:" + exception.Message);
                 }

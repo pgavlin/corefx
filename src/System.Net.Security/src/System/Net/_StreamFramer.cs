@@ -34,6 +34,8 @@ namespace System.Net
     internal class StreamFramer
     {
         private Stream m_Transport;
+
+        // TODO: Implement this using TPL instead of APM.
         private StreamAsyncHelper m_TransportAPM;
         private bool m_Eof;
 
@@ -50,8 +52,8 @@ namespace System.Net
         private readonly AsyncCallback m_ReadFrameCallback;
         private readonly AsyncCallback m_BeginWriteCallback;
 
-
-        private NetworkStream m_NetworkStream;  //optimizing writes
+        // TODO: Removed NetworkStream optimization given the Socket object is not accessible via the public contract.
+        //       Perf tests are required to justify a separate implementation using SendPacketsAsync().
 
         public StreamFramer(Stream Transport)
         {
@@ -61,10 +63,6 @@ namespace System.Net
             }
             m_Transport = Transport;
             m_TransportAPM = new StreamAsyncHelper(m_Transport);
-            if (m_Transport.GetType() == typeof(NetworkStream))
-            {
-                m_NetworkStream = Transport as NetworkStream;
-            }
             m_ReadHeaderBuffer = new byte[m_CurReadHeader.Size];
             m_WriteHeaderBuffer = new byte[m_WriteHeader.Size];
 
@@ -351,22 +349,13 @@ namespace System.Net
             m_WriteHeader.PayloadSize = message.Length;
             m_WriteHeader.CopyTo(m_WriteHeaderBuffer, 0);
 
-            if (m_NetworkStream != null && message.Length != 0)
+            // TODO: NetworkStream optimization: m_WriteHeaderBuffer and message can become a single I/O operation.
+            Transport.Write(m_WriteHeaderBuffer, 0, m_WriteHeaderBuffer.Length);
+            if (message.Length == 0)
             {
-                BufferOffsetSize[] buffers = new BufferOffsetSize[2];
-                buffers[0] = new BufferOffsetSize(m_WriteHeaderBuffer, 0, m_WriteHeaderBuffer.Length, false);
-                buffers[1] = new BufferOffsetSize(message, 0, message.Length, false);
-                m_NetworkStream.MultipleWrite(buffers);
+                return;
             }
-            else
-            {
-                Transport.Write(m_WriteHeaderBuffer, 0, m_WriteHeaderBuffer.Length);
-                if (message.Length == 0)
-                {
-                    return;
-                }
-                Transport.Write(message, 0, message.Length);
-            }
+            Transport.Write(message, 0, message.Length);
         }
 
         //
@@ -383,14 +372,7 @@ namespace System.Net
             m_WriteHeader.PayloadSize = message.Length;
             m_WriteHeader.CopyTo(m_WriteHeaderBuffer, 0);
 
-            if (m_NetworkStream != null && message.Length != 0)
-            {
-                BufferOffsetSize[] buffers = new BufferOffsetSize[2];
-                buffers[0] = new BufferOffsetSize(m_WriteHeaderBuffer, 0, m_WriteHeaderBuffer.Length, false);
-                buffers[1] = new BufferOffsetSize(message, 0, message.Length, false);
-                return m_NetworkStream.BeginMultipleWrite(buffers, asyncCallback, stateObject);
-            }
-
+            // TODO: NetworkStream optimization: m_WriteHeaderBuffer and message can become a single I/O operation.
             if (message.Length == 0)
             {
                 return TransportAPM.BeginWrite(m_WriteHeaderBuffer, 0, m_WriteHeaderBuffer.Length,

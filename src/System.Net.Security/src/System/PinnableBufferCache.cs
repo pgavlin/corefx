@@ -66,7 +66,7 @@ namespace System
                             int nonGen2Count = 0;
                             foreach (object o in m_FreeList)
                             {
-                                if (GCExtensions.GetGeneration(o) < GC.MaxGeneration)
+                                if (GC.GetGeneration(o) < GC.MaxGeneration)
                                 {
                                     nonGen2Count++;
                                 }
@@ -77,7 +77,7 @@ namespace System
                     }
                 }
 
-                PinnableBufferCacheEventSource.Log.AllocateBuffer(m_CacheName, PinnableBufferCacheEventSource.AddressOf(returnBuffer), returnBuffer.GetHashCode(), GCExtensions.GetGeneration(returnBuffer), m_FreeList.Count);
+                PinnableBufferCacheEventSource.Log.AllocateBuffer(m_CacheName, PinnableBufferCacheEventSource.AddressOf(returnBuffer), returnBuffer.GetHashCode(), GC.GetGeneration(returnBuffer), m_FreeList.Count);
             }
             return returnBuffer;
         }
@@ -97,7 +97,7 @@ namespace System
             {
                 lock (this)
                 {
-                    if (GCExtensions.GetGeneration(buffer) < GC.MaxGeneration)
+                    if (GC.GetGeneration(buffer) < GC.MaxGeneration)
                     {
                         // The buffer is not aged, so put it in the non-aged free list.
                         m_moreThanFreeListNeeded = true;
@@ -144,13 +144,13 @@ namespace System
                 // We have no buffers in the aged freelist, so get one from the newer list.   Try to pick the best one.
                 // Debug.Assert(m_NotGen2.Count != 0);
                 int idx = m_NotGen2.Count - 1;
-                if (GCExtensions.GetGeneration(m_NotGen2[idx]) < GC.MaxGeneration && GCExtensions.GetGeneration(m_NotGen2[0]) == GC.MaxGeneration)
+                if (GC.GetGeneration(m_NotGen2[idx]) < GC.MaxGeneration && GC.GetGeneration(m_NotGen2[0]) == GC.MaxGeneration)
                     idx = 0;
                 returnBuffer = m_NotGen2[idx];
                 m_NotGen2.RemoveAt(idx);
 
                 // Remember any sub-optimial buffer so we don't put it on the free list when it gets freed.   
-                if (PinnableBufferCacheEventSource.Log.IsEnabled() && GCExtensions.GetGeneration(returnBuffer) < GC.MaxGeneration)
+                if (PinnableBufferCacheEventSource.Log.IsEnabled() && GC.GetGeneration(returnBuffer) < GC.MaxGeneration)
                 {
                     PinnableBufferCacheEventSource.Log.AllocateBufferFromNotGen2(m_CacheName, m_NotGen2.Count);
                 }
@@ -186,7 +186,7 @@ namespace System
                 {
                     // We actually check every object to ensure that we aren't putting non-aged buffers into the free list.
                     object currentBuffer = m_NotGen2[i];
-                    if (GCExtensions.GetGeneration(currentBuffer) >= GC.MaxGeneration)
+                    if (GC.GetGeneration(currentBuffer) >= GC.MaxGeneration)
                     {
                         m_FreeList.Push(currentBuffer);
                         promotedCount++;
@@ -470,7 +470,7 @@ namespace System
             }
 
             // Resurrect ourselves by re-registering for finalization.
-            if (!Environment.HasShutdownStarted && !AppDomain.CurrentDomain.IsFinalizingForUnload())
+            if (!Environment.HasShutdownStarted)
             {
                 GC.ReRegisterForFinalize(this);
             }

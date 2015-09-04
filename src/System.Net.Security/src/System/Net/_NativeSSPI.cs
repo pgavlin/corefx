@@ -1,45 +1,42 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Net.Sockets;
 using System.Runtime.InteropServices;
-using System.Runtime.CompilerServices;
 using System.Globalization;
 using System.Net.Security;
 
 namespace System.Net
 {
-    // need a global so we can pass the interfaces as variables,
-    // is there a better way?
+    // Need a global so we can pass the interfaces as variables.
     internal static class GlobalSSPI
     {
         internal static SSPIInterface SSPIAuth = new SSPIAuthType();
         internal static SSPIInterface SSPISecureChannel = new SSPISecureChannelType();
     }
 
-    // used to define the interface for security to use.
+    // Used to define the interface for security to use.
     internal interface SSPIInterface
     {
         SecurityPackageInfoClass[] SecurityPackages { get; set; }
         int EnumerateSecurityPackages(out int pkgnum, out SafeFreeContextBuffer pkgArray);
-        int AcquireCredentialsHandle(string moduleName, Interop.CredentialUse usage, ref Interop.AuthIdentity authdata, out SafeFreeCredentials outCredential);
-        int AcquireCredentialsHandle(string moduleName, Interop.CredentialUse usage, ref SafeSspiAuthDataHandle authdata, out SafeFreeCredentials outCredential);
-        int AcquireDefaultCredential(string moduleName, Interop.CredentialUse usage, out SafeFreeCredentials outCredential);
-        int AcquireCredentialsHandle(string moduleName, Interop.CredentialUse usage, ref Interop.SecureCredential authdata, out SafeFreeCredentials outCredential);
-        int AcceptSecurityContext(ref SafeFreeCredentials credential, ref SafeDeleteContext context, Interop.SecurityBuffer inputBuffer, Interop.ContextFlags inFlags, Interop.Endianness endianness, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags);
-        int AcceptSecurityContext(SafeFreeCredentials credential, ref SafeDeleteContext context, Interop.SecurityBuffer[] inputBuffers, Interop.ContextFlags inFlags, Interop.Endianness endianness, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags);
-        int InitializeSecurityContext(ref SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.ContextFlags inFlags, Interop.Endianness endianness, Interop.SecurityBuffer inputBuffer, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags);
-        int InitializeSecurityContext(SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.ContextFlags inFlags, Interop.Endianness endianness, Interop.SecurityBuffer[] inputBuffers, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags);
-        int EncryptMessage(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber);
-        int DecryptMessage(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber);
-        int MakeSignature(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber);
-        int VerifySignature(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber);
+        int AcquireCredentialsHandle(string moduleName, Interop.Secur32.CredentialUse usage, ref Interop.Secur32.AuthIdentity authdata, out SafeFreeCredentials outCredential);
+        int AcquireCredentialsHandle(string moduleName, Interop.Secur32.CredentialUse usage, ref SafeSspiAuthDataHandle authdata, out SafeFreeCredentials outCredential);
+        int AcquireDefaultCredential(string moduleName, Interop.Secur32.CredentialUse usage, out SafeFreeCredentials outCredential);
+        int AcquireCredentialsHandle(string moduleName, Interop.Secur32.CredentialUse usage, ref Interop.Secur32.SecureCredential authdata, out SafeFreeCredentials outCredential);
+        int AcceptSecurityContext(ref SafeFreeCredentials credential, ref SafeDeleteContext context, SecurityBuffer inputBuffer, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness endianness, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags);
+        int AcceptSecurityContext(SafeFreeCredentials credential, ref SafeDeleteContext context, SecurityBuffer[] inputBuffers, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness endianness, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags);
+        int InitializeSecurityContext(ref SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness endianness, SecurityBuffer inputBuffer, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags);
+        int InitializeSecurityContext(SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness endianness, SecurityBuffer[] inputBuffers, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags);
+        int EncryptMessage(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber);
+        int DecryptMessage(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber);
+        int MakeSignature(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber);
+        int VerifySignature(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber);
 
-        int QueryContextChannelBinding(SafeDeleteContext phContext, Interop.ContextAttribute attribute, out SafeFreeContextBufferChannelBinding refHandle);
-        int QueryContextAttributes(SafeDeleteContext phContext, Interop.ContextAttribute attribute, byte[] buffer, Type handleType, out SafeHandle refHandle);
-        int SetContextAttributes(SafeDeleteContext phContext, Interop.ContextAttribute attribute, byte[] buffer);
-        int QuerySecurityContextToken(SafeDeleteContext phContext, out SafeCloseHandle phToken);
-        int CompleteAuthToken(ref SafeDeleteContext refContext, Interop.SecurityBuffer[] inputBuffers);
+        int QueryContextChannelBinding(SafeDeleteContext phContext, Interop.Secur32.ContextAttribute attribute, out SafeFreeContextBufferChannelBinding refHandle);
+        int QueryContextAttributes(SafeDeleteContext phContext, Interop.Secur32.ContextAttribute attribute, byte[] buffer, Type handleType, out SafeHandle refHandle);
+        int SetContextAttributes(SafeDeleteContext phContext, Interop.Secur32.ContextAttribute attribute, byte[] buffer);
+        int QuerySecurityContextToken(SafeDeleteContext phContext, out SecurityContextTokenHandle phToken);
+        int CompleteAuthToken(ref SafeDeleteContext refContext, SecurityBuffer[] inputBuffers);
     }
 
     // For SSL connections:
@@ -65,49 +62,49 @@ namespace System.Net
             return SafeFreeContextBuffer.EnumeratePackages(out pkgnum, out pkgArray);
         }
 
-        public int AcquireCredentialsHandle(string moduleName, Interop.CredentialUse usage, ref Interop.AuthIdentity authdata, out SafeFreeCredentials outCredential)
+        public int AcquireCredentialsHandle(string moduleName, Interop.Secur32.CredentialUse usage, ref Interop.Secur32.AuthIdentity authdata, out SafeFreeCredentials outCredential)
         {
             return SafeFreeCredentials.AcquireCredentialsHandle(moduleName, usage, ref authdata, out outCredential);
         }
 
-        public int AcquireCredentialsHandle(string moduleName, Interop.CredentialUse usage, ref SafeSspiAuthDataHandle authdata, out SafeFreeCredentials outCredential)
+        public int AcquireCredentialsHandle(string moduleName, Interop.Secur32.CredentialUse usage, ref SafeSspiAuthDataHandle authdata, out SafeFreeCredentials outCredential)
         {
             return SafeFreeCredentials.AcquireCredentialsHandle(moduleName, usage, ref authdata, out outCredential);
         }
 
-        public int AcquireDefaultCredential(string moduleName, Interop.CredentialUse usage, out SafeFreeCredentials outCredential)
+        public int AcquireDefaultCredential(string moduleName, Interop.Secur32.CredentialUse usage, out SafeFreeCredentials outCredential)
         {
             return SafeFreeCredentials.AcquireDefaultCredential(moduleName, usage, out outCredential);
         }
 
-        public int AcquireCredentialsHandle(string moduleName, Interop.CredentialUse usage, ref Interop.SecureCredential authdata, out SafeFreeCredentials outCredential)
+        public int AcquireCredentialsHandle(string moduleName, Interop.Secur32.CredentialUse usage, ref Interop.Secur32.SecureCredential authdata, out SafeFreeCredentials outCredential)
         {
             return SafeFreeCredentials.AcquireCredentialsHandle(moduleName, usage, ref authdata, out outCredential);
         }
 
-        public int AcceptSecurityContext(ref SafeFreeCredentials credential, ref SafeDeleteContext context, Interop.SecurityBuffer inputBuffer, Interop.ContextFlags inFlags, Interop.Endianness endianness, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags)
+        public int AcceptSecurityContext(ref SafeFreeCredentials credential, ref SafeDeleteContext context, SecurityBuffer inputBuffer, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness endianness, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             return SafeDeleteContext.AcceptSecurityContext(ref credential, ref context, inFlags, endianness, inputBuffer, null, outputBuffer, ref outFlags);
         }
 
-        public int AcceptSecurityContext(SafeFreeCredentials credential, ref SafeDeleteContext context, Interop.SecurityBuffer[] inputBuffers, Interop.ContextFlags inFlags, Interop.Endianness endianness, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags)
+        public int AcceptSecurityContext(SafeFreeCredentials credential, ref SafeDeleteContext context, SecurityBuffer[] inputBuffers, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness endianness, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             return SafeDeleteContext.AcceptSecurityContext(ref credential, ref context, inFlags, endianness, null, inputBuffers, outputBuffer, ref outFlags);
         }
 
-        public int InitializeSecurityContext(ref SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.ContextFlags inFlags, Interop.Endianness endianness, Interop.SecurityBuffer inputBuffer, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags)
+        public int InitializeSecurityContext(ref SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness endianness, SecurityBuffer inputBuffer, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             return SafeDeleteContext.InitializeSecurityContext(ref credential, ref context, targetName, inFlags, endianness, inputBuffer, null, outputBuffer, ref outFlags);
         }
 
-        public int InitializeSecurityContext(SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.ContextFlags inFlags, Interop.Endianness endianness, Interop.SecurityBuffer[] inputBuffers, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags)
+        public int InitializeSecurityContext(SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness endianness, SecurityBuffer[] inputBuffers, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             return SafeDeleteContext.InitializeSecurityContext(ref credential, ref context, targetName, inFlags, endianness, null, inputBuffers, outputBuffer, ref outFlags);
         }
 
-        public int EncryptMessage(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
+        public int EncryptMessage(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
 
             try
@@ -128,16 +125,16 @@ namespace System.Net
             {
                 if (b)
                 {
-                    status = Interop.NativeNTSSPI.EncryptMessage(ref context._handle, 0, inputOutput, sequenceNumber);
+                    status = Interop.Secur32.EncryptMessage(ref context._handle, 0, inputOutput, sequenceNumber);
                     context.DangerousRelease();
                 }
             }
             return status;
         }
 
-        public unsafe int DecryptMessage(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
+        public unsafe int DecryptMessage(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
             try
             {
@@ -157,24 +154,24 @@ namespace System.Net
             {
                 if (b)
                 {
-                    status = Interop.NativeNTSSPI.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, null);
+                    status = Interop.Secur32.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, null);
                     context.DangerousRelease();
                 }
             }
             return status;
         }
 
-        public int MakeSignature(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
+        public int MakeSignature(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            throw ExceptionHelper.MethodNotSupportedException;
+            throw NotImplemented.ByDesignWithMessage(SR.net_MethodNotImplementedException);
         }
 
-        public int VerifySignature(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
+        public int VerifySignature(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            throw ExceptionHelper.MethodNotSupportedException;
+            throw NotImplemented.ByDesignWithMessage(SR.net_MethodNotImplementedException);
         }
 
-        public unsafe int QueryContextChannelBinding(SafeDeleteContext phContext, Interop.ContextAttribute attribute, out SafeFreeContextBufferChannelBinding refHandle)
+        public unsafe int QueryContextChannelBinding(SafeDeleteContext phContext, Interop.Secur32.ContextAttribute attribute, out SafeFreeContextBufferChannelBinding refHandle)
         {
             refHandle = SafeFreeContextBufferChannelBinding.CreateEmptyHandle();
 
@@ -183,7 +180,7 @@ namespace System.Net
             return SafeFreeContextBufferChannelBinding.QueryContextChannelBinding(phContext, attribute, &bindings, refHandle);
         }
 
-        public unsafe int QueryContextAttributes(SafeDeleteContext phContext, Interop.ContextAttribute attribute, byte[] buffer, Type handleType, out SafeHandle refHandle)
+        public unsafe int QueryContextAttributes(SafeDeleteContext phContext, Interop.Secur32.ContextAttribute attribute, byte[] buffer, Type handleType, out SafeHandle refHandle)
         {
             refHandle = null;
             if (handleType != null)
@@ -207,17 +204,17 @@ namespace System.Net
             }
         }
 
-        public int SetContextAttributes(SafeDeleteContext phContext, Interop.ContextAttribute attribute, byte[] buffer)
+        public int SetContextAttributes(SafeDeleteContext phContext, Interop.Secur32.ContextAttribute attribute, byte[] buffer)
         {
             return SafeFreeContextBuffer.SetContextAttributes(phContext, attribute, buffer);
         }
 
-        public int QuerySecurityContextToken(SafeDeleteContext phContext, out SafeCloseHandle phToken)
+        public int QuerySecurityContextToken(SafeDeleteContext phContext, out SecurityContextTokenHandle phToken)
         {
             throw new NotSupportedException();
         }
 
-        public int CompleteAuthToken(ref SafeDeleteContext refContext, Interop.SecurityBuffer[] inputBuffers)
+        public int CompleteAuthToken(ref SafeDeleteContext refContext, SecurityBuffer[] inputBuffers)
         {
             throw new NotSupportedException();
         }
@@ -247,50 +244,50 @@ namespace System.Net
             return SafeFreeContextBuffer.EnumeratePackages(out pkgnum, out pkgArray);
         }
 
-        public int AcquireCredentialsHandle(string moduleName, Interop.CredentialUse usage, ref Interop.AuthIdentity authdata, out SafeFreeCredentials outCredential)
+        public int AcquireCredentialsHandle(string moduleName, Interop.Secur32.CredentialUse usage, ref Interop.Secur32.AuthIdentity authdata, out SafeFreeCredentials outCredential)
         {
             return SafeFreeCredentials.AcquireCredentialsHandle(moduleName, usage, ref authdata, out outCredential);
         }
 
-        public int AcquireCredentialsHandle(string moduleName, Interop.CredentialUse usage, ref SafeSspiAuthDataHandle authdata, out SafeFreeCredentials outCredential)
+        public int AcquireCredentialsHandle(string moduleName, Interop.Secur32.CredentialUse usage, ref SafeSspiAuthDataHandle authdata, out SafeFreeCredentials outCredential)
         {
             return SafeFreeCredentials.AcquireCredentialsHandle(moduleName, usage, ref authdata, out outCredential);
         }
 
-        public int AcquireDefaultCredential(string moduleName, Interop.CredentialUse usage, out SafeFreeCredentials outCredential)
+        public int AcquireDefaultCredential(string moduleName, Interop.Secur32.CredentialUse usage, out SafeFreeCredentials outCredential)
         {
             return SafeFreeCredentials.AcquireDefaultCredential(moduleName, usage, out outCredential);
         }
 
-        public int AcquireCredentialsHandle(string moduleName, Interop.CredentialUse usage, ref Interop.SecureCredential authdata, out SafeFreeCredentials outCredential)
+        public int AcquireCredentialsHandle(string moduleName, Interop.Secur32.CredentialUse usage, ref Interop.Secur32.SecureCredential authdata, out SafeFreeCredentials outCredential)
         {
             return SafeFreeCredentials.AcquireCredentialsHandle(moduleName, usage, ref authdata, out outCredential);
         }
 
-        public int AcceptSecurityContext(ref SafeFreeCredentials credential, ref SafeDeleteContext context, Interop.SecurityBuffer inputBuffer, Interop.ContextFlags inFlags, Interop.Endianness endianness, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags)
+        public int AcceptSecurityContext(ref SafeFreeCredentials credential, ref SafeDeleteContext context, SecurityBuffer inputBuffer, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness endianness, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             return SafeDeleteContext.AcceptSecurityContext(ref credential, ref context, inFlags, endianness, inputBuffer, null, outputBuffer, ref outFlags);
         }
 
-        public int AcceptSecurityContext(SafeFreeCredentials credential, ref SafeDeleteContext context, Interop.SecurityBuffer[] inputBuffers, Interop.ContextFlags inFlags, Interop.Endianness endianness, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags)
+        public int AcceptSecurityContext(SafeFreeCredentials credential, ref SafeDeleteContext context, SecurityBuffer[] inputBuffers, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness endianness, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             return SafeDeleteContext.AcceptSecurityContext(ref credential, ref context, inFlags, endianness, null, inputBuffers, outputBuffer, ref outFlags);
         }
 
-        public int InitializeSecurityContext(ref SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.ContextFlags inFlags, Interop.Endianness endianness, Interop.SecurityBuffer inputBuffer, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags)
+        public int InitializeSecurityContext(ref SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness endianness, SecurityBuffer inputBuffer, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             return SafeDeleteContext.InitializeSecurityContext(ref credential, ref context, targetName, inFlags, endianness, inputBuffer, null, outputBuffer, ref outFlags);
         }
 
-        public int InitializeSecurityContext(SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.ContextFlags inFlags, Interop.Endianness endianness, Interop.SecurityBuffer[] inputBuffers, Interop.SecurityBuffer outputBuffer, ref Interop.ContextFlags outFlags)
+        public int InitializeSecurityContext(SafeFreeCredentials credential, ref SafeDeleteContext context, string targetName, Interop.Secur32.ContextFlags inFlags, Interop.Secur32.Endianness endianness, SecurityBuffer[] inputBuffers, SecurityBuffer outputBuffer, ref Interop.Secur32.ContextFlags outFlags)
         {
             return SafeDeleteContext.InitializeSecurityContext(ref credential, ref context, targetName, inFlags, endianness, null, inputBuffers, outputBuffer, ref outFlags);
         }
 
 
-        public int EncryptMessage(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
+        public int EncryptMessage(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
 
             try
@@ -311,16 +308,16 @@ namespace System.Net
             {
                 if (b)
                 {
-                    status = Interop.NativeNTSSPI.EncryptMessage(ref context._handle, 0, inputOutput, sequenceNumber);
+                    status = Interop.Secur32.EncryptMessage(ref context._handle, 0, inputOutput, sequenceNumber);
                     context.DangerousRelease();
                 }
             }
             return status;
         }
 
-        public unsafe int DecryptMessage(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
+        public unsafe int DecryptMessage(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
             uint qop = 0;
 
@@ -342,7 +339,7 @@ namespace System.Net
             {
                 if (b)
                 {
-                    status = Interop.NativeNTSSPI.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, &qop);
+                    status = Interop.Secur32.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, &qop);
                     context.DangerousRelease();
                 }
             }
@@ -350,7 +347,7 @@ namespace System.Net
             const uint SECQOP_WRAP_NO_ENCRYPT = 0x80000001;
             if (status == 0 && qop == SECQOP_WRAP_NO_ENCRYPT)
             {
-                GlobalLog.Assert("NativeNTSSPI.DecryptMessage", "Expected qop = 0, returned value = " + qop.ToString("x", CultureInfo.InvariantCulture));
+                GlobalLog.Assert("Secur32.DecryptMessage", "Expected qop = 0, returned value = " + qop.ToString("x", CultureInfo.InvariantCulture));
                 throw new InvalidOperationException(SR.net_auth_message_not_encrypted);
             }
 
@@ -358,9 +355,9 @@ namespace System.Net
             return status;
         }
 
-        public int MakeSignature(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
+        public int MakeSignature(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
 
             try
@@ -382,16 +379,16 @@ namespace System.Net
                 if (b)
                 {
                     const uint SECQOP_WRAP_NO_ENCRYPT = 0x80000001;
-                    status = Interop.NativeNTSSPI.EncryptMessage(ref context._handle, SECQOP_WRAP_NO_ENCRYPT, inputOutput, sequenceNumber);
+                    status = Interop.Secur32.EncryptMessage(ref context._handle, SECQOP_WRAP_NO_ENCRYPT, inputOutput, sequenceNumber);
                     context.DangerousRelease();
                 }
             }
             return status;
         }
 
-        public unsafe int VerifySignature(SafeDeleteContext context, Interop.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
+        public unsafe int VerifySignature(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
 
             uint qop = 0;
@@ -413,7 +410,7 @@ namespace System.Net
             {
                 if (b)
                 {
-                    status = Interop.NativeNTSSPI.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, &qop);
+                    status = Interop.Secur32.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, &qop);
                     context.DangerousRelease();
                 }
             }
@@ -421,14 +418,14 @@ namespace System.Net
             return status;
         }
 
-        public int QueryContextChannelBinding(SafeDeleteContext context, Interop.ContextAttribute attribute, out SafeFreeContextBufferChannelBinding binding)
+        public int QueryContextChannelBinding(SafeDeleteContext context, Interop.Secur32.ContextAttribute attribute, out SafeFreeContextBufferChannelBinding binding)
         {
             // Querying an auth SSP for a CBT doesn't make sense
             binding = null;
             throw new NotSupportedException();
         }
 
-        public unsafe int QueryContextAttributes(SafeDeleteContext context, Interop.ContextAttribute attribute, byte[] buffer, Type handleType, out SafeHandle refHandle)
+        public unsafe int QueryContextAttributes(SafeDeleteContext context, Interop.Secur32.ContextAttribute attribute, byte[] buffer, Type handleType, out SafeHandle refHandle)
         {
             refHandle = null;
             if (handleType != null)
@@ -453,24 +450,24 @@ namespace System.Net
             }
         }
 
-        public int SetContextAttributes(SafeDeleteContext context, Interop.ContextAttribute attribute, byte[] buffer)
+        public int SetContextAttributes(SafeDeleteContext context, Interop.Secur32.ContextAttribute attribute, byte[] buffer)
         {
-            throw ExceptionHelper.MethodNotSupportedException;
+            throw NotImplemented.ByDesignWithMessage(SR.net_MethodNotImplementedException);
         }
 
-        public int QuerySecurityContextToken(SafeDeleteContext phContext, out SafeCloseHandle phToken)
+        public int QuerySecurityContextToken(SafeDeleteContext phContext, out SecurityContextTokenHandle phToken)
         {
             return GetSecurityContextToken(phContext, out phToken);
         }
 
-        public int CompleteAuthToken(ref SafeDeleteContext refContext, Interop.SecurityBuffer[] inputBuffers)
+        public int CompleteAuthToken(ref SafeDeleteContext refContext, SecurityBuffer[] inputBuffers)
         {
             return SafeDeleteContext.CompleteAuthToken(ref refContext, inputBuffers);
         }
 
-        private static int GetSecurityContextToken(SafeDeleteContext phContext, out SafeCloseHandle safeHandle)
+        private static int GetSecurityContextToken(SafeDeleteContext phContext, out SecurityContextTokenHandle safeHandle)
         {
-            int status = (int)SecurityStatus.InvalidHandle;
+            int status = (int)Interop.SecurityStatus.InvalidHandle;
             bool b = false;
             safeHandle = null;
 
@@ -492,7 +489,7 @@ namespace System.Net
             {
                 if (b)
                 {
-                    status = Interop.SafeNetHandles.QuerySecurityContextToken(ref phContext._handle, out safeHandle);
+                    status = Interop.Secur32.QuerySecurityContextToken(ref phContext._handle, out safeHandle);
                     phContext.DangerousRelease();
                 }
             }
