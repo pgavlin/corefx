@@ -9,10 +9,11 @@ using System.Diagnostics;
 
 namespace System.Net.Sockets
 {
+    internal sealed partial class SafeCloseSocket :
 #if DEBUG
-    internal sealed partial class SafeCloseSocket : DebugSafeHandleMinusOneIsInvalid
+        DebugSafeHandleMinusOneIsInvalid
 #else
-    internal sealed partial class SafeCloseSocket : SafeHandleMinusOneIsInvalid
+        SafeHandleMinusOneIsInvalid
 #endif
     {
         private ThreadPoolBoundHandle _iocpBoundHandle;

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace System.Net.Sockets
 {
-    struct SocketAsyncEngineBackend
+    internal struct SocketAsyncEngineBackend
     {
         private readonly int _kqueueFd;
 

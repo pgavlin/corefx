@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace System.Net.Sockets
 {
     [Flags]
-    enum SocketAsyncEvents
+    internal enum SocketAsyncEvents
     {
         None = 0,
         Read = 1,
@@ -20,7 +20,7 @@ namespace System.Net.Sockets
         Error = 16
     }
 
-    sealed class SocketAsyncEngine
+    internal sealed class SocketAsyncEngine
     {
         private static SocketAsyncEngine _engine;
         private static readonly object _initLock = new object();
@@ -40,7 +40,7 @@ namespace System.Net.Sockets
                             var engine = new SocketAsyncEngine(SocketAsyncEngineBackend.Create());
                             Task.Factory.StartNew(o => {
                                 ((SocketAsyncEngine)o)._backend.EventLoop();
-                            }, engine, TaskCreationOptions.LongRunning);
+                            }, engine, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
                             Volatile.Write(ref _engine, engine);
                         }
