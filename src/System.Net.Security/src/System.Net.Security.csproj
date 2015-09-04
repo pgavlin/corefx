@@ -44,7 +44,6 @@
     <!-- TODO: Move to Windows-->
     <Compile Include="System\Net\SecureProtocols\_SecuritySafeHandles.Windows.cs" />
 
-
     <!-- TODO: Shims -->
     <Compile Include="Shims\X509CertificateExtensions.cs" />
 
@@ -104,7 +103,6 @@
       <Link>Common\System\Net\UriScheme.cs</Link>
     </Compile>
 
-
     <!-- Common -->
     <Compile Include="$(CommonPath)\Microsoft\Win32\SafeHandles\CriticalHandleMinusOneIsInvalid.cs">
       <Link>Common\Microsoft\Win32\SafeHandles\CriticalHandleMinusOneIsInvalid.cs</Link>
@@ -130,32 +128,24 @@
     <Compile Include="$(CommonPath)\Interop\Windows\Interop.Libraries.cs">
       <Link>Interop\Windows\Interop.Libraries.cs</Link>
     </Compile>
-
-    <!-- NativePKI -->
     <Compile Include="$(CommonPath)\Interop\Windows\Crypt32\Interop.certificates.cs">
       <Link>Interop\Windows\Crypt32\Interop.certificates.cs</Link>
     </Compile>
     <Compile Include="$(CommonPath)\Interop\Windows\Crypt32\Interop.certificates_types.cs">
       <Link>Interop\Windows\Crypt32\Interop.certificates_types.cs</Link>
     </Compile>
-    
-    <!-- NativeSSPI -->
-    <Compile Include="$(CommonPath)\Interop\Windows\secur32\Interop.SSPI.cs">
-      <Link>Interop\Windows\secur32\Interop.SSPI.cs</Link>
-    </Compile>
     <Compile Include="$(CommonPath)\Interop\Windows\mincore\Interop.CloseHandle.cs">
       <Link>Interop\Windows\mincore\Interop.CloseHandle.cs</Link>
     </Compile>
-    
     <Compile Include="$(CommonPath)\Interop\Windows\SChannel\Interop.SchProtocols.cs">
       <Link>Interop\Windows\SChannel\Interop.SchProtocols.cs</Link>
     </Compile>
-
     <Compile Include="$(CommonPath)\Interop\Windows\SChannel\Interop.SecurityStatus.cs">
       <Link>Interop\Windows\SChannel\Interop.SecurityStatus.cs</Link>
     </Compile>
-    
-
+    <Compile Include="$(CommonPath)\Interop\Windows\secur32\Interop.SSPI.cs">
+      <Link>Interop\Windows\secur32\Interop.SSPI.cs</Link>
+    </Compile>
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetsWindows)' == 'true' ">
