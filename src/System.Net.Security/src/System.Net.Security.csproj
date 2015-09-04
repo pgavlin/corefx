@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <Compile Include="System\PinnableBufferCache.cs" />
+    <Compile Include="System\IO\StreamAsyncHelper.cs" />
     <Compile Include="System\Net\_SecurityBuffer.cs" />
     <Compile Include="System\Net\_SecurityBufferType.cs" />
     <Compile Include="System\Net\_SecureChannel.cs" />
@@ -115,10 +116,6 @@
     </Compile>
     <Compile Include="$(CommonPath)\Microsoft\Win32\SafeHandles\SafeHandleZeroOrMinusOneIsInvalid.cs">
       <Link>Common\Microsoft\Win32\SafeHandles\SafeHandleZeroOrMinusOneIsInvalid.cs</Link>
-    </Compile>
-
-    <Compile Include="$(CommonPath)\System\IO\StreamAsyncHelper.cs">
-      <Link>Common\System\IO\StreamAsyncHelper.cs</Link>
     </Compile>
     <Compile Include="$(CommonPath)\System\IO\__Error.cs">
       <Link>Common\System\IO\__Error.cs</Link>
