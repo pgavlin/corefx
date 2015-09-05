@@ -17,6 +17,10 @@ namespace System.Net.Sockets
 {
     internal static class SocketPal
     {
+        // The API that uses this information is not supported on *nix, and will throw
+        // PlatformNotSupportedException instead.
+        public const int ProtocolInformationSize = 0;
+
         public static SocketError GetLastSocketError()
         {
             return GetSocketErrorForErrorCode(Interop.Sys.GetLastError());
@@ -574,10 +578,16 @@ namespace System.Net.Sockets
             return errorCode == SocketError.InProgress ? SocketError.WouldBlock : errorCode;
         }
 
+        public static SocketError Disconnect(Socket socket, SafeCloseSocket handle, bool reuseSocket)
+        {
+            throw new PlatformNotSupportedException();
+        }
+
         public static unsafe SocketError Send(SafeCloseSocket handle, BufferOffsetSize[] buffers, SocketFlags socketFlags, out int bytesTransferred)
         {
             var iovecs = new Interop.libc.iovec[buffers.Length];
             var handles = new GCHandle[buffers.Length];
+
 
             try
             {
@@ -859,6 +869,63 @@ namespace System.Net.Sockets
             return err == -1 ? GetLastSocketError() : SocketError.Success;
         }
 
+        public static unsafe SocketError SetMulticastOption(SafeCloseSocket handle, SocketOptionName optionName, MulticastOption optionValue)
+        {
+            int optLevel, optName;
+            GetPlatformOptionInfo(SocketOptionLevel.IP, optionName, out optLevel, out optName);
+
+            var mreqn = new Interop.libc.ip_mreqn {
+                imr_multiaddr = new Interop.libc.in_addr {
+                    s_addr = unchecked((uint)optionValue.Group.GetAddress()).HostToNetwork()
+                }
+            };
+            if (optionValue.LocalAddress != null)
+            {
+                mreqn.imr_address.s_addr = unchecked((uint)optionValue.LocalAddress.GetAddress()).HostToNetwork();
+            }
+            else
+            {
+                // TODO: what is the endianness of ipv6mr_ifindex?
+                mreqn.imr_ifindex = optionValue.InterfaceIndex;
+            }
+
+            int err = Interop.libc.setsockopt(handle.FileDescriptor, optLevel, optName, &mreqn, (uint)sizeof(Interop.libc.ip_mreqn));
+            return err == -1 ? GetLastSocketError() : SocketError.Success;
+        }
+
+        public static unsafe SocketError SetIPv6MulticastOption(SafeCloseSocket handle, SocketOptionName optionName, IPv6MulticastOption optionValue)
+        {
+            int optLevel, optName;
+            GetPlatformOptionInfo(SocketOptionLevel.IPv6, optionName, out optLevel, out optName);
+
+            var mreq = new Interop.libc.ipv6_mreq {
+                // TODO: what is the endianness of ipv6mr_ifindex?
+                ipv6mr_ifindex = checked((int)optionValue.InterfaceIndex)
+            };
+
+            byte[] multicastAddress = optionValue.Group.GetAddressBytes();
+            Debug.Assert(multicastAddress.Length == sizeof(Interop.libc.in6_addr));
+
+            for (int i = 0; i < multicastAddress.Length; i++)
+            {
+                mreq.ipv6mr_multiaddr.s6_addr[i] = multicastAddress[i];
+            }
+
+            int err = Interop.libc.setsockopt(handle.FileDescriptor, optLevel, optName, &mreq, (uint)sizeof(Interop.libc.ipv6_mreq));
+            return err == -1 ? GetLastSocketError() : SocketError.Success;
+        }
+
+        public static unsafe SocketError SetLingerOption(SafeCloseSocket handle, LingerOption optionValue)
+        {
+            var linger = new Interop.libc.linger {
+                l_onoff = optionValue.Enabled ? 1 : 0,
+                l_linger = optionValue.LingerTime
+            };
+
+            int err = Interop.libc.setsockopt(handle.FileDescriptor, Interop.libc.SOL_SOCKET, Interop.libc.SO_LINGER, &linger, (uint)sizeof(Interop.libc.linger));
+            return err == -1 ? GetLastSocketError() : SocketError.Success;
+        }
+
         public static unsafe SocketError GetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, out int optionValue)
         {
             int optLevel, optName;
@@ -896,6 +963,65 @@ namespace System.Net.Sockets
 
             optionLength = (int)optLen;
             return err == -1 ? GetLastSocketError() : SocketError.Success;
+        }
+
+        public static unsafe SocketError GetMulticastOption(SafeCloseSocket handle, SocketOptionName optionName, out MulticastOption optionValue)
+        {
+            int optLevel, optName;
+            GetPlatformOptionInfo(SocketOptionLevel.IP, optionName, out optLevel, out optName);
+
+            var mreqn = new Interop.libc.ip_mreqn();
+            var optLen = (uint)sizeof(Interop.libc.ip_mreqn);
+            int err = Interop.libc.getsockopt(handle.FileDescriptor, optLevel, optName, &mreqn, &optLen);
+            if (err == -1)
+            {
+                optionValue = default(MulticastOption);
+                return GetLastSocketError();
+            }
+
+            var multicastAddress = new IPAddress((long)mreqn.imr_multiaddr.s_addr.NetworkToHost());
+            var multicastInterface = new IPAddress((long)mreqn.imr_address.s_addr.NetworkToHost());
+            optionValue = new MulticastOption(multicastAddress, multicastInterface);
+            return SocketError.Success;
+        }
+
+        public static unsafe SocketError GetIPv6MulticastOption(SafeCloseSocket handle, SocketOptionName optionName, out IPv6MulticastOption optionValue)
+        {
+            int optLevel, optName;
+            GetPlatformOptionInfo(SocketOptionLevel.IPv6, optionName, out optLevel, out optName);
+
+            var mreq = new Interop.libc.ipv6_mreq();
+            var optLen = (uint)sizeof(Interop.libc.ipv6_mreq);
+            int err = Interop.libc.getsockopt(handle.FileDescriptor, optLevel, optName, &mreq, &optLen);
+            if (err == -1)
+            {
+                optionValue = default(IPv6MulticastOption);
+                return GetLastSocketError();
+            }
+
+            var multicastAddress = new byte[sizeof(Interop.libc.in6_addr)];
+            for (int i = 0; i < multicastAddress.Length; i++)
+            {
+                multicastAddress[i] = mreq.ipv6mr_multiaddr.s6_addr[i];
+            }
+
+            optionValue = new IPv6MulticastOption(new IPAddress(multicastAddress), mreq.ipv6mr_ifindex);
+            return SocketError.Success;
+        }
+
+        public static unsafe SocketError GetLingerOption(SafeCloseSocket handle, out LingerOption optionValue)
+        {
+            var linger = new Interop.libc.linger();
+            var optLen = (uint)sizeof(Interop.libc.linger);
+            int err = Interop.libc.getsockopt(handle.FileDescriptor, Interop.libc.SOL_SOCKET, Interop.libc.SO_LINGER, &linger, &optLen);
+            if (err == -1)
+            {
+                optionValue = default(LingerOption);
+                return GetLastSocketError();
+            }
+
+            optionValue = new LingerOption(linger.l_onoff != 0, linger.l_linger);
+            return SocketError.Success;
         }
 
         public static unsafe SocketError Poll(SafeCloseSocket handle, int microseconds, SelectMode mode, out bool status)
@@ -1001,65 +1127,67 @@ namespace System.Net.Sockets
             return err == -1 ? GetLastSocketError() : SocketError.Success;
         }
 
-        public static unsafe SocketError ConnectAsync(Socket socket, SafeCloseSocket handle, byte[] socketAddress, int socketAddressLen, ConnectOverlappedAsyncResult asyncResult)
+        public static SocketError ConnectAsync(Socket socket, SafeCloseSocket handle, byte[] socketAddress, int socketAddressLen, ConnectOverlappedAsyncResult asyncResult)
         {
-            // TODO: audit "completed synchronously" behavior
             return handle.AsyncContext.ConnectAsync(socketAddress, socketAddressLen, asyncResult.CompletionCallback);
         }
 
-        public static unsafe SocketError SendAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
+        public static SocketError DisconnectAsync(Socket socket, SafeCloseSocket handle, bool reuseSocket, DisconnectOverlappedAsyncResult asyncResult)
         {
-            // TODO: audit "completed synchronously" behavior
+            throw new PlatformNotSupportedException();
+        }
+
+        public static SocketError SendAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
+        {
             return handle.AsyncContext.SendAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback);
         }
 
-        public static unsafe SocketError SendAsync(SafeCloseSocket handle, IList<ArraySegment<byte>> buffers, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
+        public static SocketError SendAsync(SafeCloseSocket handle, IList<ArraySegment<byte>> buffers, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
-            // TODO: audit "completed synchronously" behavior
             return handle.AsyncContext.SendAsync(new BufferList(buffers), GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback);
         }
 
-        public static unsafe SocketError SendAsync(SafeCloseSocket handle, BufferOffsetSize[] buffers, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
+        public static SocketError SendAsync(SafeCloseSocket handle, BufferOffsetSize[] buffers, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
-            // TODO: audit "completed synchronously" behavior
             return handle.AsyncContext.SendAsync(new BufferList(buffers), GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback);
         }
 
-        public static unsafe SocketError SendToAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
+        public static SocketError SendToAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
         {
             asyncResult.SocketAddress = socketAddress;
 
-            // TODO: audit "completed synchronously" behavior
             return handle.AsyncContext.SendToAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress.Buffer, socketAddress.Size, asyncResult.CompletionCallback);
         }
 
-        public static unsafe SocketError ReceiveAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
+        public static SocketError ReceiveAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
-            // TODO: audit "completed synchronously" behavior
             return handle.AsyncContext.ReceiveAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback);
         }
 
-        public static unsafe SocketError ReceiveAsync(SafeCloseSocket handle, IList<ArraySegment<byte>> buffers, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
+        public static SocketError ReceiveAsync(SafeCloseSocket handle, IList<ArraySegment<byte>> buffers, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
-            // TODO: audit "completed synchronously" behavior
             return handle.AsyncContext.ReceiveAsync(buffers, GetPlatformSocketFlags(socketFlags), asyncResult.CompletionCallback);
         }
 
-        public static unsafe SocketError ReceiveFromAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
+        public static SocketError ReceiveFromAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, OverlappedAsyncResult asyncResult)
         {
             asyncResult.SocketAddress = socketAddress;
 
-            // TODO: audit "completed synchronously" behavior
             return handle.AsyncContext.ReceiveFromAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress.Buffer, socketAddress.InternalSize, asyncResult.CompletionCallback);
         }
 
-        public static unsafe SocketError AcceptAsync(Socket socket, SafeCloseSocket handle, SafeCloseSocket acceptHandle, int receiveSize, int socketAddressSize, AcceptOverlappedAsyncResult asyncResult)
+        public static SocketError ReceiveMessageFromAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, ReceiveMessageOverlappedAsyncResult asyncResult)
+        {
+            // TODO: support this
+            throw new PlatformNotSupportedException();
+        }
+
+        public static SocketError AcceptAsync(Socket socket, SafeCloseSocket handle, SafeCloseSocket acceptHandle, int receiveSize, int socketAddressSize, AcceptOverlappedAsyncResult asyncResult)
         {
             Debug.Assert(acceptHandle == null);
 
             byte[] socketAddressBuffer = new byte[socketAddressSize];
 
-            // TODO: audit "completed synchronously" behavior
             return handle.AsyncContext.AcceptAsync(socketAddressBuffer, socketAddressSize, asyncResult.CompletionCallback);
         }
     }

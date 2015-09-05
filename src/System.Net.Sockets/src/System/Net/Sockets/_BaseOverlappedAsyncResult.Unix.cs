@@ -39,30 +39,5 @@ namespace System.Net.Sockets
         private void ReleaseUnmanagedStructures()
         {
         }
-
-        // TODO: remove these
-        internal SafeNativeOverlapped NativeOverlapped
-        {
-            get
-            {
-                return null;
-            }
-        }
-
-        internal SafeHandle OverlappedHandle
-        {
-            get
-            {
-                return null;
-            }
-        }
-
-        internal void SetUnmanagedStructures(object objectsToPin)
-        {
-        }
-
-        protected virtual void ForceReleaseUnmanagedStructures()
-        {
-        }
     }
 }
