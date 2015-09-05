@@ -109,7 +109,7 @@ namespace System.Net.Sockets
                     // If it's not EWOULDBLOCK, there's no more recourse - we either succeeded or failed.
                     if (errorCode != (int)Interop.Error.EWOULDBLOCK)
                     {
-                        if (errorCode == 0)
+                        if (errorCode == 0 && _asyncContext != null)
                         {
                             _asyncContext.Close();
                         }
@@ -129,7 +129,7 @@ namespace System.Net.Sockets
                         _closeSocketHandle = handle;
                         _closeSocketResult = SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
 #endif
-                        if (errorCode == 0)
+                        if (errorCode == 0 && _asyncContext != null)
                         {
                             _asyncContext.Close();
                         }
@@ -168,7 +168,7 @@ namespace System.Net.Sockets
 #endif
                 GlobalLog.Print("SafeCloseSocket::ReleaseHandle(handle:" + handle.ToString("x") + ") close#3():" + (errorCode == -1 ? (int)Interop.Sys.GetLastError() : errorCode).ToString());
 
-                if (errorCode == 0)
+                if (errorCode == 0 && _asyncContext != null)
                 {
                     _asyncContext.Close();
                 }
