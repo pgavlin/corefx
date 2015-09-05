@@ -264,11 +264,14 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteAccept(_fileDescriptor, socketAddress, ref socketAddressLen, out acceptedFd, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(args =>
+                if (errorCode == SocketError.Success)
                 {
-                    var tup = (Tuple<int, byte[], int, SocketError>)args;
-                    callback(tup.Item1, tup.Item2, tup.Item3, tup.Item4);
-                }, Tuple.Create(acceptedFd, socketAddress, socketAddressLen, errorCode));
+                    ThreadPool.QueueUserWorkItem(args =>
+                    {
+                        var tup = (Tuple<Action<int, byte[], int, SocketError>, int, byte[], int>)args;
+                        tup.Item1(tup.Item2, tup.Item3, tup.Item4, SocketError.Success);
+                    }, Tuple.Create(callback, acceptedFd, socketAddress, socketAddressLen));
+                }
                 return errorCode;
             }
 
@@ -341,7 +344,10 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteConnect(_fileDescriptor, socketAddress, socketAddressLen, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(arg => callback((SocketError)arg), errorCode);
+                if (errorCode == SocketError.Success)
+                {
+                    ThreadPool.QueueUserWorkItem(arg => ((Action<SocketError>)arg)(SocketError.Success), callback);
+                }
                 return errorCode;
             }
 
@@ -545,11 +551,14 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteReceiveFrom(_fileDescriptor, buffer, offset, count, flags, socketAddress, ref socketAddressLen, out bytesReceived, out receivedFlags, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(args =>
+                if (errorCode == SocketError.Success)
                 {
-                    var tup = (Tuple<int, byte[], int, int, SocketError>)args;
-                    callback(tup.Item1, tup.Item2, tup.Item3, tup.Item4, tup.Item5);
-                }, Tuple.Create(bytesReceived, socketAddress, socketAddressLen, receivedFlags, errorCode));
+                    ThreadPool.QueueUserWorkItem(args =>
+                    {
+                        var tup = (Tuple<Action<int, byte[], int, int, SocketError>, int, byte[], int, int>)args;
+                        tup.Item1(tup.Item2, tup.Item3, tup.Item4, tup.Item5, SocketError.Success);
+                    }, Tuple.Create(callback, bytesReceived, socketAddress, socketAddressLen, receivedFlags));
+                }
                 return errorCode;
             }
 
@@ -597,11 +606,14 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteReceiveFrom(_fileDescriptor, buffers, flags, socketAddress, ref socketAddressLen, out bytesReceived, out receivedFlags, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(args =>
+                if (errorCode == SocketError.Success)
                 {
-                    var tup = (Tuple<int, byte[], int, int, SocketError>)args;
-                    callback(tup.Item1, tup.Item2, tup.Item3, tup.Item4, tup.Item5);
-                }, Tuple.Create(bytesReceived, socketAddress, socketAddressLen, receivedFlags, errorCode));
+                    ThreadPool.QueueUserWorkItem(args =>
+                    {
+                        var tup = (Tuple<Action<int, byte[], int, int, SocketError>, int, byte[], int, int>)args;
+                        tup.Item1(tup.Item2, tup.Item3, tup.Item4, tup.Item5, SocketError.Success);
+                    }, Tuple.Create(callback, bytesReceived, socketAddress, socketAddressLen, receivedFlags));
+                }
                 return errorCode;
             }
 
@@ -745,11 +757,14 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteReceiveMessageFrom(_fileDescriptor, buffer, offset, count, flags, socketAddress, ref socketAddressLen, isIPv4, isIPv6, out bytesReceived, out receivedFlags, out ipPacketInformation, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(args =>
+                if (errorCode == SocketError.Success)
                 {
-                    var tup = (Tuple<int, byte[], int, int, IPPacketInformation, SocketError>)args;
-                    callback(tup.Item1, tup.Item2, tup.Item3, tup.Item4, tup.Item5, tup.Item6);
-                }, Tuple.Create(bytesReceived, socketAddress, socketAddressLen, receivedFlags, ipPacketInformation, errorCode));
+                    ThreadPool.QueueUserWorkItem(args =>
+                    {
+                        var tup = (Tuple<Action<int, byte[], int, int, IPPacketInformation, SocketError>, int, byte[], int, int, IPPacketInformation>)args;
+                        tup.Item1(tup.Item2, tup.Item3, tup.Item4, tup.Item5, tup.Item6, SocketError.Success);
+                    }, Tuple.Create(callback, bytesReceived, socketAddress, socketAddressLen, receivedFlags, ipPacketInformation));
+                }
                 return errorCode;
             }
 
@@ -981,11 +996,14 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteSendTo(_fileDescriptor, buffer, ref offset, ref count, flags, socketAddress, socketAddressLen, ref bytesSent, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(args =>
+                if (errorCode == SocketError.Success)
                 {
-                    var tup = (Tuple<int, byte[], int, SocketError>)args;
-                    callback(tup.Item1, tup.Item2, tup.Item3, 0, tup.Item4);
-                }, Tuple.Create(bytesSent, socketAddress, socketAddressLen, errorCode));
+                    ThreadPool.QueueUserWorkItem(args =>
+                    {
+                        var tup = (Tuple<Action<int, byte[], int, int, SocketError>, int, byte[], int>)args;
+                        tup.Item1(tup.Item2, tup.Item3, tup.Item4, 0, SocketError.Success);
+                    }, Tuple.Create(callback, bytesSent, socketAddress, socketAddressLen));
+                }
                 return errorCode;
             }
 
@@ -1033,11 +1051,14 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteSendTo(_fileDescriptor, buffers, ref bufferIndex, ref offset, flags, socketAddress, socketAddressLen, ref bytesSent, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(args =>
+                if (errorCode == SocketError.Success)
                 {
-                    var tup = (Tuple<int, byte[], int, SocketError>)args;
-                    callback(tup.Item1, tup.Item2, tup.Item3, 0, tup.Item4);
-                }, Tuple.Create(bytesSent, socketAddress, socketAddressLen, errorCode));
+                    ThreadPool.QueueUserWorkItem(args =>
+                    {
+                        var tup = (Tuple<Action<int, byte[], int, int, SocketError>, int, byte[], int>)args;
+                        tup.Item1(tup.Item2, tup.Item3, tup.Item4, 0, SocketError.Success);
+                    }, Tuple.Create(callback, bytesSent, socketAddress, socketAddressLen));
+                }
                 return errorCode;
             }
 
