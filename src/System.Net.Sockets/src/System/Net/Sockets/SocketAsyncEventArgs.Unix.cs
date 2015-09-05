@@ -66,7 +66,6 @@ namespace System.Net.Sockets
 
             bytesTransferred = 0;
 
-            // TODO: audit "completed synchronously" behavior
             return handle.AsyncContext.AcceptAsync(m_Buffer ?? m_AcceptBuffer, m_AcceptAddressBufferCount / 2, AcceptCompletionCallback);
         }
 
@@ -84,7 +83,6 @@ namespace System.Net.Sockets
         {
             bytesTransferred = 0;
 
-            // TODO: audit "completed synchronously" behavior
             return handle.AsyncContext.ConnectAsync(m_SocketAddress.Buffer, m_SocketAddress.Size, ConnectCompletionCallback);
         }
 
@@ -127,7 +125,6 @@ namespace System.Net.Sockets
                 errorCode = handle.AsyncContext.ReceiveAsync(m_BufferList, platformFlags, TransferCompletionCallback);
             }
 
-            // TODO: audit "completed synchronously" behavior
             flags = m_SocketFlags;
             bytesTransferred = 0;
             return errorCode;
@@ -153,7 +150,6 @@ namespace System.Net.Sockets
                 errorCode = handle.AsyncContext.ReceiveFromAsync(m_BufferList, platformFlags, m_SocketAddress.Buffer, m_SocketAddress.Size, TransferCompletionCallback);
             }
 
-            // TODO: audit "completed synchronously" behavior
             flags = m_SocketFlags;
             bytesTransferred = 0;
             return errorCode;
@@ -161,14 +157,32 @@ namespace System.Net.Sockets
 
         private void InnerStartOperationReceiveMessageFrom()
         {
-            // TODO: implement this.
             _receiveMessageFromPacketInfo = default(IPPacketInformation);
+            _receivedFlags = System.Net.Sockets.SocketFlags.None;
+            _socketAddressSize = 0;
+        }
+
+        private void ReceiveMessageFromCompletionCallback(int bytesTransferred, byte[] socketAddress, int socketAddressSize, int receivedFlags, IPPacketInformation ipPacketInformation, SocketError errorCode)
+        {
+            Debug.Assert(m_SocketAddress != null);
+            Debug.Assert(socketAddress == null || m_SocketAddress.Buffer == socketAddress);
+
+            _socketAddressSize = socketAddressSize;
+            _receivedFlags = SocketPal.GetSocketFlags(receivedFlags);
+            _receiveMessageFromPacketInfo = ipPacketInformation;
+
+            CompletionCallback(bytesTransferred, errorCode);
         }
 
         internal unsafe SocketError DoOperationReceiveMessageFrom(Socket socket, SafeCloseSocket handle, out int bytesTransferred)
         {
-            // TODO: implement this.
-            throw new NotImplementedException();
+            int platformFlags = SocketPal.GetPlatformSocketFlags(m_SocketFlags);
+
+            bool isIPv4, isIPv6;
+            Socket.GetIPProtocolInformation(socket.AddressFamily, m_SocketAddress, out isIPv4, out isIPv6);
+
+            bytesTransferred = 0;
+            return handle.AsyncContext.ReceiveMessageFromAsync(m_Buffer, m_Offset, m_Count, platformFlags, m_SocketAddress.Buffer, m_SocketAddress.Size, isIPv4, isIPv6, ReceiveMessageFromCompletionCallback);
         }
 
         private void InnerStartOperationSend()
@@ -225,7 +239,6 @@ namespace System.Net.Sockets
                 errorCode = handle.AsyncContext.SendToAsync(new BufferList(m_BufferList), platformFlags, m_SocketAddress.Buffer, m_SocketAddress.Size, TransferCompletionCallback);
             }
 
-            // TODO: audit "completed synchronously" behavior
             bytesTransferred = 0;
             return errorCode;
         }

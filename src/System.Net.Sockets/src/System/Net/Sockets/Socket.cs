@@ -3892,8 +3892,8 @@ namespace System.Net.Sockets
                 throw socketException;
             }
 
-            socketFlags = castedAsyncResult.m_flags;
-            ipPacketInformation = castedAsyncResult.m_IPPacketInformation;
+            socketFlags = castedAsyncResult.SocketFlags;
+            ipPacketInformation = castedAsyncResult.IPPacketInformation;
 
             if (s_LoggingEnabled) Logging.Exit(Logging.Sockets, this, "EndReceiveMessageFrom", bytesTransferred);
             return bytesTransferred;
@@ -5344,6 +5344,13 @@ namespace System.Net.Sockets
         #endregion
 
         #region Internal and private methods
+
+        internal static void GetIPProtocolInformation(AddressFamily addressFamily, Internals.SocketAddress socketAddress, out bool isIPv4, out bool isIPv6)
+        {
+            bool isIPv4MappedToIPv6 = socketAddress.Family == AddressFamily.InterNetworkV6 && socketAddress.GetIPAddress().IsIPv4MappedToIPv6;
+            isIPv4 = addressFamily == AddressFamily.InterNetwork || isIPv4MappedToIPv6; // DualMode
+            isIPv6 = addressFamily == AddressFamily.InterNetworkV6;
+        }
 
         private void CheckSetOptionPermissions(SocketOptionLevel optionLevel, SocketOptionName optionName)
         {

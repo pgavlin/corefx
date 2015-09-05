@@ -1,28 +1,29 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Net;
-using System.Runtime.InteropServices;
-using System.Threading;
-using Microsoft.Win32;
-using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace System.Net.Sockets
 {
     unsafe internal partial class ReceiveMessageOverlappedAsyncResult : BaseOverlappedAsyncResult
     {
-        // TODO: implement this
+        private int _socketAddressSize;
 
-        internal void SetUnmanagedStructures(byte[] buffer, int offset, int size, Internals.SocketAddress socketAddress, SocketFlags socketFlags)
+        internal int GetSocketAddressSize()
         {
-            // Silence the compiler until this is implemented.
-            SocketAddressOriginal = null;
-            m_SocketAddress = null;
-            _controlBuffer = null;
-            m_MessageBuffer = null;
-            m_flags = _controlBuffer == null ? SocketFlags.None : SocketFlags.None;
-            m_IPPacketInformation = default(IPPacketInformation);
+            return _socketAddressSize;
+        }
+
+        public void CompletionCallback(int numBytes, byte[] socketAddress, int socketAddressSize, int receivedFlags, IPPacketInformation ipPacketInformation, SocketError errorCode)
+        {
+            Debug.Assert(_socketAddress != null);
+            Debug.Assert(socketAddress == null || _socketAddress.Buffer == socketAddress);
+
+            _socketAddressSize = socketAddressSize;
+            _socketFlags = SocketPal.GetSocketFlags(receivedFlags);
+            _ipPacketInformation = ipPacketInformation;
+
+            base.CompletionCallback(numBytes, errorCode);
         }
     }
 }

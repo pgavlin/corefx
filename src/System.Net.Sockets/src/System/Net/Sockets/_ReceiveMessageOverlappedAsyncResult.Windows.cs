@@ -22,13 +22,23 @@ namespace System.Net.Sockets
         private Interop.Winsock.WSAMsg* _message;
         private WSABuffer* _WSABuffer;
         private byte[] _WSABufferArray;
+        private byte[] _controlBuffer;
+        internal byte[] m_MessageBuffer;
 
         private static readonly int s_ControlDataSize = Marshal.SizeOf<Interop.Winsock.ControlData>();
         private static readonly int s_ControlDataIPv6Size = Marshal.SizeOf<Interop.Winsock.ControlDataIPv6>();
         private static readonly int s_WSABufferSize = Marshal.SizeOf<WSABuffer>();
         private static readonly int s_WSAMsgSize = Marshal.SizeOf<Interop.Winsock.WSAMsg>();
 
-        internal IPPacketInformation m_IPPacketInformation;
+        private IntPtr GetSocketAddressSizePtr()
+        {
+            return Marshal.UnsafeAddrOfPinnedArrayElement(_socketAddress.Buffer, _socketAddress.GetAddressSizeOffset());
+        }
+
+        internal unsafe int GetSocketAddressSize()
+        {
+            return *(int*)GetSocketAddressSizePtr();
+        }
 
         //
         // SetUnmanagedStructures -
@@ -43,12 +53,8 @@ namespace System.Net.Sockets
             m_MessageBuffer = new byte[s_WSAMsgSize];
             _WSABufferArray = new byte[s_WSABufferSize];
 
-            //ipv4 or ipv6?
-            IPAddress ipAddress = (socketAddress.Family == AddressFamily.InterNetworkV6
-                ? socketAddress.GetIPAddress() : null);
-            bool ipv4 = (((Socket)AsyncObject).AddressFamily == AddressFamily.InterNetwork
-                || (ipAddress != null && ipAddress.IsIPv4MappedToIPv6)); // DualMode
-            bool ipv6 = ((Socket)AsyncObject).AddressFamily == AddressFamily.InterNetworkV6;
+            bool ipv4, ipv6;
+            Socket.GetIPProtocolInformation(((Socket)AsyncObject).AddressFamily, socketAddress, out ipv4, out ipv6);
 
             //prepare control buffer
             if (ipv4)
@@ -67,9 +73,9 @@ namespace System.Net.Sockets
             objectsToPin[2] = _WSABufferArray;
 
             //prepare socketaddress buffer
-            m_SocketAddress = socketAddress;
-            m_SocketAddress.CopyAddressSizeIntoBuffer();
-            objectsToPin[3] = m_SocketAddress.Buffer;
+            _socketAddress = socketAddress;
+            _socketAddress.CopyAddressSizeIntoBuffer();
+            objectsToPin[3] = _socketAddress.Buffer;
 
             if (_controlBuffer != null)
             {
@@ -86,8 +92,8 @@ namespace System.Net.Sockets
 
             //setup structure
             _message = (Interop.Winsock.WSAMsg*)Marshal.UnsafeAddrOfPinnedArrayElement(m_MessageBuffer, 0);
-            _message->socketAddress = Marshal.UnsafeAddrOfPinnedArrayElement(m_SocketAddress.Buffer, 0);
-            _message->addressLength = (uint)m_SocketAddress.Size;
+            _message->socketAddress = Marshal.UnsafeAddrOfPinnedArrayElement(_socketAddress.Buffer, 0);
+            _message->addressLength = (uint)_socketAddress.Size;
             _message->buffers = Marshal.UnsafeAddrOfPinnedArrayElement(_WSABufferArray, 0);
             _message->count = 1;
 
@@ -112,7 +118,7 @@ namespace System.Net.Sockets
                 {
                     address = new IPAddress((long)controlData.address);
                 }
-                m_IPPacketInformation = new IPPacketInformation(((address != null) ? address : IPAddress.None), (int)controlData.index);
+                _ipPacketInformation = new IPPacketInformation(((address != null) ? address : IPAddress.None), (int)controlData.index);
             }
             //ipv6
             else if (_controlBuffer.Length == s_ControlDataIPv6Size)
@@ -122,15 +128,14 @@ namespace System.Net.Sockets
                 {
                     address = new IPAddress(controlData.address);
                 }
-                m_IPPacketInformation = new IPPacketInformation(((address != null) ? address : IPAddress.IPv6None), (int)controlData.index);
+                _ipPacketInformation = new IPPacketInformation(((address != null) ? address : IPAddress.IPv6None), (int)controlData.index);
             }
             //other
             else
             {
-                m_IPPacketInformation = new IPPacketInformation();
+                _ipPacketInformation = new IPPacketInformation();
             }
         }
-
 
         //
         // This method is called after an asynchronous call is made for the user,
@@ -146,10 +151,9 @@ namespace System.Net.Sockets
             ForceReleaseUnmanagedStructures();
         }
 
-
         protected override void ForceReleaseUnmanagedStructures()
         {
-            m_flags = _message->flags;
+            _socketFlags = _message->flags;
             base.ForceReleaseUnmanagedStructures();
         }
 

@@ -7,7 +7,7 @@ namespace System.Net.Sockets
 {
     internal partial class OverlappedAsyncResult : BaseOverlappedAsyncResult
     {
-        int _socketAddressSize;
+        private int _socketAddressSize;
 
         internal int GetSocketAddressSize()
         {

@@ -12,34 +12,53 @@ namespace System.Net.Sockets
 {
     unsafe internal partial class ReceiveMessageOverlappedAsyncResult : BaseOverlappedAsyncResult
     {
-        internal Internals.SocketAddress SocketAddressOriginal;
-        internal Internals.SocketAddress m_SocketAddress;
-        private byte[] _controlBuffer;
-        internal byte[] m_MessageBuffer;
-        internal SocketFlags m_flags;
+        private Internals.SocketAddress _socketAddressOriginal;
+        private Internals.SocketAddress _socketAddress;
 
-        internal IPPacketInformation m_IPPacketInformation;
+        private SocketFlags _socketFlags;
+        private IPPacketInformation _ipPacketInformation;
 
         internal ReceiveMessageOverlappedAsyncResult(Socket socket, Object asyncState, AsyncCallback asyncCallback) :
             base(socket, asyncState, asyncCallback)
         { }
 
-        // TODO: remove these
-        internal IntPtr GetSocketAddressSizePtr()
-        {
-            return Marshal.UnsafeAddrOfPinnedArrayElement(m_SocketAddress.Buffer, m_SocketAddress.GetAddressSizeOffset());
-        }
-
-        internal unsafe int GetSocketAddressSize()
-        {
-            return *(int*)GetSocketAddressSizePtr();
-        }
-
         internal Internals.SocketAddress SocketAddress
         {
             get
             {
-                return m_SocketAddress;
+                return _socketAddress;
+            }
+            set
+            {
+                _socketAddress = value;
+            }
+        }
+
+        internal Internals.SocketAddress SocketAddressOriginal
+        {
+            get
+            {
+                return _socketAddressOriginal;
+            }
+            set
+            {
+                _socketAddressOriginal = value;
+            }
+        }
+
+        internal SocketFlags SocketFlags
+        {
+            get
+            {
+                return _socketFlags;
+            }
+        }
+
+        internal IPPacketInformation IPPacketInformation
+        {
+            get
+            {
+                return _ipPacketInformation;
             }
         }
     }

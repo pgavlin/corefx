@@ -471,6 +471,49 @@ namespace System.Net.Sockets
             }
         }
 
+        public static unsafe IPPacketInformation GetIPPacketInformation(byte* cmsgBuffer, int cmsgBufferLen, bool isIPv4, bool isIPv6)
+        {
+            if ((!isIPv4 && !isIPv6) || cmsgBufferLen < Interop.libc.cmsghdr.Size)
+            {
+                return default(IPPacketInformation);
+            }
+
+            var cmsghdr = (Interop.libc.cmsghdr*)cmsgBuffer;
+            if (isIPv4)
+            {
+                if ((int)cmsghdr->cmsg_len < sizeof(Interop.libc.in_pktinfo) ||
+                    cmsghdr->cmsg_level != Interop.libc.IPPROTO_IP ||
+                    cmsghdr->cmsg_type != Interop.libc.IP_PKTINFO)
+                {
+                    return default(IPPacketInformation);
+                }
+
+                var in_pktinfo = (Interop.libc.in_pktinfo*)&cmsghdr->cmsg_data;
+                return new IPPacketInformation(new IPAddress((long)in_pktinfo->ipi_addr.s_addr), in_pktinfo->ipi_ifindex);
+            }
+            else
+            {
+                Debug.Assert(isIPv6);
+
+                if ((int)cmsghdr->cmsg_len < sizeof(Interop.libc.in6_pktinfo) ||
+                    cmsghdr->cmsg_level != Interop.libc.IPPROTO_IPV6 ||
+                    cmsghdr->cmsg_type != Interop.libc.IPV6_RECVPKTINFO)
+                {
+                    return default(IPPacketInformation);
+                }
+
+                var in6_pktinfo = (Interop.libc.in6_pktinfo*)&cmsghdr->cmsg_data;
+
+                var address = new byte[sizeof(Interop.libc.in6_addr)];
+                for (int i = 0; i < address.Length; i++)
+                {
+                    address[i] = in6_pktinfo->ipi6_addr.s6_addr[i];
+                }
+
+                return new IPPacketInformation(new IPAddress(address), in6_pktinfo->ipi6_ifindex);
+            }
+        }
+
         public static SafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
         {
             SafeCloseSocket handle = SafeCloseSocket.CreateSocket(addressFamily, socketType, protocolType);
@@ -773,6 +816,13 @@ namespace System.Net.Sockets
 
         public static unsafe SocketError ReceiveMessageFrom(Socket socket, SafeCloseSocket handle, byte[] buffer, int offset, int size, ref SocketFlags socketFlags, Internals.SocketAddress socketAddress, out Internals.SocketAddress receiveAddress, out IPPacketInformation ipPacketInformation, out int bytesTransferred)
         {
+            bool isIPv4, isIPv6;
+            Socket.GetIPProtocolInformation(socket.AddressFamily, socketAddress, out isIPv4, out isIPv6);
+
+            var pktinfoLen = isIPv4 ? sizeof(Interop.libc.in_pktinfo) : isIPv6 ? sizeof(Interop.libc.in6_pktinfo) : 0;
+            var cmsgBufferLen = Interop.libc.cmsghdr.Size + pktinfoLen;
+            var cmsgBuffer = stackalloc byte[cmsgBufferLen];
+
             int received;
             fixed (byte* peerAddress = socketAddress.Buffer)
             fixed (byte* pinnedBuffer = buffer)
@@ -782,14 +832,14 @@ namespace System.Net.Sockets
                     iov_len = (IntPtr)size
                 };
 
-                var msghdr = new Interop.libc.msghdr(peerAddress, (uint)socketAddress.Size, &iovec, 1, null, 0, 0);
+                var msghdr = new Interop.libc.msghdr(peerAddress, (uint)socketAddress.Size, &iovec, 1, cmsgBuffer, cmsgBufferLen, 0);
                 received = (int)Interop.libc.recvmsg(handle.FileDescriptor, &msghdr, GetPlatformSocketFlags(socketFlags));
                 socketAddress.InternalSize = (int)msghdr.msg_namelen; // TODO: is this OK?
+                cmsgBufferLen = (int)msghdr.msg_controllen;
             }
 
-            // TODO: see if some reasonable value for networkInterface can be derived
             receiveAddress = socketAddress;
-            ipPacketInformation = new IPPacketInformation(socketAddress.GetIPAddress(), -1);
+            ipPacketInformation = GetIPPacketInformation(cmsgBuffer, cmsgBufferLen, isIPv4, isIPv6);
 
             if (received == -1)
             {
@@ -876,12 +926,12 @@ namespace System.Net.Sockets
 
             var mreqn = new Interop.libc.ip_mreqn {
                 imr_multiaddr = new Interop.libc.in_addr {
-                    s_addr = unchecked((uint)optionValue.Group.GetAddress()).HostToNetwork()
+                    s_addr = unchecked((uint)optionValue.Group.GetAddress())
                 }
             };
             if (optionValue.LocalAddress != null)
             {
-                mreqn.imr_address.s_addr = unchecked((uint)optionValue.LocalAddress.GetAddress()).HostToNetwork();
+                mreqn.imr_address.s_addr = unchecked((uint)optionValue.LocalAddress.GetAddress());
             }
             else
             {
@@ -979,8 +1029,8 @@ namespace System.Net.Sockets
                 return GetLastSocketError();
             }
 
-            var multicastAddress = new IPAddress((long)mreqn.imr_multiaddr.s_addr.NetworkToHost());
-            var multicastInterface = new IPAddress((long)mreqn.imr_address.s_addr.NetworkToHost());
+            var multicastAddress = new IPAddress((long)mreqn.imr_multiaddr.s_addr);
+            var multicastInterface = new IPAddress((long)mreqn.imr_address.s_addr);
             optionValue = new MulticastOption(multicastAddress, multicastInterface);
             return SocketError.Success;
         }
@@ -1178,8 +1228,12 @@ namespace System.Net.Sockets
 
         public static SocketError ReceiveMessageFromAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, ReceiveMessageOverlappedAsyncResult asyncResult)
         {
-            // TODO: support this
-            throw new PlatformNotSupportedException();
+            asyncResult.SocketAddress = socketAddress;
+
+            bool isIPv4, isIPv6;
+            Socket.GetIPProtocolInformation(((Socket)asyncResult.AsyncObject).AddressFamily, socketAddress, out isIPv4, out isIPv6);
+
+            return handle.AsyncContext.ReceiveMessageFromAsync(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress.Buffer, socketAddress.InternalSize, isIPv4, isIPv6, asyncResult.CompletionCallback);
         }
 
         public static SocketError AcceptAsync(Socket socket, SafeCloseSocket handle, SafeCloseSocket acceptHandle, int receiveSize, int socketAddressSize, AcceptOverlappedAsyncResult asyncResult)
