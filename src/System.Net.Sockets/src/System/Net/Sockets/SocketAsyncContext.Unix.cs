@@ -191,6 +191,14 @@ namespace System.Net.Sockets
         {
             _fileDescriptor = fileDescriptor;
             _engine = engine;
+        }
+
+        private void Register()
+        {
+            Debug.Assert(Monitor.IsEntered(_queueLock));
+            Debug.Assert(!_handle.IsAllocated);
+            Debug.Assert(_registeredEvents == SocketAsyncEvents.None);
+
             _handle = GCHandle.Alloc(this, GCHandleType.Normal);
 
             var events = SocketAsyncEvents.Read | SocketAsyncEvents.Write;
@@ -201,10 +209,52 @@ namespace System.Net.Sockets
                 _handle.Free();
 
                 // TODO: throw an appropiate exception
-                throw new Exception(string.Format("SocketAsyncContext: {0}", errorCode));
+                throw new Exception(string.Format("SocketAsyncContext.Register: {0}", errorCode));
             }
 
             _registeredEvents = events;
+        }
+
+        private void UnregisterRead()
+        {
+            Debug.Assert(Monitor.IsEntered(_queueLock));
+            Debug.Assert(_registeredEvents == (SocketAsyncEvents.Read | SocketAsyncEvents.Write));
+
+            SocketAsyncEvents events = _registeredEvents & ~SocketAsyncEvents.Read;
+
+            Interop.Error errorCode;
+            if (!_engine.TryRegister(_fileDescriptor, _registeredEvents, events, _handle, out errorCode))
+            {
+                // TODO: throw an appropiate exception
+                throw new Exception(string.Format("UnregisterRead: {0}", errorCode));
+            }
+
+            _registeredEvents = events;
+        }
+
+        private void Unregister()
+        {
+            Debug.Assert(Monitor.IsEntered(_queueLock));
+
+            if (_registeredEvents == SocketAsyncEvents.None)
+            {
+                Debug.Assert(!_handle.IsAllocated);
+                return;
+            }
+
+
+            Interop.Error errorCode;
+            if (!_engine.TryRegister(_fileDescriptor, _registeredEvents, SocketAsyncEvents.None, _handle, out errorCode))
+            {
+                if (errorCode != Interop.Error.EBADF)
+                {
+                    // TODO: throw an appropiate exception
+                    throw new Exception(string.Format("Unregister: {0}", errorCode));
+                }
+            }
+
+            _handle.Free();
+            _registeredEvents = SocketAsyncEvents.None;
         }
 
         public void Close()
@@ -237,6 +287,11 @@ namespace System.Net.Sockets
                         isStopped = false;
                         queue.State = State.Clear;
                         return false;
+                }
+
+                if (_registeredEvents == SocketAsyncEvents.None)
+                {
+                    Register();
                 }
 
                 queue.Enqueue(operation);
@@ -1189,21 +1244,7 @@ namespace System.Net.Sockets
                         sendQueue = _sendQueue.Stop();
                         receiveQueue = _receiveQueue.Stop();
 
-                        if (_registeredEvents != SocketAsyncEvents.None)
-                        {
-                            Interop.Error errorCode;
-                            if (!_engine.TryRegister(_fileDescriptor, _registeredEvents, SocketAsyncEvents.None, _handle, out errorCode))
-                            {
-                                if (errorCode != Interop.Error.EBADF)
-                                {
-                                    // TODO: throw an appropiate exception
-                                    throw new Exception(string.Format("HandleEvents Close: {0}", errorCode));
-                                }
-                            }
-                            _handle.Free();
-
-                            _registeredEvents = SocketAsyncEvents.None;
-                        }
+                        Unregister();
 
                         // TODO: assert that queues are all empty if _registeredEvents was SocketAsyncEvents.None?
 
@@ -1267,17 +1308,7 @@ namespace System.Net.Sockets
 
                     lock (_queueLock)
                     {
-                        SocketAsyncEvents evts = _registeredEvents & ~SocketAsyncEvents.Read;
-                        Debug.Assert(evts != SocketAsyncEvents.None);
-
-                        Interop.Error errorCode;
-                        if (!_engine.TryRegister(_fileDescriptor, _registeredEvents, evts, _handle, out errorCode))
-                        {
-                            // TODO: throw an appropiate exception
-                            throw new Exception(string.Format("HandleEvents ReadClose: {0}", errorCode));
-                        }
-
-                        _registeredEvents = evts;
+                        UnregisterRead();
                     }
 
                     // Any data left in the socket has been received above; skip further processing.
