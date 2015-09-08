@@ -17,13 +17,14 @@ namespace System.Net.Sockets
     // - Add support for unregistering + reregistering for events
     //     - This will require a new state for each queue, unregistred, to track whether or
     //       not the queue is currently registered to receive events
-
-    sealed class SocketAsyncContext
+    internal sealed class SocketAsyncContext
     {
         private abstract class AsyncOperation
         {
             public AsyncOperation Next;
             public SocketError ErrorCode;
+            public byte[] SocketAddress;
+            public int SocketAddressLen;
 
             public AsyncOperation()
             {
@@ -31,14 +32,6 @@ namespace System.Net.Sockets
             }
 
             public abstract void Complete();
-        }
-
-        private sealed class SentinelAsyncOperation : AsyncOperation
-        {
-            public override void Complete()
-            {
-                Debug.Fail("SentinelAsyncOperation.Complete() should never be called");
-            }
         }
 
         private sealed class TransferOperation : AsyncOperation
@@ -50,8 +43,6 @@ namespace System.Net.Sockets
             public int Offset;
             public int Count;
             public int Flags;
-            public byte[] SocketAddress;
-            public int SocketAddressLen;
             public int BytesTransferred;
             public int ReceivedFlags;
 
@@ -65,8 +56,6 @@ namespace System.Net.Sockets
 
         private abstract class AcceptOrConnectOperation : AsyncOperation
         {
-            public byte[] SocketAddress;
-            public int SocketAddressLen;
         }
 
         private sealed class AcceptOperation : AcceptOrConnectOperation
@@ -94,14 +83,14 @@ namespace System.Net.Sockets
             }
         }
 
-        enum State
+        private enum State
         {
             Stopped = -1,
-            Set = 0,
-            Clear = 1,
+            Clear = 0,
+            Set = 1,
         }
 
-        struct Queue<TOperation>
+        private struct OperationQueue<TOperation>
             where TOperation : AsyncOperation
         {
             private AsyncOperation _tail;
@@ -131,6 +120,7 @@ namespace System.Net.Sockets
             public void Enqueue(TOperation operation)
             {
                 Debug.Assert(!IsStopped);
+                Debug.Assert(operation.Next == operation);
 
                 if (!IsEmpty)
                 {
@@ -157,35 +147,42 @@ namespace System.Net.Sockets
                 }
             }
 
-            public Queue<TOperation> Stop()
+            public OperationQueue<TOperation> Stop()
             {
-                Queue<TOperation> result = this;
+                OperationQueue<TOperation> result = this;
                 _tail = null;
                 State = State.Stopped;
                 return result;
             }
         }
 
-        int _fileDescriptor;
-        GCHandle _handle;
-        Queue<TransferOperation> _receiveQueue;
-        Queue<TransferOperation> _sendQueue;
-        Queue<AcceptOrConnectOperation> _acceptOrConnectQueue;
-        object _closeLock = new object();
-        object _queueLock = new object();
-        SocketAsyncEngine _engine;
-        uint _registeredEvents;
+        private int _fileDescriptor;
+        private GCHandle _handle;
+        private OperationQueue<TransferOperation> _receiveQueue;
+        private OperationQueue<TransferOperation> _sendQueue;
+        private OperationQueue<AcceptOrConnectOperation> _acceptOrConnectQueue;
+        private SocketAsyncEngine _engine;
+        private SocketAsyncEvents _registeredEvents;
+
+        // These locks are hierarchical: _closeLock must be acquired before _queueLock in order
+        // to prevent deadlock.
+        private object _closeLock = new object();
+        private object _queueLock = new object();
 
         public SocketAsyncContext(int fileDescriptor, SocketAsyncEngine engine)
         {
             _fileDescriptor = fileDescriptor;
             _engine = engine;
+            _handle = GCHandle.Alloc(this, GCHandleType.Normal);
 
-            var events = Interop.libc.EPOLLIN | Interop.libc.EPOLLOUT | Interop.libc.EPOLLRDHUP | Interop.libc.EPOLLET;
+            var events = SocketAsyncEvents.Read | SocketAsyncEvents.Write;
 
             Interop.Error errorCode;
-            if (!_engine.TryRegister(this, _fileDescriptor, events, 0, ref _handle, out errorCode))
+            if (!_engine.TryRegister(_fileDescriptor, SocketAsyncEvents.None, events, _handle, out errorCode))
             {
+                _handle.Free();
+
+                // TODO: throw an appropiate exception
                 throw new Exception(string.Format("SocketAsyncContext: {0}", errorCode));
             }
 
@@ -194,15 +191,17 @@ namespace System.Net.Sockets
 
         public void Close()
         {
+            Debug.Assert(!Monitor.IsEntered(_queueLock));
+
             lock (_closeLock)
             lock (_queueLock)
             {
-                // Force a HUP event in order to drain the queues.
-                HandleEvents(Interop.libc.EPOLLHUP);
+                // Force a close event in order to drain the queues.
+                HandleEvents(SocketAsyncEvents.Close);
             }
         }
 
-        private bool TryBeginOperation<TOperation>(ref Queue<TOperation> queue, TOperation operation, out bool isStopped)
+        private bool TryBeginOperation<TOperation>(ref OperationQueue<TOperation> queue, TOperation operation, out bool isStopped)
             where TOperation : AsyncOperation
         {
             lock (_queueLock)
@@ -228,7 +227,7 @@ namespace System.Net.Sockets
             }
         }
 
-        private void EndOperation<TOperation>(ref Queue<TOperation> queue)
+        private void EndOperation<TOperation>(ref OperationQueue<TOperation> queue)
             where TOperation : AsyncOperation
         {
             lock (_queueLock)
@@ -247,7 +246,11 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteAccept(_fileDescriptor, socketAddress, ref socketAddressLen, out acceptedFd, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(_ => callback(acceptedFd, socketAddress, socketAddressLen, errorCode), null);
+                ThreadPool.QueueUserWorkItem(args =>
+                {
+                    var tup = (Tuple<int, byte[], int, SocketError>)args;
+                    callback(tup.Item1, tup.Item2, tup.Item3, tup.Item4);
+                }, Tuple.Create(acceptedFd, socketAddress, socketAddressLen, errorCode));
                 return errorCode;
             }
 
@@ -320,7 +323,7 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteConnect(_fileDescriptor, socketAddress, socketAddressLen, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(_ => callback(errorCode), null);
+                ThreadPool.QueueUserWorkItem(arg => callback((SocketError)arg), errorCode);
                 return errorCode;
             }
 
@@ -409,15 +412,7 @@ namespace System.Net.Sockets
                         iov_len = (IntPtr)count
                     };
 
-                    var msghdr = new Interop.libc.msghdr {
-                        msg_name = sockAddr,
-                        msg_namelen = sockAddrLen,
-                        msg_iov = &iov,
-                        msg_iovlen = (IntPtr)1,
-                        msg_control = null,
-                        msg_controllen = IntPtr.Zero,
-                    };
-
+                    var msghdr = new Interop.libc.msghdr(sockAddr, sockAddrLen, &iov, 1, null, 0, 0);
                     received = (int)Interop.libc.recvmsg(fd, &msghdr, flags);
                     receivedFlags = msghdr.msg_flags;
                 }
@@ -485,15 +480,7 @@ namespace System.Net.Sockets
                 // Make the call
                 fixed (Interop.libc.iovec* iov = iovecs)
                 {
-                    var msghdr = new Interop.libc.msghdr {
-                        msg_name = sockAddr,
-                        msg_namelen = sockAddrLen,
-                        msg_iov = iov,
-                        msg_iovlen = (IntPtr)iovCount,
-                        msg_control = null,
-                        msg_controllen = IntPtr.Zero,
-                    };
-
+                    var msghdr = new Interop.libc.msghdr(sockAddr, sockAddrLen, iov, iovCount, null, 0, 0);
                     received = (int)Interop.libc.recvmsg(fd, &msghdr, flags);
                     receivedFlags = msghdr.msg_flags;
                 }
@@ -538,7 +525,11 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteReceiveFrom(_fileDescriptor, buffer, offset, count, flags, socketAddress, ref socketAddressLen, out bytesReceived, out receivedFlags, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(_ => callback(bytesReceived, socketAddress, socketAddressLen, receivedFlags, errorCode), null);
+                ThreadPool.QueueUserWorkItem(args =>
+                {
+                    var tup = (Tuple<int, byte[], int, int, SocketError>)args;
+                    callback(tup.Item1, tup.Item2, tup.Item3, tup.Item4, tup.Item5);
+                }, Tuple.Create(bytesReceived, socketAddress, socketAddressLen, receivedFlags, errorCode));
                 return errorCode;
             }
 
@@ -586,7 +577,11 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteReceiveFrom(_fileDescriptor, buffers, flags, socketAddress, ref socketAddressLen, out bytesReceived, out receivedFlags, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(_ => callback(bytesReceived, socketAddress, socketAddressLen, receivedFlags, errorCode), null);
+                ThreadPool.QueueUserWorkItem(args =>
+                {
+                    var tup = (Tuple<int, byte[], int, int, SocketError>)args;
+                    callback(tup.Item1, tup.Item2, tup.Item3, tup.Item4, tup.Item5);
+                }, Tuple.Create(bytesReceived, socketAddress, socketAddressLen, receivedFlags, errorCode));
                 return errorCode;
             }
 
@@ -742,6 +737,8 @@ namespace System.Net.Sockets
                 for (int i = 0; i < maxBuffers; i++, startOffset = 0)
                 {
                     ArraySegment<byte> buffer = buffers[startIndex + i];
+                    Debug.Assert(buffer.Offset + startOffset < buffer.Array.Length);
+
                     handles[i] = GCHandle.Alloc(buffer.Array, GCHandleType.Pinned);
                     iovecs[i].iov_base = &((byte*)handles[i].AddrOfPinnedObject())[buffer.Offset + startOffset];
 
@@ -759,15 +756,7 @@ namespace System.Net.Sockets
                 // Make the call
                 fixed (Interop.libc.iovec* iov = iovecs)
                 {
-                    var msghdr = new Interop.libc.msghdr {
-                        msg_name = sockAddr,
-                        msg_namelen = sockAddrLen,
-                        msg_iov = iov,
-                        msg_iovlen = (IntPtr)iovCount,
-                        msg_control = null,
-                        msg_controllen = IntPtr.Zero,
-                    };
-
+                    var msghdr = new Interop.libc.msghdr(sockAddr, sockAddrLen, iov, iovCount, null, 0, 0);
                     sent = (int)Interop.libc.sendmsg(fd, &msghdr, flags);
                 }
                 errno = Interop.Sys.GetLastError();
@@ -824,7 +813,11 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteSendTo(_fileDescriptor, buffer, ref offset, ref count, flags, socketAddress, socketAddressLen, ref bytesSent, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(_ => callback(bytesSent, socketAddress, socketAddressLen, 0, errorCode), null);
+                ThreadPool.QueueUserWorkItem(args =>
+                {
+                    var tup = (Tuple<int, byte[], int, SocketError>)args;
+                    callback(tup.Item1, tup.Item2, tup.Item3, 0, tup.Item4);
+                }, Tuple.Create(bytesSent, socketAddress, socketAddressLen, errorCode));
                 return errorCode;
             }
 
@@ -872,7 +865,11 @@ namespace System.Net.Sockets
             SocketError errorCode;
             if (TryCompleteSendTo(_fileDescriptor, buffers, ref bufferIndex, ref offset, flags, socketAddress, socketAddressLen, ref bytesSent, out errorCode))
             {
-                ThreadPool.QueueUserWorkItem(_ => callback(bytesSent, socketAddress, socketAddressLen, 0, errorCode), null);
+                ThreadPool.QueueUserWorkItem(args =>
+                {
+                    var tup = (Tuple<int, byte[], int, SocketError>)args;
+                    callback(tup.Item1, tup.Item2, tup.Item3, 0, tup.Item4);
+                }, Tuple.Create(bytesSent, socketAddress, socketAddressLen, errorCode));
                 return errorCode;
             }
 
@@ -970,11 +967,13 @@ namespace System.Net.Sockets
             ThreadPool.QueueUserWorkItem(o => ((AsyncOperation)o).Complete(), operation);
         }
 
-        public unsafe void HandleEvents(uint events)
+        public unsafe void HandleEvents(SocketAsyncEvents events)
         {
+            Debug.Assert(!Monitor.IsEntered(_queueLock) || Monitor.IsEntered(_closeLock));
+
             lock (_closeLock)
             {
-                if ((events & Interop.libc.EPOLLERR) != 0)
+                if ((events & SocketAsyncEvents.Error) != 0)
                 {
                     int errno;
                     uint optLen = (uint)sizeof(int);
@@ -988,38 +987,36 @@ namespace System.Net.Sockets
                     // TODO: error handling
                 }
 
-                // TODO: rethink ordering of HUP/RDHUP w.r.t. IN/OUT.
-
-                if ((events & Interop.libc.EPOLLHUP) != 0)
+                if ((events & SocketAsyncEvents.Close) != 0)
                 {
-                    // Drain queues and unregister fd
+                    // Drain queues and unregister events
 
-                    Queue<AcceptOrConnectOperation> acceptOrConnectQueue;
-                    Queue<TransferOperation> sendQueue;
-                    Queue<TransferOperation> receiveQueue;
+                    OperationQueue<AcceptOrConnectOperation> acceptOrConnectQueue;
+                    OperationQueue<TransferOperation> sendQueue;
+                    OperationQueue<TransferOperation> receiveQueue;
                     lock (_queueLock)
                     {
                         acceptOrConnectQueue = _acceptOrConnectQueue.Stop();
                         sendQueue = _sendQueue.Stop();
                         receiveQueue = _receiveQueue.Stop();
 
-                        if (_registeredEvents != 0)
+                        if (_registeredEvents != SocketAsyncEvents.None)
                         {
                             Interop.Error errorCode;
-                            if (!_engine.TryUnregister(ref _handle, _fileDescriptor, 0, out errorCode))
+                            if (!_engine.TryRegister(_fileDescriptor, _registeredEvents, SocketAsyncEvents.None, _handle, out errorCode))
                             {
                                 if (errorCode != Interop.Error.EBADF)
                                 {
                                     // TODO: throw an appropiate exception
-                                    throw new Exception(string.Format("HandleEvents HUP: {0}", errorCode));
+                                    throw new Exception(string.Format("HandleEvents Close: {0}", errorCode));
                                 }
-                                _handle.Free();
                             }
+                            _handle.Free();
 
-                            _registeredEvents = 0;
+                            _registeredEvents = SocketAsyncEvents.None;
                         }
 
-                        // TODO: assert that queues are all empty if _registeredEvents was zero?
+                        // TODO: assert that queues are all empty if _registeredEvents was SocketAsyncEvents.None?
 
                         Debug.Assert(!_handle.IsAllocated);
                     }
@@ -1028,17 +1025,10 @@ namespace System.Net.Sockets
                     {
                         AcceptOrConnectOperation op = acceptOrConnectQueue.Head;
 
-                        bool completed;
-
                         var acceptOp = op as AcceptOperation;
-                        if (acceptOp != null)
-                        {
-                            completed = TryCompleteAccept(_fileDescriptor, acceptOp);
-                        }
-                        else
-                        {
-                            completed = TryCompleteConnect(_fileDescriptor, (ConnectOperation)op);
-                        }
+                        bool completed = acceptOp != null ?
+                            TryCompleteAccept(_fileDescriptor, acceptOp) :
+                            TryCompleteConnect(_fileDescriptor, (ConnectOperation)op);
 
                         Debug.Assert(completed);
                         acceptOrConnectQueue.Dequeue();
@@ -1066,12 +1056,12 @@ namespace System.Net.Sockets
                     return;
                 }
 
-                if ((events & Interop.libc.EPOLLRDHUP) != 0)
+                if ((events & SocketAsyncEvents.ReadClose) != 0)
                 {
                     // Drain read queue and unregister read operations
                     Debug.Assert(_acceptOrConnectQueue.IsEmpty);
 
-                    Queue<TransferOperation> receiveQueue;
+                    OperationQueue<TransferOperation> receiveQueue;
                     lock (_queueLock)
                     {
                         receiveQueue = _receiveQueue.Stop();
@@ -1088,26 +1078,28 @@ namespace System.Net.Sockets
 
                     lock (_queueLock)
                     {
+                        SocketAsyncEvents evts = _registeredEvents & ~SocketAsyncEvents.Read;
+                        Debug.Assert(evts != SocketAsyncEvents.None);
+
                         Interop.Error errorCode;
-                        uint evts = _registeredEvents & ~(Interop.libc.EPOLLIN | Interop.libc.EPOLLRDHUP);
-                        if (!_engine.TryUnregister(ref _handle, _fileDescriptor, evts, out errorCode))
+                        if (!_engine.TryRegister(_fileDescriptor, _registeredEvents, evts, _handle, out errorCode))
                         {
                             // TODO: throw an appropiate exception
-                            throw new Exception(string.Format("HandleEvents RDHUP: {0}", errorCode));
+                            throw new Exception(string.Format("HandleEvents ReadClose: {0}", errorCode));
                         }
 
                         _registeredEvents = evts;
                     }
 
-                    // Don't process received data if we saw a RDHUP.
-                    events &= ~Interop.libc.EPOLLIN;
+                    // Any data left in the socket has been received above; skip further processing.
+                    events &= ~SocketAsyncEvents.Read;
                 }
 
                 // TODO: optimize locking and completions:
                 // - Dequeues (and therefore locking) for multiple contiguous operations can be combined
                 // - Contiguous completions can happen in a single thread
 
-                if ((events & Interop.libc.EPOLLIN) != 0)
+                if ((events & SocketAsyncEvents.Read) != 0)
                 {
                     AcceptOrConnectOperation acceptTail;
                     TransferOperation receiveTail;
@@ -1151,7 +1143,7 @@ namespace System.Net.Sockets
                     }
                 }
 
-                if ((events & Interop.libc.EPOLLOUT) != 0)
+                if ((events & SocketAsyncEvents.Write) != 0)
                 {
                     AcceptOrConnectOperation connectTail;
                     TransferOperation sendTail;
@@ -1173,6 +1165,14 @@ namespace System.Net.Sockets
                             if (TryCompleteConnect(_fileDescriptor, op))
                             {
                                 EndOperation(ref _acceptOrConnectQueue);
+
+                                // The only situation in which we should see EISCONN when completing an
+                                // async connect is if this earlier connect completed successfully:
+                                // POSIX does not allow more than one outstanding async connect.
+                                if (op.ErrorCode == SocketError.IsConnected)
+                                {
+                                    op.ErrorCode = SocketError.Success;
+                                }
                                 QueueCompletion(op);
                             }
                             break;

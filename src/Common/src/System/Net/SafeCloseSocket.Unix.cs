@@ -9,10 +9,11 @@ using System.Diagnostics;
 
 namespace System.Net.Sockets
 {
+    internal sealed partial class SafeCloseSocket :
 #if DEBUG
-    internal sealed partial class SafeCloseSocket : DebugSafeHandleMinusOneIsInvalid
+        DebugSafeHandleMinusOneIsInvalid
 #else
-    internal sealed partial class SafeCloseSocket : SafeHandleMinusOneIsInvalid
+        SafeHandleMinusOneIsInvalid
 #endif
     {
         public SocketAsyncContext AsyncContext
@@ -23,13 +24,13 @@ namespace System.Net.Sockets
             }
         }
 
-		public int FileDescriptor
-		{
-			get
-			{
-				return (int)handle;
-			}
-		}
+        public int FileDescriptor
+        {
+            get
+            {
+                return (int)handle;
+            }
+        }
 
         public ThreadPoolBoundHandle IOCPBoundHandle
         {
@@ -45,15 +46,15 @@ namespace System.Net.Sockets
             return CreateSocket(InnerSafeCloseSocket.CreateSocket(fileDescriptor));
         }
 
-		public unsafe static SafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
-		{
-			return CreateSocket(InnerSafeCloseSocket.CreateSocket(addressFamily, socketType, protocolType));
-		}
+        public unsafe static SafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
+        {
+            return CreateSocket(InnerSafeCloseSocket.CreateSocket(addressFamily, socketType, protocolType));
+        }
 
-		public unsafe static SafeCloseSocket Accept(SafeCloseSocket socketHandle, byte[] socketAddress, ref int socketAddressSize)
-		{
-			return CreateSocket(InnerSafeCloseSocket.Accept(socketHandle, socketAddress, ref socketAddressSize));
-		}
+        public unsafe static SafeCloseSocket Accept(SafeCloseSocket socketHandle, byte[] socketAddress, ref int socketAddressSize)
+        {
+            return CreateSocket(InnerSafeCloseSocket.Accept(socketHandle, socketAddress, ref socketAddressSize));
+        }
 
         public ThreadPoolBoundHandle GetOrAllocateThreadPoolBoundHandle()
         {
@@ -63,7 +64,7 @@ namespace System.Net.Sockets
 
         private void InnerReleaseHandle()
         {
-			// No-op for Unix.
+            // No-op for Unix.
         }
 
         internal sealed partial class InnerSafeCloseSocket : SafeHandleMinusOneIsInvalid
@@ -84,7 +85,7 @@ namespace System.Net.Sockets
 
             private unsafe SocketError InnerReleaseHandle()
             {
-				int errorCode;
+                int errorCode;
 
                 // If m_Blockable was set in BlockingRelease, it's safe to block here, which means
                 // we can honor the linger options set on the socket.  It also means closesocket() might return WSAEWOULDBLOCK, in which
@@ -93,11 +94,11 @@ namespace System.Net.Sockets
                 {
                     GlobalLog.Print("SafeCloseSocket::ReleaseHandle(handle:" + handle.ToString("x") + ") Following 'blockable' branch.");
 
-					errorCode = Interop.Sys.Close((int)handle);
-					if (errorCode == -1)
-					{
-						errorCode = (int)Interop.Sys.GetLastError();
-					}
+                    errorCode = Interop.Sys.Close((int)handle);
+                    if (errorCode == -1)
+                    {
+                        errorCode = (int)Interop.Sys.GetLastError();
+                    }
                     GlobalLog.Print("SafeCloseSocket::ReleaseHandle(handle:" + handle.ToString("x") + ") close()#1:" + errorCode.ToString());
 
 #if DEBUG
@@ -106,13 +107,13 @@ namespace System.Net.Sockets
 #endif
 
                     // If it's not EWOULDBLOCK, there's no more recourse - we either succeeded or failed.
-					if (errorCode != (int)Interop.Error.EWOULDBLOCK)
+                    if (errorCode != (int)Interop.Error.EWOULDBLOCK)
                     {
                         if (errorCode == 0)
                         {
                             _asyncContext.Close();
                         }
-						return SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
+                        return SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
                     }
 
                     // The socket must be non-blocking with a linger timeout set.
@@ -133,25 +134,25 @@ namespace System.Net.Sockets
                             _asyncContext.Close();
                         }
                         return SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
-					}
+                    }
 
                     // The socket could not be made blocking; fall through to the regular abortive close.
                 }
 
                 // By default or if CloseAsIs() path failed, set linger timeout to zero to get an abortive close (RST).
-				var linger = new Interop.libc.linger {
-					l_onoff = 1,
-					l_linger = 0
-				};
+                var linger = new Interop.libc.linger {
+                    l_onoff = 1,
+                    l_linger = 0
+                };
 
-				errorCode = Interop.libc.setsockopt((int)handle, Interop.libc.SOL_SOCKET, Interop.libc.SO_LINGER, &linger, (uint)sizeof(Interop.libc.linger));
+                errorCode = Interop.libc.setsockopt((int)handle, Interop.libc.SOL_SOCKET, Interop.libc.SO_LINGER, &linger, (uint)sizeof(Interop.libc.linger));
 #if DEBUG
                 _closeSocketLinger = SocketPal.GetSocketErrorForErrorCode((Interop.Error)errorCode);
 #endif
-				if (errorCode == -1)
-				{
-					errorCode = (int)Interop.Sys.GetLastError();
-				}
+                if (errorCode == -1)
+                {
+                    errorCode = (int)Interop.Sys.GetLastError();
+                }
                 GlobalLog.Print("SafeCloseSocket::ReleaseHandle(handle:" + handle.ToString("x") + ") setsockopt():" + errorCode.ToString());
 
                 if (errorCode != 0 && errorCode != (int)Interop.Error.EINVAL && errorCode != (int)Interop.Error.ENOPROTOOPT)
@@ -181,33 +182,33 @@ namespace System.Net.Sockets
                 return res;
             }
 
-			public static InnerSafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
-			{
+            public static InnerSafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
+            {
                 int af = SocketPal.GetPlatformAddressFamily(addressFamily);
                 int sock = SocketPal.GetPlatformSocketType(socketType);
                 int pt = (int)protocolType;
 
-				int fd = Interop.libc.socket(af, sock, pt);
+                int fd = Interop.libc.socket(af, sock, pt);
 
                 var res = new InnerSafeCloseSocket();
                 res.SetHandle((IntPtr)fd);
                 return res;
-			}
+            }
 
-			public static unsafe InnerSafeCloseSocket Accept(SafeCloseSocket socketHandle, byte[] socketAddress, ref int socketAddressSize)
-			{
-				int fd;
-				uint addressLen = (uint)socketAddressSize;
-				fixed (byte* rawAddress = socketAddress)
-				{
-					fd = Interop.libc.accept(socketHandle.FileDescriptor, (Interop.libc.sockaddr*)rawAddress, &addressLen);
-				}
+            public static unsafe InnerSafeCloseSocket Accept(SafeCloseSocket socketHandle, byte[] socketAddress, ref int socketAddressSize)
+            {
+                int fd;
+                uint addressLen = (uint)socketAddressSize;
+                fixed (byte* rawAddress = socketAddress)
+                {
+                    fd = Interop.libc.accept(socketHandle.FileDescriptor, (Interop.libc.sockaddr*)rawAddress, &addressLen);
+                }
                 socketAddressSize = (int)addressLen;
 
                 var res = new InnerSafeCloseSocket();
                 res.SetHandle((IntPtr)fd);
                 return res;
-			}
+            }
         }
     }
 }

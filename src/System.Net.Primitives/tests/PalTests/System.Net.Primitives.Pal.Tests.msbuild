@@ -172,12 +172,12 @@
     </CompileItem>
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetsUnix)' == 'true' and '$(TargetsOSX)' != 'true' ">
-    <CompileItem Include="$(CommonPath)\Interop\Unix\libc\Interop.addrinfo.cs" >
-      <Link>ProductionCode\Common\Interop\Unix\libc\Interop.addrinfo.cs</Link>
+  <ItemGroup Condition=" '$(TargetsLinux)' == 'true' ">
+    <CompileItem Include="$(CommonPath)\Interop\Linux\libc\Interop.addrinfo.cs" >
+      <Link>ProductionCode\Common\Interop\Linux\libc\Interop.addrinfo.cs</Link>
     </CompileItem>
-    <CompileItem Include="$(CommonPath)\Interop\Unix\libc\Interop.sockaddr.cs" >
-      <Link>ProductionCode\Common\Interop\Unix\libc\Interop.sockaddr.cs</Link>
+    <CompileItem Include="$(CommonPath)\Interop\Linux\libc\Interop.sockaddr.cs" >
+      <Link>ProductionCode\Common\Interop\Linux\libc\Interop.sockaddr.cs</Link>
     </CompileItem>
   </ItemGroup>
 

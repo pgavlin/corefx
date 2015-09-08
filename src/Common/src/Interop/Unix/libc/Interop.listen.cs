@@ -10,6 +10,6 @@ internal static partial class Interop
     internal static partial class libc
     {
         [DllImport(Libraries.Libc, SetLastError = true)]
-		public static extern int listen(int sockfd, int backlog);
+        public static extern int listen(int sockfd, int backlog);
     }
 }

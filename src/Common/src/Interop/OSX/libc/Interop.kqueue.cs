@@ -3,13 +3,12 @@
 
 using System;
 using System.Runtime.InteropServices;
-using System.Text;
 
 internal static partial class Interop
 {
     internal static partial class libc
     {
         [DllImport(Libraries.Libc, SetLastError = true)]
-        public static extern unsafe int ioctl(int d, UIntPtr request, void* argp);
+        public static extern int kqueue();
     }
 }

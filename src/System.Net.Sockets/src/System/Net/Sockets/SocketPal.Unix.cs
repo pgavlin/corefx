@@ -591,15 +591,7 @@ namespace System.Net.Sockets
                 int sent;
                 fixed (Interop.libc.iovec* iov = iovecs)
                 {
-                    var msghdr = new Interop.libc.msghdr {
-                        msg_name = null,
-                        msg_namelen = 0,
-                        msg_iov = iov,
-                        msg_iovlen = (IntPtr)iovecs.Length,
-                        msg_control = null,
-                        msg_controllen = IntPtr.Zero,
-                    };
-
+                    var msghdr = new Interop.libc.msghdr(null, 0, iov, iovecs.Length, null, 0, 0);
                     sent = (int)Interop.libc.sendmsg(handle.FileDescriptor, &msghdr, GetPlatformSocketFlags(socketFlags));
                 }
 
@@ -641,15 +633,7 @@ namespace System.Net.Sockets
                 int sent;
                 fixed (Interop.libc.iovec* iov = iovecs)
                 {
-                    var msghdr = new Interop.libc.msghdr {
-                        msg_name = null,
-                        msg_namelen = 0,
-                        msg_iov = iov,
-                        msg_iovlen = (IntPtr)iovecs.Length,
-                        msg_control = null,
-                        msg_controllen = IntPtr.Zero,
-                    };
-
+                    var msghdr = new Interop.libc.msghdr(null, 0, iov, iovecs.Length, null, 0, 0);
                     sent = (int)Interop.libc.sendmsg(handle.FileDescriptor, &msghdr, GetPlatformSocketFlags(socketFlags));
                 }
 
@@ -733,15 +717,7 @@ namespace System.Net.Sockets
                 int received;
                 fixed (Interop.libc.iovec* iov = iovecs)
                 {
-                    var msghdr = new Interop.libc.msghdr {
-                        msg_name = null,
-                        msg_namelen = 0,
-                        msg_iov = iov,
-                        msg_iovlen = (IntPtr)iovecs.Length,
-                        msg_control = null,
-                        msg_controllen = IntPtr.Zero,
-                    };
-
+                    var msghdr = new Interop.libc.msghdr(null, 0, iov, iovecs.Length, null, 0, 0);
                     received = (int)Interop.libc.recvmsg(handle.FileDescriptor, &msghdr, GetPlatformSocketFlags(socketFlags));
                 }
 
@@ -796,15 +772,7 @@ namespace System.Net.Sockets
                     iov_len = (IntPtr)size
                 };
 
-                var msghdr = new Interop.libc.msghdr {
-                    msg_name = peerAddress,
-                    msg_namelen = (uint)socketAddress.InternalSize,
-                    msg_iov = &iovec,
-                    msg_iovlen = (IntPtr)1,
-                    msg_control = null,
-                    msg_controllen = IntPtr.Zero,
-                };
-
+                var msghdr = new Interop.libc.msghdr(peerAddress, (uint)socketAddress.Size, &iovec, 1, null, 0, 0);
                 received = (int)Interop.libc.recvmsg(handle.FileDescriptor, &msghdr, GetPlatformSocketFlags(socketFlags));
                 socketAddress.InternalSize = (int)msghdr.msg_namelen; // TODO: is this OK?
             }
