@@ -29,7 +29,7 @@
     <Compile Include="System\Net\_NativeSSPI.cs" />
     <Compile Include="System\Net\_StreamFramer.cs" />
     <Compile Include="System\Net\_SslSessionsCache.cs" />
-    <!--<Compile Include="System\Net\SecurityContextTokenHandle.cs" />-->
+    <Compile Include="System\Net\SecurityContextTokenHandle.cs" />
     <Compile Include="System\Net\SecureProtocols\SslStream.cs" />
     <Compile Include="System\Net\SecureProtocols\AuthenticatedStream.cs" />
     <Compile Include="System\Net\SecureProtocols\_SslState.cs" />
