@@ -86,9 +86,6 @@ namespace System.Net.NetworkInformation
             return false;
         }
 
-        // Vista+
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods",
-            Justification = "DangerousGetHandle is required for marshaling")]
         internal static NetworkInterface[] GetNetworkInterfaces()
         {
             Contract.Ensures(Contract.Result<NetworkInterface[]>() != null);

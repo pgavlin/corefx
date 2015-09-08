@@ -20,37 +20,6 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Windows_Release|AnyCPU' " />
 
   <ItemGroup>
-    <Compile Include="$(CommonPath)\System\NotImplemented.cs"/>
-
-    <!--Shims for Primitives, Sockets and NetworkInformation-->
-    <Compile Include="$(CommonPath)\System\Net\Shims\ExecutionContext.cs" />
-    <Compile Include="$(CommonPath)\System\Net\Shims\DBNull.cs" />
-    <Compile Include="$(CommonPath)\System\Net\Shims\_NetworkingPerfCounters.cs" />
-    <Compile Include="$(CommonPath)\System\Net\Shims\Uri.cs" />
-    <Compile Include="$(CommonPath)\System\Net\Shims\Win32SafeHandles.cs" />
-
-    <!-- Interop for Primitives, Sockets and NetworkInformation -->
-    <Compile Include="$(CommonPath)\Interop\Windows\SystemNet\Interop.Primitives.Manual.cs" />
-    <Compile Include="$(CommonPath)\Interop\Windows\Interop.Libraries.cs" />
-
-    <!-- Primitives, Sockets, NetworkInformation Common-->
-    <Compile Include="$(CommonPath)\System\Net\Internal.cs" />
-    <Compile Include="$(CommonPath)\System\Net\UnsafeNativeMethods.cs" />
-    <Compile Include="$(CommonPath)\System\Net\_BufferOffsetSize.cs" />
-    <Compile Include="$(CommonPath)\System\Net\_SafeNetHandles.cs" />
-    <Compile Include="$(CommonPath)\System\Net\_Win32.cs" />
-    <Compile Include="$(CommonPath)\System\Net\NetworkInformation\nodetype.cs" /> 
-    <Compile Include="$(CommonPath)\System\Net\NetworkInformation\NetworkInformationException.cs" />
-    <Compile Include="$(CommonPath)\System\Net\Cookie\cookie.cs" />
-    <Compile Include="$(CommonPath)\System\Net\Cookie\cookieexception.cs" />
-
-    <!-- Logging -->
-    <Compile Include="$(CommonPath)\System\Net\Shims\TraceSource.cs" />
-    <Compile Include="$(CommonPath)\System\Net\Logging\Logging.cs" />
-    <Compile Include="$(CommonPath)\System\Net\Logging\GlobalLog.cs" />
-    <Compile Include="$(CommonPath)\System\Net\Logging\EventSourceLogging.cs" />
-    <Compile Include="$(CommonPath)\System\Net\InternalException.cs" />
-
     <!-- NetworkInformation -->
     <Compile Include="System\Net\NetworkInformation\DuplicateAddressDetectionState.cs" />
     <Compile Include="System\Net\NetworkInformation\GatewayIPAddressInformation.cs" />
@@ -101,9 +70,50 @@
     <Compile Include="System\Net\NetworkInformation\UdpStatistics.cs" />
     <Compile Include="System\Net\NetworkInformation\UnicastIPAddressInformation.cs" />
     <Compile Include="System\Net\NetworkInformation\UnicastIPAddressInformationCollection.cs" />
-    <Compile Include="System\Net\NetworkInformation\UnsafeNetInfoNativeMethods.cs" />
 
+    <!--TODO-->
+    <Compile Include="System\Net\NetworkInformation\UnsafeNetInfoNativeMethods.cs" />
     <Compile Include="System\net\NetworkInformation\_SafeNetHandles.cs" />
+
+    <!-- System.Net common -->
+    <Compile Include="$(CommonPath)\System\Net\_ContextAwareResult.cs">
+      <Link>Common\System\Net\_ContextAwareResult.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\_LazyAsyncResult.cs">
+      <Link>Common\System\Net\_LazyAsyncResult.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\Shims\ExecutionContext.cs">
+      <Link>Common\System\Net\Shims\ExecutionContext.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\Shims\DBNull.cs">
+      <Link>Common\System\Net\Shims\DBNull.cs</Link>
+    </Compile>
+
+    <!-- Logging -->
+    <Compile Include="$(CommonPath)\System\Net\Shims\TraceSource.cs">
+      <Link>Common\System\Net\Shims\TraceSource.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\Logging\Logging.cs">
+      <Link>Common\System\Net\Logging\Logging.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\Logging\GlobalLog.cs">
+      <Link>Common\System\Net\Logging\GlobalLog.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\Logging\EventSourceLogging.cs">
+      <Link>Common\System\Net\Logging\EventSourceLogging.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\InternalException.cs">
+      <Link>Common\System\Net\InternalException.cs</Link>
+    </Compile>
+
+    <!-- Common -->
+    <Compile Include="$(CommonPath)\Microsoft\Win32\SafeHandles\SafeHandleZeroOrMinusOneIsInvalid.cs">
+      <Link>Common\Microsoft\Win32\SafeHandles\SafeHandleZeroOrMinusOneIsInvalid.cs</Link>
+    </Compile>
+
+    <Compile Include="$(CommonPath)\Interop\Windows\Interop.Libraries.cs">
+      <Link>Interop\Windows\Interop.Libraries.cs</Link>
+    </Compile>
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetsWindows)' == 'true' ">

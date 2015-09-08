@@ -583,9 +583,6 @@ namespace System.Net.NetworkInformation
             SafeLocalFree adapterAddresses,
             ref uint outBufLen);
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security",
-            "CA2118:ReviewSuppressUnmanagedCodeSecurityUsage",
-            Justification = "This operation is Read-Only and does not access restricted information")]
         [DllImport(Interop.Libraries.IpHlpApi)]
         internal extern static uint GetBestInterfaceEx(byte[] ipAddress, out int index);
 

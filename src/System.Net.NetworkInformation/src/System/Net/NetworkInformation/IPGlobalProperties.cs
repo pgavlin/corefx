@@ -87,7 +87,6 @@ namespace System.Net.NetworkInformation
         }
 
         //************* Task-based async public methods *************************
-        [SuppressMessage("Microsoft.Naming", "CA1704:IdentifiersShouldBeSpelledCorrectly", MessageId = "Unicast")]
         public virtual Task<UnicastIPAddressInformationCollection> GetUnicastAddressesAsync()
         {
             return Task<UnicastIPAddressInformationCollection>.Factory.FromAsync(BeginGetUnicastAddresses, EndGetUnicastAddresses, null);

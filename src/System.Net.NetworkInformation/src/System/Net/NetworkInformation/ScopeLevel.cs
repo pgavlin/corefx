@@ -6,8 +6,6 @@ using System.Diagnostics.CodeAnalysis;
 namespace System.Net.NetworkInformation
 {
     // See SCOPE_LEVEL
-    [SuppressMessage("Microsoft.Design", "CA1027:MarkEnumsWithFlags",
-        Justification = "This enum does not represent combinable flags")]
     public enum ScopeLevel
     {
         None = 0,
