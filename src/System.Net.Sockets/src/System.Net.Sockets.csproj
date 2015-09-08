@@ -427,8 +427,23 @@
     <Compile Include="$(CommonPath)\Interop\OSX\libc\Interop.addrinfo.cs">
       <Link>Interop\OSX\libc\Interop.addrinfo.cs</Link>
     </Compile>
+    <Compile Include="$(CommonPath)\Interop\OSX\libc\Interop.cmsghdr.cs">
+      <Link>Interop\OSX\libc\Interop.cmsghdr.cs</Link>
+    </Compile>
     <Compile Include="$(CommonPath)\Interop\OSX\libc\Interop.fd_set.cs">
       <Link>Interop\OSX\libc\Interop.fd_set.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\Interop\OSX\libc\Interop.in_pktinfo.cs">
+      <Link>Interop\OSX\libc\Interop.in_pktinfo.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\Interop\OSX\libc\Interop.in6_pktinfo.cs">
+      <Link>Interop\OSX\libc\Interop.in6_pktinfo.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\Interop\OSX\libc\Interop.ip_mreqn.cs">
+      <Link>Interop\OSX\libc\Interop.ip_mreqn.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\Interop\OSX\libc\Interop.ipv6_mreq.cs">
+      <Link>Interop\OSX\libc\Interop.ipv6_mreq.cs</Link>
     </Compile>
     <Compile Include="$(CommonPath)\Interop\OSX\libc\Interop.kqueue.cs">
       <Link>Interop\OSX\libc\Interop.kqueue.cs</Link>

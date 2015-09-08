@@ -4881,13 +4881,6 @@ namespace System.Net.Sockets
                 throw ex;
             }
 
-            // Native method emits single catch-all error code when error occurs.
-            // Must get Win32 error for specific error code.
-            if (socketError != SocketError.Success)
-            {
-                socketError = SocketPal.GetLastSocketError();
-            }
-
             // Handle completion when completion port is not posted.
             if (socketError != SocketError.Success && socketError != SocketError.IOPending)
             {
@@ -4962,13 +4955,6 @@ namespace System.Net.Sockets
                 // clear in-use on event arg object 
                 e.Complete();
                 throw ex;
-            }
-
-            // Native method emits single catch-all error code when error occurs.
-            // Must get Win32 error for specific error code.
-            if (socketError != SocketError.Success)
-            {
-                socketError = SocketPal.GetLastSocketError();
             }
 
             // Handle completion when completion port is not posted.
@@ -5048,13 +5034,6 @@ namespace System.Net.Sockets
                 throw ex;
             }
 
-            // Native method emits single catch-all error code when error occurs.
-            // Must get Win32 error for specific error code.
-            if (socketError != SocketError.Success)
-            {
-                socketError = SocketPal.GetLastSocketError();
-            }
-
             // Handle completion when completion port is not posted.
             if (socketError != SocketError.Success && socketError != SocketError.IOPending)
             {
@@ -5109,13 +5088,6 @@ namespace System.Net.Sockets
                 // clear in-use on event arg object 
                 e.Complete();
                 throw ex;
-            }
-
-            // Native method emits single catch-all error code when error occurs.
-            // Must get Win32 error for specific error code.
-            if (socketError != SocketError.Success)
-            {
-                socketError = SocketPal.GetLastSocketError();
             }
 
             // Handle completion when completion port is not posted.
@@ -5258,13 +5230,6 @@ namespace System.Net.Sockets
                 // clear in-use on event arg object 
                 e.Complete();
                 throw ex;
-            }
-
-            // Native method emits single catch-all error code when error occurs.
-            // Must get Win32 error for specific error code.
-            if (socketError != SocketError.Success)
-            {
-                socketError = SocketPal.GetLastSocketError();
             }
 
             // Handle completion when completion port is not posted.

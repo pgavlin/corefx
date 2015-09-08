@@ -302,6 +302,11 @@ namespace System.Net.Sockets
                     IntPtr.Zero);
             }
 
+            if (socketError == SocketError.SocketError)
+            {
+                socketError = SocketPal.GetLastSocketError();
+            }
+
             return socketError;
         }
 
@@ -354,6 +359,11 @@ namespace System.Net.Sockets
                                 m_PtrSocketAddressBufferSize,
                                 m_PtrNativeOverlapped,
                                 IntPtr.Zero);
+            }
+
+            if (socketError == SocketError.SocketError)
+            {
+                socketError = SocketPal.GetLastSocketError();
             }
 
             return socketError;
@@ -504,6 +514,11 @@ namespace System.Net.Sockets
                     m_SocketFlags,
                     m_PtrNativeOverlapped,
                     IntPtr.Zero);
+            }
+
+            if (socketError == SocketError.SocketError)
+            {
+                socketError = SocketPal.GetLastSocketError();
             }
 
             return socketError;
@@ -660,6 +675,11 @@ namespace System.Net.Sockets
                                 m_SocketAddress.Size,
                                 m_PtrNativeOverlapped,
                                 IntPtr.Zero);
+            }
+
+            if (socketError == SocketError.SocketError)
+            {
+                socketError = SocketPal.GetLastSocketError();
             }
 
             return socketError;
