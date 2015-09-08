@@ -33,7 +33,7 @@ namespace System.Net.NetworkInformation
         {
             get
             {
-                throw ExceptionHelper.PropertyNotImplementedException;
+                throw NotImplemented.ByDesignWithMessage(SR.net_PropertyNotImplementedException);
             }
         }
     }

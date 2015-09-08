@@ -45,7 +45,7 @@ namespace System.Net.NetworkInformation
 
 
         // the main constructor for the icmpsendecho apis
-        internal PingReply(IcmpEchoReply reply)
+        internal PingReply(Interop.IpHlpApi.IcmpEchoReply reply)
         {
             _address = new IPAddress(reply.address);
             _ipStatus = (IPStatus)reply.status; //the icmpsendecho ip status codes
@@ -63,7 +63,7 @@ namespace System.Net.NetworkInformation
         }
 
         // the main constructor for the icmpsendecho apis
-        internal PingReply(Icmp6EchoReply reply, IntPtr dataPtr, int sendSize)
+        internal PingReply(Interop.IpHlpApi.Icmp6EchoReply reply, IntPtr dataPtr, int sendSize)
         {
             _address = new IPAddress(reply.Address.Address, reply.Address.ScopeID);
             _ipStatus = (IPStatus)reply.Status; //the icmpsendecho ip status codes

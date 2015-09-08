@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Diagnostics;
+using Microsoft.Win32.SafeHandles;
 
 namespace System.Net.NetworkInformation
 {
@@ -42,8 +43,8 @@ namespace System.Net.NetworkInformation
         //used for icmpsendecho apis
         internal ManualResetEvent pingEvent = null;
         private RegisteredWaitHandle _registeredWait = null;
-        private SafeLocalFree _requestBuffer = null;
-        private SafeLocalFree _replyBuffer = null;
+        private SafeLocalAllocHandle _requestBuffer = null;
+        private SafeLocalAllocHandle _replyBuffer = null;
         private int _sendSize = 0;  //needed to determine what reply size is for ipv6 in callback
 
         private SafeCloseIcmpHandle _handlePingV4 = null;
@@ -246,19 +247,19 @@ namespace System.Net.NetworkInformation
                     if (!cancelled)
                     {
                         //parse reply buffer
-                        SafeLocalFree buffer = ping._replyBuffer;
+                        SafeLocalAllocHandle buffer = ping._replyBuffer;
 
                         //marshals and constructs new reply
                         PingReply reply;
 
                         if (ping._ipv6)
                         {
-                            Icmp6EchoReply icmp6Reply = Marshal.PtrToStructure<Icmp6EchoReply>(buffer.DangerousGetHandle());
+                            Interop.IpHlpApi.Icmp6EchoReply icmp6Reply = Marshal.PtrToStructure<Interop.IpHlpApi.Icmp6EchoReply>(buffer.DangerousGetHandle());
                             reply = new PingReply(icmp6Reply, buffer.DangerousGetHandle(), ping._sendSize);
                         }
                         else
                         {
-                            IcmpEchoReply icmpReply = Marshal.PtrToStructure<IcmpEchoReply>(buffer.DangerousGetHandle());
+                            Interop.IpHlpApi.IcmpEchoReply icmpReply = Marshal.PtrToStructure<Interop.IpHlpApi.IcmpEchoReply>(buffer.DangerousGetHandle());
                             reply = new PingReply(icmpReply);
                         }
 
@@ -679,7 +680,7 @@ namespace System.Net.NetworkInformation
             //get and cache correct handle
             if (!_ipv6 && _handlePingV4 == null)
             {
-                _handlePingV4 = UnsafeNetInfoNativeMethods.IcmpCreateFile();
+                _handlePingV4 = Interop.IpHlpApi.IcmpCreateFile();
                 if (_handlePingV4.IsInvalid)
                 {
                     _handlePingV4 = null;
@@ -688,7 +689,7 @@ namespace System.Net.NetworkInformation
             }
             else if (_ipv6 && _handlePingV6 == null)
             {
-                _handlePingV6 = UnsafeNetInfoNativeMethods.Icmp6CreateFile();
+                _handlePingV6 = Interop.IpHlpApi.Icmp6CreateFile();
                 if (_handlePingV6.IsInvalid)
                 {
                     _handlePingV6 = null;
@@ -698,12 +699,12 @@ namespace System.Net.NetworkInformation
 
 
             //setup the options
-            IPOptions ipOptions = new IPOptions(options);
+            var ipOptions = new Interop.IpHlpApi.IPOptions(options);
 
             //setup the reply buffer
             if (_replyBuffer == null)
             {
-                _replyBuffer = SafeLocalFree.LocalAlloc(MaxUdpPacket);
+                _replyBuffer = SafeLocalAllocHandle.LocalAlloc(MaxUdpPacket);
             }
 
             //queue the event
@@ -729,11 +730,11 @@ namespace System.Net.NetworkInformation
                     if (async)
                     {
                         var pingEventSafeWaitHandle = pingEvent.GetSafeWaitHandle();
-                        error = (int)UnsafeNetInfoNativeMethods.IcmpSendEcho2(_handlePingV4, pingEventSafeWaitHandle, IntPtr.Zero, IntPtr.Zero, (uint)address.m_Address, _requestBuffer, (ushort)buffer.Length, ref ipOptions, _replyBuffer, MaxUdpPacket, (uint)timeout);
+                        error = (int)Interop.IpHlpApi.IcmpSendEcho2(_handlePingV4, pingEventSafeWaitHandle, IntPtr.Zero, IntPtr.Zero, (uint)address.m_Address, _requestBuffer, (ushort)buffer.Length, ref ipOptions, _replyBuffer, MaxUdpPacket, (uint)timeout);
                     }
                     else
                     {
-                        error = (int)UnsafeNetInfoNativeMethods.IcmpSendEcho2(_handlePingV4, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, (uint)address.m_Address, _requestBuffer, (ushort)buffer.Length, ref ipOptions, _replyBuffer, MaxUdpPacket, (uint)timeout);
+                        error = (int)Interop.IpHlpApi.IcmpSendEcho2(_handlePingV4, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, (uint)address.m_Address, _requestBuffer, (ushort)buffer.Length, ref ipOptions, _replyBuffer, MaxUdpPacket, (uint)timeout);
                     }
                 }
                 else
@@ -744,11 +745,11 @@ namespace System.Net.NetworkInformation
                     if (async)
                     {
                         var pingEventSafeWaitHandle = pingEvent.GetSafeWaitHandle();
-                        error = (int)UnsafeNetInfoNativeMethods.Icmp6SendEcho2(_handlePingV6, pingEventSafeWaitHandle, IntPtr.Zero, IntPtr.Zero, sourceAddr, remoteAddr.m_Buffer, _requestBuffer, (ushort)buffer.Length, ref ipOptions, _replyBuffer, MaxUdpPacket, (uint)timeout);
+                        error = (int)Interop.IpHlpApi.Icmp6SendEcho2(_handlePingV6, pingEventSafeWaitHandle, IntPtr.Zero, IntPtr.Zero, sourceAddr, remoteAddr.m_Buffer, _requestBuffer, (ushort)buffer.Length, ref ipOptions, _replyBuffer, MaxUdpPacket, (uint)timeout);
                     }
                     else
                     {
-                        error = (int)UnsafeNetInfoNativeMethods.Icmp6SendEcho2(_handlePingV6, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, sourceAddr, remoteAddr.m_Buffer, _requestBuffer, (ushort)buffer.Length, ref ipOptions, _replyBuffer, MaxUdpPacket, (uint)timeout);
+                        error = (int)Interop.IpHlpApi.Icmp6SendEcho2(_handlePingV6, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, sourceAddr, remoteAddr.m_Buffer, _requestBuffer, (ushort)buffer.Length, ref ipOptions, _replyBuffer, MaxUdpPacket, (uint)timeout);
                     }
                 }
             }
@@ -764,7 +765,7 @@ namespace System.Net.NetworkInformation
                 error = (int)Marshal.GetLastWin32Error();
 
                 // Only skip Async IO Pending error value
-                if (async && error == UnsafeCommonNativeMethods.ErrorCodes.ERROR_IO_PENDING)
+                if (async && error == Interop.IpHlpApi.ERROR_IO_PENDING)
                     return null; // Expected async return value
 
                 // Cleanup
@@ -790,12 +791,12 @@ namespace System.Net.NetworkInformation
             PingReply reply;
             if (_ipv6)
             {
-                Icmp6EchoReply icmp6Reply = Marshal.PtrToStructure<Icmp6EchoReply>(_replyBuffer.DangerousGetHandle());
+                Interop.IpHlpApi.Icmp6EchoReply icmp6Reply = Marshal.PtrToStructure<Interop.IpHlpApi.Icmp6EchoReply>(_replyBuffer.DangerousGetHandle());
                 reply = new PingReply(icmp6Reply, _replyBuffer.DangerousGetHandle(), _sendSize);
             }
             else
             {
-                IcmpEchoReply icmpReply = Marshal.PtrToStructure<IcmpEchoReply>(_replyBuffer.DangerousGetHandle());
+                Interop.IpHlpApi.IcmpEchoReply icmpReply = Marshal.PtrToStructure<Interop.IpHlpApi.IcmpEchoReply>(_replyBuffer.DangerousGetHandle());
                 reply = new PingReply(icmpReply);
             }
 
@@ -820,7 +821,7 @@ namespace System.Net.NetworkInformation
         // copies sendbuffer into unmanaged memory for async icmpsendecho apis
         private unsafe void SetUnmanagedStructures(byte[] buffer)
         {
-            _requestBuffer = SafeLocalFree.LocalAlloc(buffer.Length);
+            _requestBuffer = SafeLocalAllocHandle.LocalAlloc(buffer.Length);
             byte* dst = (byte*)_requestBuffer.DangerousGetHandle();
             for (int i = 0; i < buffer.Length; ++i)
             {

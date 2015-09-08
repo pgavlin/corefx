@@ -14,7 +14,7 @@ namespace System.Net.NetworkInformation
         private int _ttl = 128;
         private bool _dontFragment;
 
-        internal PingOptions(IPOptions options)
+        internal PingOptions(Interop.IpHlpApi.IPOptions options)
         {
             _ttl = options.ttl;
             _dontFragment = ((options.flags & DontFragmentFlag) > 0 ? true : false);

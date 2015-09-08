@@ -15,7 +15,7 @@ namespace System.Net.NetworkInformation
         /// Returns IPv6 scope identifiers.
         public virtual long GetScopeId(ScopeLevel scopeLevel)
         {
-            throw ExceptionHelper.MethodNotImplementedException;
+            throw NotImplemented.ByDesignWithMessage(SR.net_MethodNotImplementedException);
         }
     }
 }

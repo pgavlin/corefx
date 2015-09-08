@@ -73,17 +73,17 @@ namespace System.Net.NetworkInformation
         /// Returns a list of all unicast IP addresses after ensuring they are all stable
         public virtual UnicastIPAddressInformationCollection GetUnicastAddresses()
         {
-            throw ExceptionHelper.MethodNotImplementedException;
+            throw NotImplemented.ByDesignWithMessage(SR.net_MethodNotImplementedException);
         }
 
         public virtual IAsyncResult BeginGetUnicastAddresses(AsyncCallback callback, object state)
         {
-            throw ExceptionHelper.MethodNotImplementedException;
+            throw NotImplemented.ByDesignWithMessage(SR.net_MethodNotImplementedException);
         }
 
         public virtual UnicastIPAddressInformationCollection EndGetUnicastAddresses(IAsyncResult asyncResult)
         {
-            throw ExceptionHelper.MethodNotImplementedException;
+            throw NotImplemented.ByDesignWithMessage(SR.net_MethodNotImplementedException);
         }
 
         //************* Task-based async public methods *************************
