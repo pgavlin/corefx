@@ -65,10 +65,12 @@ namespace System.Net.Sockets
 
         public unsafe void EventLoop()
         {
-            var events = stackalloc Interop.libc.kevent64_s[64];
+            const int EventCount = 64;
+
+            var events = stackalloc Interop.libc.kevent64_s[EventCount];
             for (;;)
             {
-                int numEvents = Interop.libc.kevent64(_kqueueFd, null, 0, events, 64, 0, null);
+                int numEvents = Interop.libc.kevent64(_kqueueFd, null, 0, events, EventCount, 0, null);
                 if (numEvents == -1)
                 {
                     // TODO: error handling + EINTR?

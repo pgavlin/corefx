@@ -201,10 +201,10 @@ namespace System.Net.Sockets
 
             _handle = GCHandle.Alloc(this, GCHandleType.Normal);
 
-            var events = SocketAsyncEvents.Read | SocketAsyncEvents.Write;
+            const SocketAsyncEvents Events = SocketAsyncEvents.Read | SocketAsyncEvents.Write;
 
             Interop.Error errorCode;
-            if (!_engine.TryRegister(_fileDescriptor, SocketAsyncEvents.None, events, _handle, out errorCode))
+            if (!_engine.TryRegister(_fileDescriptor, SocketAsyncEvents.None, Events, _handle, out errorCode))
             {
                 _handle.Free();
 
@@ -212,7 +212,7 @@ namespace System.Net.Sockets
                 throw new Exception(string.Format("SocketAsyncContext.Register: {0}", errorCode));
             }
 
-            _registeredEvents = events;
+            _registeredEvents = Events;
         }
 
         private void UnregisterRead()
@@ -242,19 +242,17 @@ namespace System.Net.Sockets
                 return;
             }
 
-
             Interop.Error errorCode;
-            if (!_engine.TryRegister(_fileDescriptor, _registeredEvents, SocketAsyncEvents.None, _handle, out errorCode))
+            bool unregistered = !_engine.TryRegister(_fileDescriptor, _registeredEvents, SocketAsyncEvents.None, _handle, out errorCode);
+            _registeredEvents = (SocketAsyncEvents)(-1);
+
+            if (!unregistered && errorCode != Interop.Error.EBADF)
             {
-                if (errorCode != Interop.Error.EBADF)
-                {
-                    // TODO: throw an appropiate exception
-                    throw new Exception(string.Format("Unregister: {0}", errorCode));
-                }
+                // TODO: throw an appropiate exception
+                throw new Exception(string.Format("Unregister: {0}", errorCode));
             }
 
             _handle.Free();
-            _registeredEvents = SocketAsyncEvents.None;
         }
 
         public void Close()
@@ -1217,6 +1215,21 @@ namespace System.Net.Sockets
 
             lock (_closeLock)
             {
+                if (_registeredEvents == (SocketAsyncEvents)(-1))
+                {
+                    // This can happen if a previous attempt at unregistration did not succeed.
+                    // Retry the unregistration.
+                    lock (_queueLock)
+                    {
+                        Debug.Assert(_acceptOrConnectQueue.IsStopped);
+                        Debug.Assert(_sendQueue.IsStopped);
+                        Debug.Assert(_receiveQueue.IsStopped);
+
+                        Unregister();
+                        return;
+                    }
+                }
+
                 if ((events & SocketAsyncEvents.Error) != 0)
                 {
                     int errno;

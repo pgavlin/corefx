@@ -3,7 +3,6 @@
 
 internal static partial class Interop
 {
-    // NOTE: this is only correct for Linux on x86-64
     internal static partial class libc
     {
         public const int SO_DEBUG = 0x0001;

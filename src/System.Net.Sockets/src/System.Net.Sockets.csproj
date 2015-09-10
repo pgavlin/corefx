@@ -251,11 +251,6 @@
     <Compile Include="System\Net\Sockets\SocketAsyncEventArgs.Unix.cs" />
     <Compile Include="System\Net\Sockets\SocketPal.Unix.cs" />
 
-    <!-- TODO: remove this -->
-    <!--<Compile Include="RefactoringShims\InteropShim.cs">
-      <Link>RefactoringShims\InteropShim.cs</Link>
-    </Compile>-->
-
     <Compile Include="$(CommonPath)\System\Net\SafeCloseSocket.Unix.cs">
       <Link>Common\System\Net\SafeCloseSocket.Unix.cs</Link>
     </Compile>    
