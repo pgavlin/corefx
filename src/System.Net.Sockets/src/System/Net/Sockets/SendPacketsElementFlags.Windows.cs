@@ -3,7 +3,7 @@
 
 namespace System.Net.Sockets
 {
-    internal enum SendPacketsElementFlags
+    internal enum SendPacketsElementFlags : uint
     {
         File = Interop.Winsock.TransmitPacketsElementFlags.File,
         Memory = Interop.Winsock.TransmitPacketsElementFlags.Memory,

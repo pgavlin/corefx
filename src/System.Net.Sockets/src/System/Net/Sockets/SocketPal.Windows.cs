@@ -366,9 +366,9 @@ namespace System.Net.Sockets
                 asyncResult.SyncReleaseUnmanagedStructures();
             }
 
-            socketFlags = asyncResult.m_flags;
-            receiveAddress = asyncResult.m_SocketAddress;
-            ipPacketInformation = asyncResult.m_IPPacketInformation;
+            socketFlags = asyncResult.SocketFlags;
+            receiveAddress = asyncResult.SocketAddress;
+            ipPacketInformation = asyncResult.IPPacketInformation;
 
             return errorCode;
         }
@@ -476,8 +476,6 @@ namespace System.Net.Sockets
             }
 #endif  // BIGENDIAN
 
-            GlobalLog.Print("Socket#" + Logging.HashString(this) + "::setMulticastOption(): optionName:" + optionName.ToString() + " MR:" + optionValue.ToString() + " ipmr:" + ipmr.ToString() + " Interop.Winsock.IPMulticastRequest.Size:" + Interop.Winsock.IPMulticastRequest.Size.ToString());
-
             // This can throw ObjectDisposedException.
             SocketError errorCode = Interop.Winsock.setsockopt(
                 handle,
@@ -495,8 +493,6 @@ namespace System.Net.Sockets
             ipmr.MulticastAddress = optionValue.Group.GetAddressBytes();
             ipmr.InterfaceIndex = unchecked((int)optionValue.InterfaceIndex);
 
-            GlobalLog.Print("Socket#" + Logging.HashString(this) + "::setIPv6MulticastOption(): optionName:" + optionName.ToString() + " MR:" + optionValue.ToString() + " ipmr:" + ipmr.ToString() + " Interop.Winsock.IPv6MulticastRequest.Size:" + Interop.Winsock.IPv6MulticastRequest.Size.ToString());
-
             // This can throw ObjectDisposedException.
             SocketError errorCode = Interop.Winsock.setsockopt(
                 handle,
@@ -512,8 +508,6 @@ namespace System.Net.Sockets
             Interop.Winsock.Linger lngopt = new Interop.Winsock.Linger();
             lngopt.OnOff = optionValue.Enabled ? (ushort)1 : (ushort)0;
             lngopt.Time = (ushort)optionValue.LingerTime;
-
-            GlobalLog.Print("Socket#" + Logging.HashString(this) + "::setLingerOption(): lref:" + optionValue.ToString());
 
             // This can throw ObjectDisposedException.
             SocketError errorCode = Interop.Winsock.setsockopt(
@@ -593,7 +587,7 @@ namespace System.Net.Sockets
 
             // This can throw ObjectDisposedException.
             SocketError errorCode = Interop.Winsock.getsockopt(
-                _handle,
+                handle,
                 SocketOptionLevel.IP,
                 optionName,
                 out ipmr,
@@ -616,7 +610,7 @@ namespace System.Net.Sockets
 
             // This can throw ObjectDisposedException.
             SocketError errorCode = Interop.Winsock.getsockopt(
-                _handle,
+                handle,
                 SocketOptionLevel.Socket,
                 SocketOptionName.Linger,
                 out lngopt,
@@ -628,7 +622,7 @@ namespace System.Net.Sockets
                 return GetLastSocketError();
             }
 
-            optionValue = new LingerOption(lngopt.OnOff != 0, (int)lngoipt.Time);
+            optionValue = new LingerOption(lngopt.OnOff != 0, (int)lngopt.Time);
             return SocketError.Success;
         }
 
@@ -950,12 +944,12 @@ namespace System.Net.Sockets
             return errorCode;
         }
 
-        public static unsafe SocketError ReceiveMessageFromAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, ReceiveMessageOverlappedAsyncResult asyncResult)
+        public static unsafe SocketError ReceiveMessageFromAsync(Socket socket, SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, ReceiveMessageOverlappedAsyncResult asyncResult)
         {
-            asyncResult.SetUnmanagedStructures(buffer, offset, size, socketAddress, socketFlags);
+            asyncResult.SetUnmanagedStructures(buffer, offset, count, socketAddress, socketFlags);
 
             int bytesTransfered;
-            SocketError errorCode = (SocketError)WSARecvMsg(
+            SocketError errorCode = (SocketError)socket.WSARecvMsg(
                 handle,
                 Marshal.UnsafeAddrOfPinnedArrayElement(asyncResult.m_MessageBuffer, 0),
                 out bytesTransfered,

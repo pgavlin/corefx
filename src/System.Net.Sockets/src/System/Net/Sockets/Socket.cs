@@ -3750,7 +3750,7 @@ namespace System.Net.Sockets
                     m_RightEndPoint = remoteEP;
                 }
 
-                errorCode = SocketPal.ReceiveMessageFromAsync(_handle, buffer, offset, size, socketFlags, socketAddress, asyncResult);
+                errorCode = SocketPal.ReceiveMessageFromAsync(this, _handle, buffer, offset, size, socketFlags, socketAddress, asyncResult);
 
                 if (errorCode != SocketError.Success)
                 {

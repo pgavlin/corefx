@@ -5,7 +5,7 @@ namespace System.Net.Sockets
 {
     // NOTE: these values are arbitrary. The APIs that consume SendPacketsElement values are not
     // supported on *nix.
-    internal enum SendPacketsElementFlags
+    internal enum SendPacketsElementFlags : uint
     {
         File = 0,
         Memory = 1,

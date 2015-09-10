@@ -1001,7 +1001,7 @@ namespace System.Net.Sockets
                         // a buffer
                         m_SendPacketsDescriptor[descriptorIndex].buffer = Marshal.UnsafeAddrOfPinnedArrayElement(spe.m_Buffer, spe.m_Offset);
                         m_SendPacketsDescriptor[descriptorIndex].length = (uint)spe.m_Count;
-                        m_SendPacketsDescriptor[descriptorIndex].flags = spe.m_Flags;
+                        m_SendPacketsDescriptor[descriptorIndex].flags = (Interop.Winsock.TransmitPacketsElementFlags)spe.m_Flags;
                         descriptorIndex++;
                     }
                     else if (spe.m_FilePath != null)
@@ -1010,7 +1010,7 @@ namespace System.Net.Sockets
                         m_SendPacketsDescriptor[descriptorIndex].fileHandle = m_SendPacketsFileHandles[fileIndex].DangerousGetHandle();
                         m_SendPacketsDescriptor[descriptorIndex].fileOffset = spe.m_Offset;
                         m_SendPacketsDescriptor[descriptorIndex].length = (uint)spe.m_Count;
-                        m_SendPacketsDescriptor[descriptorIndex].flags = spe.m_Flags;
+                        m_SendPacketsDescriptor[descriptorIndex].flags = (Interop.Winsock.TransmitPacketsElementFlags)spe.m_Flags;
                         fileIndex++;
                         descriptorIndex++;
                     }

@@ -79,7 +79,7 @@ namespace System.Net.Sockets
             return disconnectEx(socketHandle, overlapped, flags, reserved);
         }
 
-        private bool DisconnectEx_Blocking(IntPtr socketHandle, IntPtr overlapped, int flags, int reserved)
+        internal bool DisconnectEx_Blocking(IntPtr socketHandle, IntPtr overlapped, int flags, int reserved)
         {
             EnsureDynamicWinsockMethods();
             DisconnectExDelegate_Blocking disconnectEx_Blocking = _dynamicWinsockMethods.GetDelegate<DisconnectExDelegate_Blocking>(_handle);
