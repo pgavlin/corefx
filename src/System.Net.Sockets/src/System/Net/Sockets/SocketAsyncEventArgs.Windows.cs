@@ -464,12 +464,19 @@ namespace System.Net.Sockets
         {
             PrepareIOCPOperation();
 
-            return socket.WSARecvMsg(
+            SocketError socketError = socket.WSARecvMsg(
                 handle,
                 m_PtrWSAMessageBuffer,
                 out bytesTransferred,
                 m_PtrNativeOverlapped,
                 IntPtr.Zero);
+
+            if (socketError == SocketError.SocketError)
+            {
+                socketError = SocketPal.GetLastSocketError();
+            }
+
+            return socketError;
         }
 
         private void InnerStartOperationSend()
