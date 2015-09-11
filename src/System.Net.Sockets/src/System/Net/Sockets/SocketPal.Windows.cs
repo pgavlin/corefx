@@ -239,28 +239,39 @@ namespace System.Net.Sockets
             }
         }
 
-        public static unsafe int Send(SafeCloseSocket handle, byte[] buffer, int offset, int size, SocketFlags socketFlags)
+        public static unsafe SocketError Send(SafeCloseSocket handle, byte[] buffer, int offset, int size, SocketFlags socketFlags, out int bytesTransferred)
         {
+            int bytesSent;
             if (buffer.Length == 0)
-                return Interop.Winsock.send(handle.DangerousGetHandle(), null, 0, socketFlags);
+                bytesSent = Interop.Winsock.send(handle.DangerousGetHandle(), null, 0, socketFlags);
             else
             {
                 fixed (byte* pinnedBuffer = buffer)
                 {
-                    return Interop.Winsock.send(
+                    bytesSent = Interop.Winsock.send(
                         handle.DangerousGetHandle(),
                         pinnedBuffer + offset,
                         size,
                         socketFlags);
                 }
             }
+
+            if (bytesSent == (int)SocketError.SocketError)
+            {
+                bytesTransferred = 0;
+                return GetLastSocketError();
+            }
+
+            bytesTransferred = bytesSent;
+            return SocketError.Success;
         }
 
-        public static unsafe int SendTo(SafeCloseSocket handle, byte[] buffer, int offset, int size, SocketFlags socketFlags, byte[] peerAddress, int peerAddressSize)
+        public static unsafe SocketError SendTo(SafeCloseSocket handle, byte[] buffer, int offset, int size, SocketFlags socketFlags, byte[] peerAddress, int peerAddressSize, out int bytesTransferred)
         {
+            int bytesSent;
             if (buffer.Length == 0)
             {
-                return Interop.Winsock.sendto(
+                bytesSent = Interop.Winsock.sendto(
                     handle.DangerousGetHandle(),
                     null,
                     0,
@@ -272,7 +283,7 @@ namespace System.Net.Sockets
             {
                 fixed (byte* pinnedBuffer = buffer)
                 {
-                    return Interop.Winsock.sendto(
+                    bytesSent = Interop.Winsock.sendto(
                         handle.DangerousGetHandle(),
                         pinnedBuffer + offset,
                         size,
@@ -281,6 +292,15 @@ namespace System.Net.Sockets
                         peerAddressSize);
                 }
             }
+
+            if (bytesSent == (int)SocketError.SocketError)
+            {
+                bytesTransferred = 0;
+                return GetLastSocketError();
+            }
+
+            bytesTransferred = bytesSent;
+            return SocketError.Success;
         }
 
         public static SocketError Receive(SafeCloseSocket handle, IList<ArraySegment<byte>> buffers, ref SocketFlags socketFlags, out int bytesTransferred)
@@ -327,17 +347,27 @@ namespace System.Net.Sockets
             }
         }
 
-        public static unsafe int Receive(SafeCloseSocket handle, byte[] buffer, int offset, int size, SocketFlags socketFlags)
+        public static unsafe SocketError Receive(SafeCloseSocket handle, byte[] buffer, int offset, int size, SocketFlags socketFlags, out int bytesTransferred)
         {
+            int bytesReceived;
             if (buffer.Length == 0)
             {
-                return Interop.Winsock.recv(handle.DangerousGetHandle(), null, 0, socketFlags);
+                bytesReceived = Interop.Winsock.recv(handle.DangerousGetHandle(), null, 0, socketFlags);
             }
             else
                 fixed (byte* pinnedBuffer = buffer)
                 {
-                    return Interop.Winsock.recv(handle.DangerousGetHandle(), pinnedBuffer + offset, size, socketFlags);
+                    bytesReceived = Interop.Winsock.recv(handle.DangerousGetHandle(), pinnedBuffer + offset, size, socketFlags);
                 }
+
+            if (bytesReceived == (int)SocketError.SocketError)
+            {
+                bytesTransferred = 0;
+                return GetLastSocketError();
+            }
+
+            bytesTransferred = bytesReceived;
+            return SocketError.Success;
         }
 
         public static SocketError ReceiveMessageFrom(Socket socket, SafeCloseSocket handle, byte[] buffer, int offset, int size, ref SocketFlags socketFlags, Internals.SocketAddress socketAddress, out Internals.SocketAddress receiveAddress, out IPPacketInformation ipPacketInformation, out int bytesTransferred)
@@ -373,15 +403,25 @@ namespace System.Net.Sockets
             return errorCode;
         }
 
-        public static unsafe int ReceiveFrom(SafeCloseSocket handle, byte[] buffer, int offset, int size, SocketFlags socketFlags, byte[] socketAddress, ref int addressLength)
+        public static unsafe SocketError ReceiveFrom(SafeCloseSocket handle, byte[] buffer, int offset, int size, SocketFlags socketFlags, byte[] socketAddress, ref int addressLength, out int bytesTransferred)
         {
+            int bytesReceived;
             if (buffer.Length == 0)
-                return Interop.Winsock.recvfrom(handle.DangerousGetHandle(), null, 0, socketFlags, socketAddress, ref addressLength);
+                bytesReceived = Interop.Winsock.recvfrom(handle.DangerousGetHandle(), null, 0, socketFlags, socketAddress, ref addressLength);
             else
                 fixed (byte* pinnedBuffer = buffer)
                 {
-                    return Interop.Winsock.recvfrom(handle.DangerousGetHandle(), pinnedBuffer + offset, size, socketFlags, socketAddress, ref addressLength);
+                    bytesReceived = Interop.Winsock.recvfrom(handle.DangerousGetHandle(), pinnedBuffer + offset, size, socketFlags, socketAddress, ref addressLength);
                 }
+
+            if (bytesReceived == (int)SocketError.SocketError)
+            {
+                bytesTransferred = 0;
+                return GetLastSocketError();
+            }
+
+            bytesTransferred = bytesReceived;
+            return SocketError.Success;
         }
 
         public static SocketError Ioctl(SafeCloseSocket handle, int ioControlCode, byte[] optionInValue, byte[] optionOutValue, out int optionLength)

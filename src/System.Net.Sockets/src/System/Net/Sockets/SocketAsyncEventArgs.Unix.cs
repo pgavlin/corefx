@@ -275,8 +275,7 @@ namespace System.Net.Sockets
 
         private unsafe void FinishOperationReceiveMessageFrom()
         {
-            // TODO: implement this.
-            throw new NotImplementedException();
+            // No-op for *nix.
         }
 
         private void FinishOperationSendPackets()

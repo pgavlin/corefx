@@ -10,5 +10,6 @@ internal static partial class Interop
         public const int MSG_DONTROUTE = 0x04; // Don't use local routing.
         public const int MSG_CTRUNC = 0x08;    // Control data lost before delivery.
         public const int MSG_TRUNC = 0x20;     // Data lost before delivery.
+        public const int MSG_DONTWAIT = 0x40;  // Use non-blocking I/O.
     }
 }

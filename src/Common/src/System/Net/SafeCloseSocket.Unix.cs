@@ -32,14 +32,7 @@ namespace System.Net.Sockets
             }
         }
 
-        public ThreadPoolBoundHandle IOCPBoundHandle
-        {
-            get
-            {
-                // TODO: remove this once async sockets are PAL'd out
-                throw new PlatformNotSupportedException();
-            }
-        }
+        public bool IsNonBlocking { get; set; }
 
         public unsafe static SafeCloseSocket CreateSocket(int fileDescriptor)
         {
@@ -189,6 +182,16 @@ namespace System.Net.Sockets
                 int pt = (int)protocolType;
 
                 int fd = Interop.libc.socket(af, sock, pt);
+                if (fd != -1)
+                {
+                    // The socket was created successfully; make it non-blocking.
+                    int err = Interop.Sys.Fcntl.SetIsNonBlocking(fd, 1);
+                    if (err != 0)
+                    {
+                        Interop.Sys.Close(fd);
+                        fd = -1;
+                    }
+                }
 
                 var res = new InnerSafeCloseSocket();
                 res.SetHandle((IntPtr)fd);
@@ -197,16 +200,20 @@ namespace System.Net.Sockets
 
             public static unsafe InnerSafeCloseSocket Accept(SafeCloseSocket socketHandle, byte[] socketAddress, ref int socketAddressSize)
             {
-                int fd;
-                uint addressLen = (uint)socketAddressSize;
-                fixed (byte* rawAddress = socketAddress)
+                int fd = socketHandle.FileDescriptor;
+
+                int acceptedFd;
+                SocketError errorCode;
+                while (!SocketPal.TryCompleteAccept(fd, socketAddress, ref socketAddressSize, out acceptedFd, out errorCode) && !socketHandle.IsNonBlocking)
                 {
-                    fd = Interop.libc.accept(socketHandle.FileDescriptor, (Interop.libc.sockaddr*)rawAddress, &addressLen);
+                    if (!SocketPal.Poll(fd, Interop.libc.PollFlags.POLLIN, out errorCode))
+                    {
+                        break;
+                    }
                 }
-                socketAddressSize = (int)addressLen;
 
                 var res = new InnerSafeCloseSocket();
-                res.SetHandle((IntPtr)fd);
+                res.SetHandle((IntPtr)acceptedFd);
                 return res;
             }
         }
