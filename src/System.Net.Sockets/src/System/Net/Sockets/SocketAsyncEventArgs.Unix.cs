@@ -255,7 +255,7 @@ namespace System.Net.Sockets
 
         private SocketError FinishOperationAccept(Internals.SocketAddress remoteSocketAddress)
         {
-            System.Buffer.BlockCopy(m_AcceptBuffer, 0, remoteSocketAddress.Buffer, 0, _socketAddressSize);
+            System.Buffer.BlockCopy(m_AcceptBuffer, 0, remoteSocketAddress.Buffer, 0, m_AcceptAddressBufferCount);
             m_AcceptSocket = _currentSocket.CreateAcceptSocket(
                 SafeCloseSocket.CreateSocket(_acceptedFileDescriptor),
                 _currentSocket.m_RightEndPoint.Create(remoteSocketAddress));
