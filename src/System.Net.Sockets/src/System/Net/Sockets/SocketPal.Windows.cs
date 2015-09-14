@@ -17,6 +17,10 @@ namespace System.Net.Sockets
 {
     internal static class SocketPal
     {
+        private readonly static int s_protocolInformationSize = Marshal.SizeOf<Interop.Winsock.WSAPROTOCOL_INFO>();
+
+        public static int ProtocolInformationSize { get { return s_protocolInformationSize; } }
+
         private static void MicrosecondsToTimeValue(long microseconds, ref Interop.Winsock.TimeValue socketTime)
         {
             const int microcnv = 1000000;
@@ -94,7 +98,8 @@ namespace System.Net.Sockets
 
         public static SocketError GetSockName(SafeCloseSocket handle, byte[] buffer, ref int nameLen)
         {
-            return Interop.Winsock.getsockname(handle, buffer, ref nameLen);
+            SocketError errorCode = Interop.Winsock.getsockname(handle, buffer, ref nameLen);
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
         }
 
         public static SocketError GetAvailable(SafeCloseSocket handle, out int available)
@@ -105,22 +110,25 @@ namespace System.Net.Sockets
                 Interop.Winsock.IoctlSocketConstants.FIONREAD,
                 ref value);
             available = value;
-            return errorCode;
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
         }
 
         public static SocketError GetPeerName(SafeCloseSocket handle, byte[] buffer, ref int nameLen)
         {
-            return Interop.Winsock.getpeername(handle, buffer, ref nameLen);
+            SocketError errorCode = Interop.Winsock.getpeername(handle, buffer, ref nameLen);
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
         }
 
         public static SocketError Bind(SafeCloseSocket handle, byte[] buffer, int nameLen)
         {
-            return Interop.Winsock.bind(handle, buffer, nameLen);
+            SocketError errorCode = Interop.Winsock.bind(handle, buffer, nameLen);
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
         }
 
         public static SocketError Listen(SafeCloseSocket handle, int backlog)
         {
-            return Interop.Winsock.listen(handle, backlog);
+            SocketError errorCode = Interop.Winsock.listen(handle, backlog);
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
         }
 
         public static SafeCloseSocket Accept(SafeCloseSocket handle, byte[] buffer, ref int nameLen)
@@ -138,6 +146,19 @@ namespace System.Net.Sockets
                 IntPtr.Zero,
                 IntPtr.Zero,
                 IntPtr.Zero);
+        }
+
+        public static SocketError Disconnect(Socket socket, SafeCloseSocket handle, bool reuseSocket)
+        {
+            SocketError errorCode = SocketError.Success;
+
+            // This can throw ObjectDisposedException (handle, and retrieving the delegate).
+            if (!socket.DisconnectEx_Blocking(handle.DangerousGetHandle(), IntPtr.Zero, (int)(reuseSocket ? TransmitFileOptions.ReuseSocket : 0), 0))
+            {
+                errorCode = GetLastSocketError();
+            }
+
+            return errorCode;
         }
 
         public static SocketError Send(SafeCloseSocket handle, BufferOffsetSize[] buffers, SocketFlags socketFlags, out int bytesTransferred)
@@ -345,9 +366,9 @@ namespace System.Net.Sockets
                 asyncResult.SyncReleaseUnmanagedStructures();
             }
 
-            socketFlags = asyncResult.m_flags;
-            receiveAddress = asyncResult.m_SocketAddress;
-            ipPacketInformation = asyncResult.m_IPPacketInformation;
+            socketFlags = asyncResult.SocketFlags;
+            receiveAddress = asyncResult.SocketAddress;
+            ipPacketInformation = asyncResult.IPPacketInformation;
 
             return errorCode;
         }
@@ -365,7 +386,12 @@ namespace System.Net.Sockets
 
         public static SocketError Ioctl(SafeCloseSocket handle, int ioControlCode, byte[] optionInValue, byte[] optionOutValue, out int optionLength)
         {
-            return Interop.Winsock.WSAIoctl_Blocking(
+            if (ioControlCode == Interop.Winsock.IoctlSocketConstants.FIONBIO)
+            {
+                throw new InvalidOperationException(SR.net_sockets_useblocking);
+            }
+
+            SocketError errorCode = Interop.Winsock.WSAIoctl_Blocking(
                 handle.DangerousGetHandle(),
                 ioControlCode,
                 optionInValue,
@@ -375,11 +401,17 @@ namespace System.Net.Sockets
                 out optionLength,
                 SafeNativeOverlapped.Zero,
                 IntPtr.Zero);
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
         }
 
         public static SocketError IoctlInternal(SafeCloseSocket handle, IOControlCode ioControlCode, IntPtr optionInValue, int inValueLength, IntPtr optionOutValue, int outValueLength, out int optionLength)
         {
-            return Interop.Winsock.WSAIoctl_Blocking_Internal(
+            if ((unchecked((int)ioControlCode)) == Interop.Winsock.IoctlSocketConstants.FIONBIO)
+            {
+                throw new InvalidOperationException(SR.net_sockets_useblocking);
+            }
+
+            SocketError errorCode = Interop.Winsock.WSAIoctl_Blocking_Internal(
                 handle.DangerousGetHandle(),
                 (uint)ioControlCode,
                 optionInValue,
@@ -389,47 +421,209 @@ namespace System.Net.Sockets
                 out optionLength,
                 SafeNativeOverlapped.Zero,
                 IntPtr.Zero);
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
         }
 
         public static unsafe SocketError SetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, int optionValue)
         {
-            return Interop.Winsock.setsockopt(
+            SocketError errorCode = Interop.Winsock.setsockopt(
                 handle,
                 optionLevel,
                 optionName,
                 ref optionValue,
                 sizeof(int));
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
         }
 
         public static SocketError SetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, byte[] optionValue)
         {
-            return Interop.Winsock.setsockopt(
+            SocketError errorCode = Interop.Winsock.setsockopt(
                 handle,
                 optionLevel,
                 optionName,
                 optionValue,
                 optionValue != null ? optionValue.Length : 0);
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
+        }
+
+        public static SocketError SetMulticastOption(SafeCloseSocket handle, SocketOptionName optionName, MulticastOption optionValue)
+        {
+            Interop.Winsock.IPMulticastRequest ipmr = new Interop.Winsock.IPMulticastRequest();
+
+            ipmr.MulticastAddress = unchecked((int)optionValue.Group.GetAddress());
+
+            if (optionValue.LocalAddress != null)
+            {
+                ipmr.InterfaceAddress = unchecked((int)optionValue.LocalAddress.GetAddress());
+            }
+            else
+            {  //this structure works w/ interfaces as well
+                int ifIndex = IPAddress.HostToNetworkOrder(optionValue.InterfaceIndex);
+                ipmr.InterfaceAddress = unchecked((int)ifIndex);
+            }
+
+#if BIGENDIAN
+            ipmr.MulticastAddress = (int) (((uint) ipmr.MulticastAddress << 24) |
+                                           (((uint) ipmr.MulticastAddress & 0x0000FF00) << 8) |
+                                           (((uint) ipmr.MulticastAddress >> 8) & 0x0000FF00) |
+                                           ((uint) ipmr.MulticastAddress >> 24));
+
+            if(optionValue.LocalAddress != null){
+                ipmr.InterfaceAddress = (int) (((uint) ipmr.InterfaceAddress << 24) |
+                                           (((uint) ipmr.InterfaceAddress & 0x0000FF00) << 8) |
+                                           (((uint) ipmr.InterfaceAddress >> 8) & 0x0000FF00) |
+                                           ((uint) ipmr.InterfaceAddress >> 24));
+            }
+#endif  // BIGENDIAN
+
+            // This can throw ObjectDisposedException.
+            SocketError errorCode = Interop.Winsock.setsockopt(
+                handle,
+                SocketOptionLevel.IP,
+                optionName,
+                ref ipmr,
+                Interop.Winsock.IPMulticastRequest.Size);
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
+        }
+
+        public static SocketError SetIPv6MulticastOption(SafeCloseSocket handle, SocketOptionName optionName, IPv6MulticastOption optionValue)
+        {
+            Interop.Winsock.IPv6MulticastRequest ipmr = new Interop.Winsock.IPv6MulticastRequest();
+
+            ipmr.MulticastAddress = optionValue.Group.GetAddressBytes();
+            ipmr.InterfaceIndex = unchecked((int)optionValue.InterfaceIndex);
+
+            // This can throw ObjectDisposedException.
+            SocketError errorCode = Interop.Winsock.setsockopt(
+                handle,
+                SocketOptionLevel.IPv6,
+                optionName,
+                ref ipmr,
+                Interop.Winsock.IPv6MulticastRequest.Size);
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
+        }
+
+        public static SocketError SetLingerOption(SafeCloseSocket handle, LingerOption optionValue)
+        {
+            Interop.Winsock.Linger lngopt = new Interop.Winsock.Linger();
+            lngopt.OnOff = optionValue.Enabled ? (ushort)1 : (ushort)0;
+            lngopt.Time = (ushort)optionValue.LingerTime;
+
+            // This can throw ObjectDisposedException.
+            SocketError errorCode = Interop.Winsock.setsockopt(
+                handle,
+                SocketOptionLevel.Socket,
+                SocketOptionName.Linger,
+                ref lngopt,
+                4);
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
         }
 
         public static SocketError GetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, out int optionValue)
         {
             int optionLength = 4; // sizeof(int)
-            return Interop.Winsock.getsockopt(
+            SocketError errorCode = Interop.Winsock.getsockopt(
                 handle,
                 optionLevel,
                 optionName,
                 out optionValue,
                 ref optionLength);
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
         }
 
         public static SocketError GetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, byte[] optionValue, ref int optionLength)
         {
-             return Interop.Winsock.getsockopt(
+             SocketError errorCode = Interop.Winsock.getsockopt(
                 handle,
                 optionLevel,
                 optionName,
                 optionValue,
                 ref optionLength);
+            return errorCode == SocketError.SocketError ? GetLastSocketError() : SocketError.Success;
+        }
+
+        public static SocketError GetMulticastOption(SafeCloseSocket handle, SocketOptionName optionName, out MulticastOption optionValue)
+        {
+            Interop.Winsock.IPMulticastRequest ipmr = new Interop.Winsock.IPMulticastRequest();
+            int optlen = Interop.Winsock.IPMulticastRequest.Size;
+
+            // This can throw ObjectDisposedException.
+            SocketError errorCode = Interop.Winsock.getsockopt(
+                handle,
+                SocketOptionLevel.IP,
+                optionName,
+                out ipmr,
+                ref optlen);
+
+            if (errorCode == SocketError.SocketError)
+            {
+                optionValue = default(MulticastOption);
+                return GetLastSocketError();
+            }
+
+#if BIGENDIAN
+            ipmr.MulticastAddress = (int) (((uint) ipmr.MulticastAddress << 24) |
+                                           (((uint) ipmr.MulticastAddress & 0x0000FF00) << 8) |
+                                           (((uint) ipmr.MulticastAddress >> 8) & 0x0000FF00) |
+                                           ((uint) ipmr.MulticastAddress >> 24));
+            ipmr.InterfaceAddress = (int) (((uint) ipmr.InterfaceAddress << 24) |
+                                           (((uint) ipmr.InterfaceAddress & 0x0000FF00) << 8) |
+                                           (((uint) ipmr.InterfaceAddress >> 8) & 0x0000FF00) |
+                                           ((uint) ipmr.InterfaceAddress >> 24));
+#endif  // BIGENDIAN
+
+            IPAddress multicastAddr = new IPAddress(ipmr.MulticastAddress);
+            IPAddress multicastIntr = new IPAddress(ipmr.InterfaceAddress);
+            optionValue = new MulticastOption(multicastAddr, multicastIntr);
+
+            return SocketError.Success;
+        }
+
+        public static SocketError GetIPv6MulticastOption(SafeCloseSocket handle, SocketOptionName optionName, out IPv6MulticastOption optionValue)
+        {
+            Interop.Winsock.IPv6MulticastRequest ipmr = new Interop.Winsock.IPv6MulticastRequest();
+
+            int optlen = Interop.Winsock.IPv6MulticastRequest.Size;
+
+            // This can throw ObjectDisposedException.
+            SocketError errorCode = Interop.Winsock.getsockopt(
+                handle,
+                SocketOptionLevel.IP,
+                optionName,
+                out ipmr,
+                ref optlen);
+            
+            if (errorCode == SocketError.SocketError)
+            {
+                optionValue = default(IPv6MulticastOption);
+                return GetLastSocketError();
+            }
+
+            optionValue = new IPv6MulticastOption(new IPAddress(ipmr.MulticastAddress), ipmr.InterfaceIndex);
+            return SocketError.Success;
+        }
+
+        public static SocketError GetLingerOption(SafeCloseSocket handle, out LingerOption optionValue)
+        {
+            Interop.Winsock.Linger lngopt = new Interop.Winsock.Linger();
+            int optlen = 4;
+
+            // This can throw ObjectDisposedException.
+            SocketError errorCode = Interop.Winsock.getsockopt(
+                handle,
+                SocketOptionLevel.Socket,
+                SocketOptionName.Linger,
+                out lngopt,
+                ref optlen);
+
+            if (errorCode == SocketError.SocketError)
+            {
+                optionValue = default(LingerOption);
+                return GetLastSocketError();
+            }
+
+            optionValue = new LingerOption(lngopt.OnOff != 0, (int)lngopt.Time);
+            return SocketError.Success;
         }
 
         public static SocketError Poll(SafeCloseSocket handle, int microseconds, SelectMode mode, out bool status)
@@ -558,6 +752,21 @@ namespace System.Net.Sockets
             return SocketError.Success;
         }
 
+        public static unsafe SocketError DisconnectAsync(Socket socket, SafeCloseSocket handle, bool reuseSocket, DisconnectOverlappedAsyncResult asyncResult)
+        {
+            asyncResult.SetUnmanagedStructures(null);
+
+            SocketError errorCode = SocketError.Success;
+
+            // This can throw ObjectDisposedException (handle, and retrieving the delegate).
+            if (!socket.DisconnectEx(handle, asyncResult.OverlappedHandle, (int)(reuseSocket ? TransmitFileOptions.ReuseSocket : 0), 0))
+            {
+                errorCode = GetLastSocketError();
+            }
+
+            return errorCode;
+        }
+
         public static unsafe SocketError SendAsync(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, OverlappedAsyncResult asyncResult)
         {
             // Set up asyncResult for overlapped WSASend.
@@ -653,7 +862,7 @@ namespace System.Net.Sockets
 
             if (errorCode != SocketError.Success)
             {
-                errorCode = SocketPal.GetLastSocketError();
+                errorCode = GetLastSocketError();
             }
 
             return errorCode;
@@ -729,7 +938,27 @@ namespace System.Net.Sockets
 
             if (errorCode != SocketError.Success)
             {
-                errorCode = SocketPal.GetLastSocketError();
+                errorCode = GetLastSocketError();
+            }
+
+            return errorCode;
+        }
+
+        public static unsafe SocketError ReceiveMessageFromAsync(Socket socket, SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, Internals.SocketAddress socketAddress, ReceiveMessageOverlappedAsyncResult asyncResult)
+        {
+            asyncResult.SetUnmanagedStructures(buffer, offset, count, socketAddress, socketFlags);
+
+            int bytesTransfered;
+            SocketError errorCode = (SocketError)socket.WSARecvMsg(
+                handle,
+                Marshal.UnsafeAddrOfPinnedArrayElement(asyncResult.m_MessageBuffer, 0),
+                out bytesTransfered,
+                asyncResult.OverlappedHandle,
+                IntPtr.Zero);
+
+            if (errorCode != SocketError.Success)
+            {
+                errorCode = GetLastSocketError();
             }
 
             return errorCode;
@@ -763,7 +992,7 @@ namespace System.Net.Sockets
                 out bytesTransferred,
                 asyncResult.OverlappedHandle))
             {
-                errorCode = SocketPal.GetLastSocketError();
+                errorCode = GetLastSocketError();
             }
 
             return errorCode;

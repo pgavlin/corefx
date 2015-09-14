@@ -302,6 +302,11 @@ namespace System.Net.Sockets
                     IntPtr.Zero);
             }
 
+            if (socketError == SocketError.SocketError)
+            {
+                socketError = SocketPal.GetLastSocketError();
+            }
+
             return socketError;
         }
 
@@ -354,6 +359,11 @@ namespace System.Net.Sockets
                                 m_PtrSocketAddressBufferSize,
                                 m_PtrNativeOverlapped,
                                 IntPtr.Zero);
+            }
+
+            if (socketError == SocketError.SocketError)
+            {
+                socketError = SocketPal.GetLastSocketError();
             }
 
             return socketError;
@@ -454,12 +464,19 @@ namespace System.Net.Sockets
         {
             PrepareIOCPOperation();
 
-            return socket.WSARecvMsg(
+            SocketError socketError = socket.WSARecvMsg(
                 handle,
                 m_PtrWSAMessageBuffer,
                 out bytesTransferred,
                 m_PtrNativeOverlapped,
                 IntPtr.Zero);
+
+            if (socketError == SocketError.SocketError)
+            {
+                socketError = SocketPal.GetLastSocketError();
+            }
+
+            return socketError;
         }
 
         private void InnerStartOperationSend()
@@ -504,6 +521,11 @@ namespace System.Net.Sockets
                     m_SocketFlags,
                     m_PtrNativeOverlapped,
                     IntPtr.Zero);
+            }
+
+            if (socketError == SocketError.SocketError)
+            {
+                socketError = SocketPal.GetLastSocketError();
             }
 
             return socketError;
@@ -660,6 +682,11 @@ namespace System.Net.Sockets
                                 m_SocketAddress.Size,
                                 m_PtrNativeOverlapped,
                                 IntPtr.Zero);
+            }
+
+            if (socketError == SocketError.SocketError)
+            {
+                socketError = SocketPal.GetLastSocketError();
             }
 
             return socketError;
@@ -981,7 +1008,7 @@ namespace System.Net.Sockets
                         // a buffer
                         m_SendPacketsDescriptor[descriptorIndex].buffer = Marshal.UnsafeAddrOfPinnedArrayElement(spe.m_Buffer, spe.m_Offset);
                         m_SendPacketsDescriptor[descriptorIndex].length = (uint)spe.m_Count;
-                        m_SendPacketsDescriptor[descriptorIndex].flags = spe.m_Flags;
+                        m_SendPacketsDescriptor[descriptorIndex].flags = (Interop.Winsock.TransmitPacketsElementFlags)spe.m_Flags;
                         descriptorIndex++;
                     }
                     else if (spe.m_FilePath != null)
@@ -990,7 +1017,7 @@ namespace System.Net.Sockets
                         m_SendPacketsDescriptor[descriptorIndex].fileHandle = m_SendPacketsFileHandles[fileIndex].DangerousGetHandle();
                         m_SendPacketsDescriptor[descriptorIndex].fileOffset = spe.m_Offset;
                         m_SendPacketsDescriptor[descriptorIndex].length = (uint)spe.m_Count;
-                        m_SendPacketsDescriptor[descriptorIndex].flags = spe.m_Flags;
+                        m_SendPacketsDescriptor[descriptorIndex].flags = (Interop.Winsock.TransmitPacketsElementFlags)spe.m_Flags;
                         fileIndex++;
                         descriptorIndex++;
                     }

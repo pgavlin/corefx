@@ -52,10 +52,12 @@ namespace System.Net.Sockets
 
         public unsafe void EventLoop()
         {
-            var events = stackalloc Interop.libc.epoll_event[64];
+            const int EventCount = 64;
+
+            var events = stackalloc Interop.libc.epoll_event[EventCount];
             for (;;)
             {
-                int numEvents = Interop.libc.epoll_wait(_epollFd, events, 64, -1);
+                int numEvents = Interop.libc.epoll_wait(_epollFd, events, EventCount, -1);
                 if (numEvents == -1)
                 {
                     // TODO: error handling + EINTR?

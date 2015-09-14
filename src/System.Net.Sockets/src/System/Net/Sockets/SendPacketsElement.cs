@@ -12,7 +12,7 @@ namespace System.Net.Sockets
         internal byte[] m_Buffer;
         internal int m_Offset;
         internal int m_Count;
-        internal Interop.Winsock.TransmitPacketsElementFlags m_Flags;
+        internal SendPacketsElementFlags m_Flags;
 
         // hide default constructor
         private SendPacketsElement() { }
@@ -44,7 +44,7 @@ namespace System.Net.Sockets
             }
             Contract.EndContractBlock();
 
-            Initialize(filepath, null, offset, count, Interop.Winsock.TransmitPacketsElementFlags.File,
+            Initialize(filepath, null, offset, count, SendPacketsElementFlags.File,
                 endOfPacket);
         }
 
@@ -73,12 +73,12 @@ namespace System.Net.Sockets
             }
             Contract.EndContractBlock();
 
-            Initialize(null, buffer, offset, count, Interop.Winsock.TransmitPacketsElementFlags.Memory,
+            Initialize(null, buffer, offset, count, SendPacketsElementFlags.Memory,
                 endOfPacket);
         }
 
         private void Initialize(string filePath, byte[] buffer, int offset, int count,
-            Interop.Winsock.TransmitPacketsElementFlags flags, bool endOfPacket)
+            SendPacketsElementFlags flags, bool endOfPacket)
         {
             m_FilePath = filePath;
             m_Buffer = buffer;
@@ -87,7 +87,7 @@ namespace System.Net.Sockets
             m_Flags = flags;
             if (endOfPacket)
             {
-                m_Flags |= Interop.Winsock.TransmitPacketsElementFlags.EndOfPacket;
+                m_Flags |= SendPacketsElementFlags.EndOfPacket;
             }
         }
 
@@ -118,7 +118,7 @@ namespace System.Net.Sockets
         // EndOfPacket property
         public bool EndOfPacket
         {
-            get { return (m_Flags & Interop.Winsock.TransmitPacketsElementFlags.EndOfPacket) != 0; }
+            get { return (m_Flags & SendPacketsElementFlags.EndOfPacket) != 0; }
         }
     }
 }
