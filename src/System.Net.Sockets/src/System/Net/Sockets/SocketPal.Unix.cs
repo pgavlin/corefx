@@ -17,6 +17,8 @@ namespace System.Net.Sockets
 {
     internal static class SocketPal
     {
+        // TODO: properly adjust send/receive timeouts in the case of repeated calls to poll()
+
         // The API that uses this information is not supported on *nix, and will throw
         // PlatformNotSupportedException instead.
         public const int ProtocolInformationSize = 0;
@@ -530,19 +532,17 @@ namespace System.Net.Sockets
             throw new PlatformNotSupportedException();
         }
 
-        public static unsafe bool Poll(int fd, Interop.libc.PollFlags events, out SocketError errorCode)
+        public static unsafe bool Poll(int fd, Interop.libc.PollFlags events, int timeout, out SocketError errorCode)
         {
-            // TODO: respect send/receive timeouts?
-
             var pollfd = new Interop.libc.pollfd {
                 fd = fd,
                 events = events
             };
 
-            int nfds = Interop.libc.poll(&pollfd, 1, -1);
+            int nfds = Interop.libc.poll(&pollfd, 1, timeout);
             if (nfds != 1)
             {
-                errorCode = nfds == 0 ? SocketError.SocketError : GetLastSocketError();
+                errorCode = nfds == 0 ? SocketError.TimedOut : GetLastSocketError();
                 return false;
             }
 
@@ -1187,14 +1187,14 @@ namespace System.Net.Sockets
             int fd = handle.FileDescriptor;
 
             SocketError errorCode;
-            if (!TryStartConnect(fd, peerAddress, peerAddressLen, out errorCode))
+            if (TryStartConnect(fd, peerAddress, peerAddressLen, out errorCode))
             {
                 return errorCode;
             }
 
             while (!TryCompleteConnect(fd, peerAddressLen, out errorCode) && !handle.IsNonBlocking)
             {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, out errorCode))
+                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, -1, out errorCode))
                 {
                     break;
                 }
@@ -1221,7 +1221,7 @@ namespace System.Net.Sockets
             SocketError errorCode;
             while (!TryCompleteSendTo(fd, bufferList, ref bufferIndex, ref offset, platformFlags, null, 0, ref bytesSent, out errorCode) && !handle.IsNonBlocking)
             {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, out errorCode))
+                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, handle.SendTimeout, out errorCode))
                 {
                     break;
                 }
@@ -1244,7 +1244,7 @@ namespace System.Net.Sockets
             SocketError errorCode;
             while (!TryCompleteSendTo(fd, bufferList, ref bufferIndex, ref offset, platformFlags, null, 0, ref bytesSent, out errorCode) && !handle.IsNonBlocking)
             {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, out errorCode))
+                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, handle.SendTimeout, out errorCode))
                 {
                     break;
                 }
@@ -1264,7 +1264,7 @@ namespace System.Net.Sockets
             SocketError errorCode;
             while (!TryCompleteSendTo(fd, buffer, ref offset, ref size, platformFlags, null, 0, ref bytesSent, out errorCode) && !handle.IsNonBlocking)
             {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, out errorCode))
+                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, handle.SendTimeout, out errorCode))
                 {
                     break;
                 }
@@ -1284,7 +1284,7 @@ namespace System.Net.Sockets
             SocketError errorCode;
             while (!TryCompleteSendTo(fd, buffer, ref offset, ref size, platformFlags, peerAddress, peerAddressSize, ref bytesSent, out errorCode) && !handle.IsNonBlocking)
             {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, out errorCode))
+                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, handle.SendTimeout, out errorCode))
                 {
                     break;
                 }
@@ -1305,7 +1305,7 @@ namespace System.Net.Sockets
             SocketError errorCode;
             while (!TryCompleteReceiveFrom(fd, buffers, platformFlags, null, ref socketAddressLen, out bytesReceived, out receiveFlags, out errorCode) && !handle.IsNonBlocking)
             {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLIN, out errorCode))
+                if (!Poll(fd, Interop.libc.PollFlags.POLLIN, handle.ReceiveTimeout, out errorCode))
                 {
                     break;
                 }
@@ -1327,7 +1327,7 @@ namespace System.Net.Sockets
             SocketError errorCode;
             while (!TryCompleteReceiveFrom(fd, buffer, offset, size, platformFlags, null, ref socketAddressLen, out bytesReceived, out receiveFlags, out errorCode) && !handle.IsNonBlocking)
             {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLIN, out errorCode))
+                if (!Poll(fd, Interop.libc.PollFlags.POLLIN, handle.ReceiveTimeout, out errorCode))
                 {
                     break;
                 }
@@ -1353,7 +1353,7 @@ namespace System.Net.Sockets
             SocketError errorCode;
             while (!TryCompleteReceiveMessageFrom(fd, buffer, offset, size, platformFlags, socketAddressBuffer, ref socketAddressLen, isIPv4, isIPv6, out bytesReceived, out receiveFlags, out ipPacketInformation, out errorCode) && !handle.IsNonBlocking)
             {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLIN, out errorCode))
+                if (!Poll(fd, Interop.libc.PollFlags.POLLIN, handle.ReceiveTimeout, out errorCode))
                 {
                     break;
                 }
@@ -1376,7 +1376,7 @@ namespace System.Net.Sockets
             SocketError errorCode;
             while (!TryCompleteReceiveFrom(fd, buffer, offset, size, platformFlags, peerAddress, ref addressLength, out bytesReceived, out receiveFlags, out errorCode) && !handle.IsNonBlocking)
             {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLIN, out errorCode))
+                if (!Poll(fd, Interop.libc.PollFlags.POLLIN, handle.ReceiveTimeout, out errorCode))
                 {
                     break;
                 }
@@ -1400,6 +1400,20 @@ namespace System.Net.Sockets
 
         public static unsafe SocketError SetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, int optionValue)
         {
+            if (optionLevel == SocketOptionLevel.Socket)
+            {
+                if (optionName == SocketOptionName.ReceiveTimeout)
+                {
+                    handle.ReceiveTimeout = optionValue;
+                    return SocketError.Success;
+                }
+                else if (optionName == SocketOptionName.SendTimeout)
+                {
+                    handle.SendTimeout = optionValue;
+                    return SocketError.Success;
+                }
+            }
+
             int optLevel, optName;
             GetPlatformOptionInfo(optionLevel, optionName, out optLevel, out optName);
 
@@ -1488,15 +1502,28 @@ namespace System.Net.Sockets
 
         public static unsafe SocketError GetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, out int optionValue)
         {
+            if (optionLevel == SocketOptionLevel.Socket)
+            {
+                if (optionName == SocketOptionName.ReceiveTimeout)
+                {
+                    optionValue = handle.ReceiveTimeout;
+                    return SocketError.Success;
+                }
+                else if (optionName == SocketOptionName.SendTimeout)
+                {
+                    optionValue = handle.SendTimeout;
+                    return SocketError.Success;
+                }
+            }
+
             int optLevel, optName;
             GetPlatformOptionInfo(optionLevel, optionName, out optLevel, out optName);
 
-            uint optLen = 4; // sizeof(int)
             int value = 0;
-
+            var optLen = (uint)sizeof(int);
             int err = Interop.libc.getsockopt(handle.FileDescriptor, optLevel, optName, &value, &optLen);
+            optionValue = (int)value;
 
-            optionValue = value;
             return err == -1 ? GetLastSocketError() : SocketError.Success;
         }
 

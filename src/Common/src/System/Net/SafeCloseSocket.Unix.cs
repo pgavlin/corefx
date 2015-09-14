@@ -33,6 +33,8 @@ namespace System.Net.Sockets
         }
 
         public bool IsNonBlocking { get; set; }
+        public int ReceiveTimeout { get; set; }
+        public int SendTimeout { get; set; }
 
         public unsafe static SafeCloseSocket CreateSocket(int fileDescriptor)
         {
@@ -206,7 +208,7 @@ namespace System.Net.Sockets
                 SocketError errorCode;
                 while (!SocketPal.TryCompleteAccept(fd, socketAddress, ref socketAddressSize, out acceptedFd, out errorCode) && !socketHandle.IsNonBlocking)
                 {
-                    if (!SocketPal.Poll(fd, Interop.libc.PollFlags.POLLIN, out errorCode))
+                    if (!SocketPal.Poll(fd, Interop.libc.PollFlags.POLLIN, -1, out errorCode))
                     {
                         break;
                     }

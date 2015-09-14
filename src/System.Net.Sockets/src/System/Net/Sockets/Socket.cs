@@ -2205,35 +2205,33 @@ namespace System.Net.Sockets
             {
                 return getIPv6MulticastOpt(optionName);
             }
-            else
+
+            int optionValue = 0;
+
+            // This can throw ObjectDisposedException.
+            SocketError errorCode = SocketPal.GetSockOpt(
+                _handle,
+                optionLevel,
+                optionName,
+                out optionValue);
+
+            GlobalLog.Print("Socket#" + Logging.HashString(this) + "::GetSocketOption() Interop.Winsock.getsockopt returns errorCode:" + errorCode);
+
+            //
+            // if the native call fails we'll throw a SocketException
+            //
+            if (errorCode != SocketError.Success)
             {
-                int optionValue = 0;
-
-                // This can throw ObjectDisposedException.
-                SocketError errorCode = SocketPal.GetSockOpt(
-                    _handle,
-                    optionLevel,
-                    optionName,
-                    out optionValue);
-
-                GlobalLog.Print("Socket#" + Logging.HashString(this) + "::GetSocketOption() Interop.Winsock.getsockopt returns errorCode:" + errorCode);
-
                 //
-                // if the native call fails we'll throw a SocketException
+                // update our internal state after this socket error and throw
                 //
-                if (errorCode != SocketError.Success)
-                {
-                    //
-                    // update our internal state after this socket error and throw
-                    //
-                    SocketException socketException = new SocketException((int)errorCode);
-                    UpdateStatusAfterSocketError(socketException);
-                    if (s_LoggingEnabled) Logging.Exception(Logging.Sockets, this, "GetSocketOption", socketException);
-                    throw socketException;
-                }
-
-                return optionValue;
+                SocketException socketException = new SocketException((int)errorCode);
+                UpdateStatusAfterSocketError(socketException);
+                if (s_LoggingEnabled) Logging.Exception(Logging.Sockets, this, "GetSocketOption", socketException);
+                throw socketException;
             }
+
+            return optionValue;
         }
 
         /// <devdoc>
