@@ -1160,7 +1160,14 @@ namespace System.Net.Sockets
 
         public static SocketError Connect(SafeCloseSocket handle, byte[] socketAddress, int socketAddressLen)
         {
-            return handle.AsyncContext.Connect(socketAddress, socketAddressLen, -1);
+            if (!handle.IsNonBlocking)
+            {
+                return handle.AsyncContext.Connect(socketAddress, socketAddressLen, -1);
+            }
+
+            SocketError errorCode;
+            bool completed = SocketPal.TryStartConnect(handle.FileDescriptor, socketAddress, socketAddressLen, out errorCode);
+            return completed ? errorCode : SocketError.WouldBlock;
         }
 
         public static SocketError Disconnect(Socket socket, SafeCloseSocket handle, bool reuseSocket)
@@ -1170,28 +1177,88 @@ namespace System.Net.Sockets
 
         public static SocketError Send(SafeCloseSocket handle, BufferOffsetSize[] buffers, SocketFlags socketFlags, out int bytesTransferred)
         {
-            return handle.AsyncContext.Send(new BufferList(buffers), GetPlatformSocketFlags(socketFlags), handle.SendTimeout, out bytesTransferred);
+            var bufferList = new BufferList(buffers);
+            int platformFlags = GetPlatformSocketFlags(socketFlags);
+
+            if (!handle.IsNonBlocking)
+            {
+                return handle.AsyncContext.Send(bufferList, platformFlags, handle.SendTimeout, out bytesTransferred);
+            }
+
+            bytesTransferred = 0;
+            int bufferIndex = 0;
+            int offset = 0;
+            SocketError errorCode;
+            bool completed = TryCompleteSendTo(handle.FileDescriptor, bufferList, ref bufferIndex, ref offset, platformFlags, null, 0, ref bytesTransferred, out errorCode);
+            return completed ? errorCode : SocketError.WouldBlock;
         }
 
         public static SocketError Send(SafeCloseSocket handle, IList<ArraySegment<byte>> buffers, SocketFlags socketFlags, out int bytesTransferred)
         {
-            return handle.AsyncContext.Send(new BufferList(buffers), GetPlatformSocketFlags(socketFlags), handle.SendTimeout, out bytesTransferred);
+            var bufferList = new BufferList(buffers);
+            int platformFlags = GetPlatformSocketFlags(socketFlags);
+
+            if (!handle.IsNonBlocking)
+            {
+                return handle.AsyncContext.Send(bufferList, platformFlags, handle.SendTimeout, out bytesTransferred);
+            }
+
+            bytesTransferred = 0;
+            int bufferIndex = 0;
+            int offset = 0;
+            SocketError errorCode;
+            bool completed = TryCompleteSendTo(handle.FileDescriptor, bufferList, ref bufferIndex, ref offset, platformFlags, null, 0, ref bytesTransferred, out errorCode);
+            return completed ? errorCode : SocketError.WouldBlock;
         }
 
         public static SocketError Send(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, out int bytesTransferred)
         {
-            return handle.AsyncContext.Send(buffer, offset, count, GetPlatformSocketFlags(socketFlags), handle.SendTimeout, out bytesTransferred);
+            int platformFlags = GetPlatformSocketFlags(socketFlags);
+
+            if (!handle.IsNonBlocking)
+            {
+                return handle.AsyncContext.Send(buffer, offset, count, platformFlags, handle.SendTimeout, out bytesTransferred);
+            }
+
+            bytesTransferred = 0;
+            SocketError errorCode;
+            bool completed = TryCompleteSendTo(handle.FileDescriptor, buffer, ref offset, ref count, platformFlags, null, 0, ref bytesTransferred, out errorCode);
+            return completed ? errorCode : SocketError.WouldBlock;
         }
 
         public static SocketError SendTo(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, byte[] socketAddress, int socketAddressLen, out int bytesTransferred)
         {
-            return handle.AsyncContext.SendTo(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress, socketAddressLen, handle.SendTimeout, out bytesTransferred);
+            int platformFlags = GetPlatformSocketFlags(socketFlags);
+
+            if (!handle.IsNonBlocking)
+            {
+                return handle.AsyncContext.SendTo(buffer, offset, count, platformFlags, socketAddress, socketAddressLen, handle.SendTimeout, out bytesTransferred);
+            }
+
+            bytesTransferred = 0;
+            SocketError errorCode;
+            bool completed = TryCompleteSendTo(handle.FileDescriptor, buffer, ref offset, ref count, platformFlags, socketAddress, socketAddressLen, ref bytesTransferred, out errorCode);
+            return completed ? errorCode : SocketError.WouldBlock;
         }
 
         public static SocketError Receive(SafeCloseSocket handle, IList<ArraySegment<byte>> buffers, ref SocketFlags socketFlags, out int bytesTransferred)
         {
             int platformFlags = GetPlatformSocketFlags(socketFlags);
-            SocketError errorCode = handle.AsyncContext.Receive(buffers, ref platformFlags, handle.ReceiveTimeout, out bytesTransferred);
+
+            SocketError errorCode;
+            if (!handle.IsNonBlocking)
+            {
+                errorCode = handle.AsyncContext.Receive(buffers, ref platformFlags, handle.ReceiveTimeout, out bytesTransferred);
+            }
+            else
+            {
+                int socketAddressLen = 0;
+                if (!TryCompleteReceiveFrom(handle.FileDescriptor, buffers, platformFlags, null, ref socketAddressLen, out bytesTransferred, out platformFlags, out errorCode))
+                {
+                    errorCode = SocketError.WouldBlock;
+                }
+            }
+
             socketFlags = GetSocketFlags(platformFlags);
             return errorCode;
         }
@@ -1199,7 +1266,16 @@ namespace System.Net.Sockets
         public static SocketError Receive(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, out int bytesTransferred)
         {
             int platformFlags = GetPlatformSocketFlags(socketFlags);
-            return handle.AsyncContext.Receive(buffer, offset, count, ref platformFlags, handle.ReceiveTimeout, out bytesTransferred);
+
+            if (!handle.IsNonBlocking)
+            {
+                return handle.AsyncContext.Receive(buffer, offset, count, ref platformFlags, handle.ReceiveTimeout, out bytesTransferred);
+            }
+
+            int socketAddressLen = 0;
+            SocketError errorCode;
+            bool completed = TryCompleteReceiveFrom(handle.FileDescriptor, buffer, offset, count, platformFlags, null, ref socketAddressLen, out bytesTransferred, out platformFlags, out errorCode);
+            return completed ? errorCode : SocketError.WouldBlock;
         }
 
         public static SocketError ReceiveMessageFrom(Socket socket, SafeCloseSocket handle, byte[] buffer, int offset, int count, ref SocketFlags socketFlags, Internals.SocketAddress socketAddress, out Internals.SocketAddress receiveAddress, out IPPacketInformation ipPacketInformation, out int bytesTransferred)
@@ -1211,8 +1287,19 @@ namespace System.Net.Sockets
             bool isIPv4, isIPv6;
             Socket.GetIPProtocolInformation(socket.AddressFamily, socketAddress, out isIPv4, out isIPv6);
 
-            SocketError errorCode = handle.AsyncContext.ReceiveMessageFrom(buffer, offset, count, ref platformFlags, socketAddressBuffer, ref socketAddressLen, isIPv4, isIPv6, handle.ReceiveTimeout, out ipPacketInformation, out bytesTransferred);
-            
+            SocketError errorCode;
+            if (!handle.IsNonBlocking)
+            {
+                errorCode = handle.AsyncContext.ReceiveMessageFrom(buffer, offset, count, ref platformFlags, socketAddressBuffer, ref socketAddressLen, isIPv4, isIPv6, handle.ReceiveTimeout, out ipPacketInformation, out bytesTransferred);
+            }
+            else
+            {
+                if (!TryCompleteReceiveMessageFrom(handle.FileDescriptor, buffer, offset, count, platformFlags, socketAddressBuffer, ref socketAddressLen, isIPv4, isIPv6, out bytesTransferred, out platformFlags, out ipPacketInformation, out errorCode))
+                {
+                    errorCode = SocketError.WouldBlock;
+                }
+            }
+
             socketAddress.InternalSize = socketAddressLen;
             receiveAddress = socketAddress;
             socketFlags = GetSocketFlags(platformFlags);
@@ -1222,7 +1309,15 @@ namespace System.Net.Sockets
         public static SocketError ReceiveFrom(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, byte[] socketAddress, ref int socketAddressLen, out int bytesTransferred)
         {
             int platformFlags = GetPlatformSocketFlags(socketFlags);
-            return handle.AsyncContext.ReceiveFrom(buffer, offset, count, ref platformFlags, socketAddress, ref socketAddressLen, handle.ReceiveTimeout, out bytesTransferred);
+
+            if (!handle.IsNonBlocking)
+            {
+                return handle.AsyncContext.ReceiveFrom(buffer, offset, count, ref platformFlags, socketAddress, ref socketAddressLen, handle.ReceiveTimeout, out bytesTransferred);
+            }
+
+            SocketError errorCode;
+            bool completed = TryCompleteReceiveFrom(handle.FileDescriptor, buffer, offset, count, platformFlags, socketAddress, ref socketAddressLen, out bytesTransferred, out platformFlags, out errorCode);
+            return completed ? errorCode : SocketError.WouldBlock;
         }
 
         public static SocketError Ioctl(SafeCloseSocket handle, int ioControlCode, byte[] optionInValue, byte[] optionOutValue, out int optionLength)

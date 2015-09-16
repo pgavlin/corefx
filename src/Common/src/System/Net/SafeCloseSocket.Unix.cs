@@ -230,7 +230,15 @@ namespace System.Net.Sockets
             public static unsafe InnerSafeCloseSocket Accept(SafeCloseSocket socketHandle, byte[] socketAddress, ref int socketAddressLen)
             {
                 int acceptedFd;
-                socketHandle.AsyncContext.Accept(socketAddress, ref socketAddressLen, -1, out acceptedFd);
+                if (!socketHandle.IsNonBlocking)
+                {
+                    socketHandle.AsyncContext.Accept(socketAddress, ref socketAddressLen, -1, out acceptedFd);
+                }
+                else
+                {
+                    SocketError unused;
+                    SocketPal.TryCompleteAccept(socketHandle.FileDescriptor, socketAddress, ref socketAddressLen, out acceptedFd, out unused);
+                }
 
                 var res = new InnerSafeCloseSocket();
                 res.SetHandle((IntPtr)acceptedFd);

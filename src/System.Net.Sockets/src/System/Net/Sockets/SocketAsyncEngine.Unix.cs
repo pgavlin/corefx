@@ -47,7 +47,7 @@ namespace System.Net.Sockets
                                     }
                                     catch (Exception e)
                                     {
-                                        Debug.Fail("Exception thrown from event loop: {0}", e.Message);
+                                        Debug.Fail(string.Format("Exception thrown from event loop: {0}", e.Message));
                                     }
                                 }
                             }, engine, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
