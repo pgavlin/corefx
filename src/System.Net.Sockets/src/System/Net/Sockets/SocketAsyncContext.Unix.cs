@@ -345,12 +345,8 @@ namespace System.Net.Sockets
             SocketAsyncEvents events = _registeredEvents & ~SocketAsyncEvents.Read;
 
             Interop.Error errorCode;
-            if (!_engine.TryRegister(_fileDescriptor, _registeredEvents, events, _handle, out errorCode))
-            {
-                // TODO: throw an appropiate exception
-                throw new Exception(string.Format("UnregisterRead: {0}", errorCode));
-            }
-
+            bool unregistered = _engine.TryRegister(_fileDescriptor, _registeredEvents, events, _handle, out errorCode);
+            Debug.Assert(unregistered, string.Format("UnregisterRead failed: {0}", errorCode));
             _registeredEvents = events;
         }
 
