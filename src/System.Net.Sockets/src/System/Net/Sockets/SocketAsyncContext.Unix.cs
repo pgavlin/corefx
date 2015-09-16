@@ -402,15 +402,14 @@ namespace System.Net.Sockets
             }
         }
 
-        public void Close()
+        private void ProcessClose()
         {
-            Debug.Assert(!Monitor.IsEntered(_queueLock));
+            Debug.Assert(Monitor.IsEntered(_closeLock) && !Monitor.IsEntered(_queueLock));
 
             OperationQueue<AcceptOrConnectOperation> acceptOrConnectQueue;
             OperationQueue<SendOperation> sendQueue;
             OperationQueue<TransferOperation> receiveQueue;
 
-            lock (_closeLock)
             lock (_queueLock)
             {
                 // Drain queues and unregister events
@@ -446,6 +445,16 @@ namespace System.Net.Sockets
                 bool completed = op.TryCompleteAsync(_fileDescriptor);
                 Debug.Assert(completed);
                 receiveQueue.Dequeue();
+            }
+        }
+
+        public void Close()
+        {
+            Debug.Assert(!Monitor.IsEntered(_queueLock));
+
+            lock (_closeLock)
+            {
+                ProcessClose();
             }
         }
 
@@ -1246,9 +1255,16 @@ namespace System.Net.Sockets
 
                 if ((events & SocketAsyncEvents.Error) != 0)
                 {
-                    // We should only receive error events in conjuntction with other events.
-                    // Processing for those events will pick up the error.
-                    Debug.Assert((events & ~SocketAsyncEvents.Error) != 0);
+                    // Set the Read and Write flags as well; the processing for these events
+                    // will pick up the error.
+                    events |= SocketAsyncEvents.Read | SocketAsyncEvents.Write;
+                }
+
+                if ((events & SocketAsyncEvents.Close) != 0)
+                {
+                    // Drain queues and unregister this fd, then return.
+                    ProcessClose();
+                    return;
                 }
 
                 if ((events & SocketAsyncEvents.ReadClose) != 0)
