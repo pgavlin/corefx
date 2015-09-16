@@ -423,28 +423,37 @@ namespace System.Net.Sockets
                 // TODO: assert that queues are all empty if _registeredEvents was SocketAsyncEvents.None?
             }
 
-            while (!acceptOrConnectQueue.IsEmpty)
+            if (!acceptOrConnectQueue.IsStopped)
             {
-                AcceptOrConnectOperation op = acceptOrConnectQueue.Head;
-                bool completed = op.TryCompleteAsync(_fileDescriptor);
-                Debug.Assert(completed);
-                acceptOrConnectQueue.Dequeue();
+                while (!acceptOrConnectQueue.IsEmpty)
+                {
+                    AcceptOrConnectOperation op = acceptOrConnectQueue.Head;
+                    bool completed = op.TryCompleteAsync(_fileDescriptor);
+                    Debug.Assert(completed);
+                    acceptOrConnectQueue.Dequeue();
+                }
             }
 
-            while (!sendQueue.IsEmpty)
+            if (!sendQueue.IsStopped)
             {
-                SendReceiveOperation op = sendQueue.Head;
-                bool completed = op.TryCompleteAsync(_fileDescriptor);
-                Debug.Assert(completed);
-                sendQueue.Dequeue();
+                while (!sendQueue.IsEmpty)
+                {
+                    SendReceiveOperation op = sendQueue.Head;
+                    bool completed = op.TryCompleteAsync(_fileDescriptor);
+                    Debug.Assert(completed);
+                    sendQueue.Dequeue();
+                }
             }
 
-            while (!receiveQueue.IsEmpty)
+            if (!receiveQueue.IsStopped)
             {
-                TransferOperation op = receiveQueue.Head;
-                bool completed = op.TryCompleteAsync(_fileDescriptor);
-                Debug.Assert(completed);
-                receiveQueue.Dequeue();
+                while (!receiveQueue.IsEmpty)
+                {
+                    TransferOperation op = receiveQueue.Head;
+                    bool completed = op.TryCompleteAsync(_fileDescriptor);
+                    Debug.Assert(completed);
+                    receiveQueue.Dequeue();
+                }
             }
         }
 

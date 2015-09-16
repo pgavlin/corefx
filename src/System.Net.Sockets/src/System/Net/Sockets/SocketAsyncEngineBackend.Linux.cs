@@ -85,7 +85,10 @@ namespace System.Net.Sockets
 
                     var handle = (GCHandle)events[i].data;
                     var context = (SocketAsyncContext)handle.Target;
-                    context.HandleEvents(GetSocketAsyncEvents(evts));
+                    if (context != null)
+                    {
+                        context.HandleEvents(GetSocketAsyncEvents(evts));
+                    }
                 }
             }
         }
