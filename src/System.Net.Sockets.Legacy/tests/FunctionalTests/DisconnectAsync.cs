@@ -15,6 +15,7 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
+        [PlatformSpecific(PlatformID.Windows)]
         public void Success()
         {
             AutoResetEvent completed = new AutoResetEvent(false);
