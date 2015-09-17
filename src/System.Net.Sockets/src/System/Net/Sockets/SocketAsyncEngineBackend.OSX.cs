@@ -45,9 +45,14 @@ namespace System.Net.Sockets
 
                 case Interop.libc.EVFILT_WRITE:
                     events = SocketAsyncEvents.Write;
+
+                    // kqueue does not play well with disconnected connection-oriented sockets, frequently
+                    // reporting spurious EOF events. Fortunately, EOF may be handled as an EVFILT_READ |
+                    // EVFILT_WRITE event: the usual processing for these events will recognize and
+                    // handle the EOF condition.
                     if ((flags & Interop.libc.EV_EOF) != 0)
                     {
-                        events |= SocketAsyncEvents.Close;
+                        events |= SocketAsyncEvents.Read;
                     }
                     break;
 
