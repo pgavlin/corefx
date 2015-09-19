@@ -16,6 +16,17 @@ namespace System.Net.Sockets
     // - Add support for unregistering + reregistering for events
     //     - This will require a new state for each queue, unregistred, to track whether or
     //       not the queue is currently registered to receive events
+    // - Audit Close()-related code for the possibility of file descriptor recycling issues
+    //     - This will at least involve moving the call to SocketAsyncContext.Close() in
+    //       SafeCloseSocket to before the file descriptor is actually closed.
+    //         - This timing change will require adding a "forcible complete" flag to
+    //           AsyncOperation.TryCopmlete that completes the operation whether or not
+    //           the underlying system call returns EAGAIN/EINPROGRESS/EWOULDBLOCK.
+    //         - Note that this may be required regardless of file descriptor recycling in
+    //           order to match Winsock behavior, particularly with regards to error codes.
+    //     - It might make sense to change _closeLock to a ReaderWriterLockSlim that is
+    //       acquired for read by all public methods before attempting a completion and
+    //       acquired for write by Close() and HandlEvents()
     internal sealed class SocketAsyncContext
     {
         private abstract class AsyncOperation
@@ -28,7 +39,11 @@ namespace System.Net.Sockets
                 Cancelled = 3
             }
 
-            private int _state; // Actually AsyncOperation.State
+            private int _state; // Actually AsyncOperation.State.
+
+#if DEBUG
+            private int _callbackQueued; // When non-zero, the callback has been queued.
+#endif
 
             public AsyncOperation Next;
             protected object CallbackOrEvent;
@@ -36,7 +51,11 @@ namespace System.Net.Sockets
             public byte[] SocketAddress;
             public int SocketAddressLen;
 
-            public ManualResetEventSlim Event { set { CallbackOrEvent = value; } }
+            public ManualResetEventSlim Event
+            {
+                private get { return (ManualResetEventSlim)CallbackOrEvent; }
+                set { CallbackOrEvent = value; }
+            }
 
             public AsyncOperation()
             {
@@ -48,8 +67,11 @@ namespace System.Net.Sockets
             {
                 Debug.Assert(!(CallbackOrEvent is ManualResetEventSlim));
                 Debug.Assert(_state != (int)State.Cancelled);
+#if DEBUG
+                Debug.Assert(Interlocked.CompareExchange(ref _callbackQueued, 1, 0) == 0);
+#endif
 
-                ThreadPool.QueueUserWorkItem(o => ((AsyncOperation)o).DoCallback(), this);
+                ThreadPool.QueueUserWorkItem(o => ((AsyncOperation)o).InvokeCallback(), this);
             }
 
             public bool TryComplete(int fileDescriptor)
@@ -90,7 +112,7 @@ namespace System.Net.Sockets
 
             public bool Wait(int timeout)
             {
-                if (((ManualResetEventSlim)CallbackOrEvent).Wait(timeout))
+                if (Event.Wait(timeout))
                 {
                     return true;
                 }
@@ -119,7 +141,7 @@ namespace System.Net.Sockets
 
             protected abstract bool DoTryComplete(int fileDescriptor);
 
-            protected abstract void DoCallback();
+            protected abstract void InvokeCallback();
         }
 
         private abstract class TransferOperation : AsyncOperation
@@ -134,14 +156,18 @@ namespace System.Net.Sockets
 
         private abstract class SendReceiveOperation : TransferOperation
         {
-            public Action<int, byte[], int, int, SocketError> Callback { set { CallbackOrEvent = value; } }
             public BufferList Buffers;
             public int BufferIndex;
 
-            protected sealed override void DoCallback()
+            public Action<int, byte[], int, int, SocketError> Callback
             {
-                var callback = (Action<int, byte[], int, int, SocketError>)CallbackOrEvent;
-                callback(BytesTransferred, SocketAddress, SocketAddressLen, ReceivedFlags, ErrorCode);
+                private get { return (Action<int, byte[], int, int, SocketError>)CallbackOrEvent; }
+                set { CallbackOrEvent = value; }
+            }
+
+            protected sealed override void InvokeCallback()
+            {
+                Callback(BytesTransferred, SocketAddress, SocketAddressLen, ReceivedFlags, ErrorCode);
             }
         }
 
@@ -163,20 +189,24 @@ namespace System.Net.Sockets
 
         private sealed class ReceiveMessageFromOperation : TransferOperation
         {
-            public Action<int, byte[], int, int, IPPacketInformation, SocketError> Callback { set { CallbackOrEvent = value; } }
             public bool IsIPv4;
             public bool IsIPv6;
             public IPPacketInformation IPPacketInformation;
+
+            public Action<int, byte[], int, int, IPPacketInformation, SocketError> Callback
+            {
+                private get { return (Action<int, byte[], int, int, IPPacketInformation, SocketError>)CallbackOrEvent; }
+                set { CallbackOrEvent = value; }
+            }
 
             protected override bool DoTryComplete(int fileDescriptor)
             {
                 return SocketPal.TryCompleteReceiveMessageFrom(fileDescriptor, Buffer, Offset, Count, Flags, SocketAddress, ref SocketAddressLen, IsIPv4, IsIPv6, out BytesTransferred, out ReceivedFlags, out IPPacketInformation, out ErrorCode);
             }
 
-            protected override void DoCallback()
+            protected override void InvokeCallback()
             {
-                var callback = (Action<int, byte[], int, int, IPPacketInformation, SocketError>)CallbackOrEvent;
-                callback(BytesTransferred, SocketAddress, SocketAddressLen, ReceivedFlags, IPPacketInformation, ErrorCode);
+                Callback(BytesTransferred, SocketAddress, SocketAddressLen, ReceivedFlags, IPPacketInformation, ErrorCode);
             }
         }
 
@@ -186,42 +216,41 @@ namespace System.Net.Sockets
 
         private sealed class AcceptOperation : AcceptOrConnectOperation
         {
-            public Action<int, byte[], int, SocketError> Callback { set { CallbackOrEvent = value; } }
             public int AcceptedFileDescriptor;
+
+            public Action<int, byte[], int, SocketError> Callback
+            {
+                private get { return (Action<int, byte[], int, SocketError>)CallbackOrEvent; }
+                set { CallbackOrEvent = value; }
+            }
 
             protected override bool DoTryComplete(int fileDescriptor)
             {
                 return SocketPal.TryCompleteAccept(fileDescriptor, SocketAddress, ref SocketAddressLen, out AcceptedFileDescriptor, out ErrorCode);
             }
 
-            protected override void DoCallback()
+            protected override void InvokeCallback()
             {
-                var callback = (Action<int, byte[], int, SocketError>)CallbackOrEvent;
-                callback(AcceptedFileDescriptor, SocketAddress, SocketAddressLen, ErrorCode);
+                Callback(AcceptedFileDescriptor, SocketAddress, SocketAddressLen, ErrorCode);
             }
         }
 
         private sealed class ConnectOperation : AcceptOrConnectOperation
         {
-            public Action<SocketError> Callback { set { CallbackOrEvent = value; } }
+            public Action<SocketError> Callback
+            {
+                private get { return (Action<SocketError>)CallbackOrEvent; }
+                set { CallbackOrEvent = value; }
+            }
 
             protected override bool DoTryComplete(int fileDescriptor)
             {
                 return SocketPal.TryCompleteConnect(fileDescriptor, SocketAddressLen, out ErrorCode);
-
-                // The only situation in which we should see EISCONN when completing an
-                // async connect is if this earlier connect completed successfully:
-                // POSIX does not allow more than one outstanding async connect.
-                // if (op.ErrorCode == SocketError.IsConnected)
-                // {
-                //     op.ErrorCode = SocketError.Success;
-                // }
             }
 
-            protected override void DoCallback()
+            protected override void InvokeCallback()
             {
-                var callback = (Action<SocketError>)CallbackOrEvent;
-                callback(ErrorCode);
+                Callback(ErrorCode);
             }
         }
 
