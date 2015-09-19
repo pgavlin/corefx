@@ -532,30 +532,6 @@ namespace System.Net.Sockets
             throw new PlatformNotSupportedException();
         }
 
-        public static unsafe bool Poll(int fd, Interop.libc.PollFlags events, int timeout, out SocketError errorCode)
-        {
-            var pollfd = new Interop.libc.pollfd {
-                fd = fd,
-                events = events
-            };
-
-            int nfds = Interop.libc.poll(&pollfd, 1, timeout);
-            if (nfds != 1)
-            {
-                errorCode = nfds == 0 ? SocketError.TimedOut : GetLastSocketError();
-                return false;
-            }
-
-            if ((pollfd.revents & events) == 0)
-            {
-                errorCode = SocketError.SocketError;
-                return false;
-            }
-
-            errorCode = SocketError.Success;
-            return true;
-        }
-
         private static unsafe int Receive(int fd, int flags, int available, byte[] buffer, int offset, int count, byte[] socketAddress, ref int socketAddressLen, out int receivedFlags, out Interop.Error errno)
         {
             Debug.Assert(socketAddress != null || socketAddressLen == 0);
@@ -928,7 +904,7 @@ namespace System.Net.Sockets
 
             if (err != 0)
             {
-                Debug.Fail("TryCompleteConnect: getsockopt() failed");
+                Debug.Assert(Interop.Sys.GetLastError() == Interop.Error.EBADF);
                 errorCode = SocketError.SocketError;
                 return true;
             }
@@ -1182,25 +1158,9 @@ namespace System.Net.Sockets
             return SafeCloseSocket.Accept(handle, buffer, ref nameLen);
         }
 
-        public static SocketError Connect(SafeCloseSocket handle, byte[] peerAddress, int peerAddressLen)
+        public static SocketError Connect(SafeCloseSocket handle, byte[] socketAddress, int socketAddressLen)
         {
-            int fd = handle.FileDescriptor;
-
-            SocketError errorCode;
-            if (TryStartConnect(fd, peerAddress, peerAddressLen, out errorCode))
-            {
-                return errorCode;
-            }
-
-            while (!TryCompleteConnect(fd, peerAddressLen, out errorCode) && !handle.IsNonBlocking)
-            {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, -1, out errorCode))
-                {
-                    break;
-                }
-            }
-
-            return errorCode;
+            return handle.AsyncContext.Connect(socketAddress, socketAddressLen, -1);
         }
 
         public static SocketError Disconnect(Socket socket, SafeCloseSocket handle, bool reuseSocket)
@@ -1210,137 +1170,40 @@ namespace System.Net.Sockets
 
         public static SocketError Send(SafeCloseSocket handle, BufferOffsetSize[] buffers, SocketFlags socketFlags, out int bytesTransferred)
         {
-            int fd = handle.FileDescriptor;
-            var bufferList = new BufferList(buffers);
-            int platformFlags = GetPlatformSocketFlags(socketFlags);
-
-            int bufferIndex = 0;
-            int offset = 0;
-            int bytesSent = 0;
-
-            SocketError errorCode;
-            while (!TryCompleteSendTo(fd, bufferList, ref bufferIndex, ref offset, platformFlags, null, 0, ref bytesSent, out errorCode) && !handle.IsNonBlocking)
-            {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, handle.SendTimeout, out errorCode))
-                {
-                    break;
-                }
-            }
-
-            bytesTransferred = bytesSent;
-            return errorCode;
+            return handle.AsyncContext.Send(new BufferList(buffers), GetPlatformSocketFlags(socketFlags), handle.SendTimeout, out bytesTransferred);
         }
 
         public static SocketError Send(SafeCloseSocket handle, IList<ArraySegment<byte>> buffers, SocketFlags socketFlags, out int bytesTransferred)
         {
-            int fd = handle.FileDescriptor;
-            var bufferList = new BufferList(buffers);
-            int platformFlags = GetPlatformSocketFlags(socketFlags);
-
-            int bufferIndex = 0;
-            int offset = 0;
-            int bytesSent = 0;
-
-            SocketError errorCode;
-            while (!TryCompleteSendTo(fd, bufferList, ref bufferIndex, ref offset, platformFlags, null, 0, ref bytesSent, out errorCode) && !handle.IsNonBlocking)
-            {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, handle.SendTimeout, out errorCode))
-                {
-                    break;
-                }
-            }
-
-            bytesTransferred = bytesSent;
-            return errorCode;
+            return handle.AsyncContext.Send(new BufferList(buffers), GetPlatformSocketFlags(socketFlags), handle.SendTimeout, out bytesTransferred);
         }
 
-        public static SocketError Send(SafeCloseSocket handle, byte[] buffer, int offset, int size, SocketFlags socketFlags, out int bytesTransferred)
+        public static SocketError Send(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, out int bytesTransferred)
         {
-            int fd = handle.FileDescriptor;
-            int platformFlags = GetPlatformSocketFlags(socketFlags);
-
-            int bytesSent = 0;
-
-            SocketError errorCode;
-            while (!TryCompleteSendTo(fd, buffer, ref offset, ref size, platformFlags, null, 0, ref bytesSent, out errorCode) && !handle.IsNonBlocking)
-            {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, handle.SendTimeout, out errorCode))
-                {
-                    break;
-                }
-            }
-
-            bytesTransferred = bytesSent;
-            return errorCode;
+            return handle.AsyncContext.Send(buffer, offset, count, GetPlatformSocketFlags(socketFlags), handle.SendTimeout, out bytesTransferred);
         }
 
-        public static SocketError SendTo(SafeCloseSocket handle, byte[] buffer, int offset, int size, SocketFlags socketFlags, byte[] peerAddress, int peerAddressSize, out int bytesTransferred)
+        public static SocketError SendTo(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, byte[] socketAddress, int socketAddressLen, out int bytesTransferred)
         {
-            int fd = handle.FileDescriptor;
-            int platformFlags = GetPlatformSocketFlags(socketFlags);
-
-            int bytesSent = 0;
-
-            SocketError errorCode;
-            while (!TryCompleteSendTo(fd, buffer, ref offset, ref size, platformFlags, peerAddress, peerAddressSize, ref bytesSent, out errorCode) && !handle.IsNonBlocking)
-            {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLOUT, handle.SendTimeout, out errorCode))
-                {
-                    break;
-                }
-            }
-
-            bytesTransferred = bytesSent;
-            return errorCode;
+            return handle.AsyncContext.SendTo(buffer, offset, count, GetPlatformSocketFlags(socketFlags), socketAddress, socketAddressLen, handle.SendTimeout, out bytesTransferred);
         }
 
         public static SocketError Receive(SafeCloseSocket handle, IList<ArraySegment<byte>> buffers, ref SocketFlags socketFlags, out int bytesTransferred)
         {
-            int fd = handle.FileDescriptor;
             int platformFlags = GetPlatformSocketFlags(socketFlags);
-
-            int socketAddressLen = 0;
-            int bytesReceived;
-            int receiveFlags;
-            SocketError errorCode;
-            while (!TryCompleteReceiveFrom(fd, buffers, platformFlags, null, ref socketAddressLen, out bytesReceived, out receiveFlags, out errorCode) && !handle.IsNonBlocking)
-            {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLIN, handle.ReceiveTimeout, out errorCode))
-                {
-                    break;
-                }
-            }
-
-            socketFlags = GetSocketFlags(receiveFlags);
-            bytesTransferred = bytesReceived;
+            SocketError errorCode = handle.AsyncContext.Receive(buffers, ref platformFlags, handle.ReceiveTimeout, out bytesTransferred);
+            socketFlags = GetSocketFlags(platformFlags);
             return errorCode;
         }
 
-        public static SocketError Receive(SafeCloseSocket handle, byte[] buffer, int offset, int size, SocketFlags socketFlags, out int bytesTransferred)
+        public static SocketError Receive(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, out int bytesTransferred)
         {
-            int fd = handle.FileDescriptor;
             int platformFlags = GetPlatformSocketFlags(socketFlags);
-
-            int socketAddressLen = 0;
-            int bytesReceived;
-            int receiveFlags;
-            SocketError errorCode;
-            while (!TryCompleteReceiveFrom(fd, buffer, offset, size, platformFlags, null, ref socketAddressLen, out bytesReceived, out receiveFlags, out errorCode) && !handle.IsNonBlocking)
-            {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLIN, handle.ReceiveTimeout, out errorCode))
-                {
-                    break;
-                }
-            }
-
-            socketFlags = GetSocketFlags(receiveFlags);
-            bytesTransferred = bytesReceived;
-            return errorCode;
+            return handle.AsyncContext.Receive(buffer, offset, count, ref platformFlags, handle.ReceiveTimeout, out bytesTransferred);
         }
 
-        public static SocketError ReceiveMessageFrom(Socket socket, SafeCloseSocket handle, byte[] buffer, int offset, int size, ref SocketFlags socketFlags, Internals.SocketAddress socketAddress, out Internals.SocketAddress receiveAddress, out IPPacketInformation ipPacketInformation, out int bytesTransferred)
+        public static SocketError ReceiveMessageFrom(Socket socket, SafeCloseSocket handle, byte[] buffer, int offset, int count, ref SocketFlags socketFlags, Internals.SocketAddress socketAddress, out Internals.SocketAddress receiveAddress, out IPPacketInformation ipPacketInformation, out int bytesTransferred)
         {
-            int fd = handle.FileDescriptor;
             int platformFlags = GetPlatformSocketFlags(socketFlags);
             byte[] socketAddressBuffer = socketAddress.Buffer;
             int socketAddressLen = socketAddress.Size;
@@ -1348,42 +1211,18 @@ namespace System.Net.Sockets
             bool isIPv4, isIPv6;
             Socket.GetIPProtocolInformation(socket.AddressFamily, socketAddress, out isIPv4, out isIPv6);
 
-            int bytesReceived;
-            int receiveFlags;
-            SocketError errorCode;
-            while (!TryCompleteReceiveMessageFrom(fd, buffer, offset, size, platformFlags, socketAddressBuffer, ref socketAddressLen, isIPv4, isIPv6, out bytesReceived, out receiveFlags, out ipPacketInformation, out errorCode) && !handle.IsNonBlocking)
-            {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLIN, handle.ReceiveTimeout, out errorCode))
-                {
-                    break;
-                }
-            }
-
+            SocketError errorCode = handle.AsyncContext.ReceiveMessageFrom(buffer, offset, count, ref platformFlags, socketAddressBuffer, ref socketAddressLen, isIPv4, isIPv6, handle.ReceiveTimeout, out ipPacketInformation, out bytesTransferred);
+            
             socketAddress.InternalSize = socketAddressLen;
             receiveAddress = socketAddress;
-            socketFlags = GetSocketFlags(receiveFlags);
-            bytesTransferred = bytesReceived;
+            socketFlags = GetSocketFlags(platformFlags);
             return errorCode;
         }
 
-        public static SocketError ReceiveFrom(SafeCloseSocket handle, byte[] buffer, int offset, int size, SocketFlags socketFlags, byte[] peerAddress, ref int addressLength, out int bytesTransferred)
+        public static SocketError ReceiveFrom(SafeCloseSocket handle, byte[] buffer, int offset, int count, SocketFlags socketFlags, byte[] socketAddress, ref int socketAddressLen, out int bytesTransferred)
         {
-            int fd = handle.FileDescriptor;
             int platformFlags = GetPlatformSocketFlags(socketFlags);
-
-            int bytesReceived;
-            int receiveFlags;
-            SocketError errorCode;
-            while (!TryCompleteReceiveFrom(fd, buffer, offset, size, platformFlags, peerAddress, ref addressLength, out bytesReceived, out receiveFlags, out errorCode) && !handle.IsNonBlocking)
-            {
-                if (!Poll(fd, Interop.libc.PollFlags.POLLIN, handle.ReceiveTimeout, out errorCode))
-                {
-                    break;
-                }
-            }
-
-            bytesTransferred = bytesReceived;
-            return errorCode;
+            return handle.AsyncContext.ReceiveFrom(buffer, offset, count, ref platformFlags, socketAddress, ref socketAddressLen, handle.ReceiveTimeout, out bytesTransferred);
         }
 
         public static SocketError Ioctl(SafeCloseSocket handle, int ioControlCode, byte[] optionInValue, byte[] optionOutValue, out int optionLength)
@@ -1404,12 +1243,12 @@ namespace System.Net.Sockets
             {
                 if (optionName == SocketOptionName.ReceiveTimeout)
                 {
-                    handle.ReceiveTimeout = optionValue;
+                    handle.ReceiveTimeout = optionValue == 0 ? -1 : optionValue;
                     return SocketError.Success;
                 }
                 else if (optionName == SocketOptionName.SendTimeout)
                 {
-                    handle.SendTimeout = optionValue;
+                    handle.SendTimeout = optionValue == 0 ? -1 : optionValue;
                     return SocketError.Success;
                 }
             }
@@ -1506,12 +1345,12 @@ namespace System.Net.Sockets
             {
                 if (optionName == SocketOptionName.ReceiveTimeout)
                 {
-                    optionValue = handle.ReceiveTimeout;
+                    optionValue = handle.ReceiveTimeout == -1 ? 0 : handle.ReceiveTimeout;
                     return SocketError.Success;
                 }
                 else if (optionName == SocketOptionName.SendTimeout)
                 {
-                    optionValue = handle.SendTimeout;
+                    optionValue = handle.SendTimeout == -1 ? 0 : handle.SendTimeout;
                     return SocketError.Success;
                 }
             }

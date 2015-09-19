@@ -16,6 +16,9 @@ namespace System.Net.Sockets
         SafeHandleMinusOneIsInvalid
 #endif
     {
+        private int _receiveTimeout = -1;
+        private int _sendTimeout = -1;
+
         public SocketAsyncContext AsyncContext
         {
             get
@@ -33,8 +36,32 @@ namespace System.Net.Sockets
         }
 
         public bool IsNonBlocking { get; set; }
-        public int ReceiveTimeout { get; set; }
-        public int SendTimeout { get; set; }
+
+        public int ReceiveTimeout
+        {
+            get
+            {
+                return _receiveTimeout;
+            }
+            set
+            {
+                Debug.Assert(value == -1 || value > 0);
+                _receiveTimeout = value;;
+            }
+        }
+
+        public int SendTimeout
+        {
+            get
+            {
+                return _sendTimeout;
+            }
+            set
+            {
+                Debug.Assert(value == -1 || value > 0);
+                _sendTimeout = value;
+            }
+        }
 
         public unsafe static SafeCloseSocket CreateSocket(int fileDescriptor)
         {
@@ -200,19 +227,10 @@ namespace System.Net.Sockets
                 return res;
             }
 
-            public static unsafe InnerSafeCloseSocket Accept(SafeCloseSocket socketHandle, byte[] socketAddress, ref int socketAddressSize)
+            public static unsafe InnerSafeCloseSocket Accept(SafeCloseSocket socketHandle, byte[] socketAddress, ref int socketAddressLen)
             {
-                int fd = socketHandle.FileDescriptor;
-
                 int acceptedFd;
-                SocketError errorCode;
-                while (!SocketPal.TryCompleteAccept(fd, socketAddress, ref socketAddressSize, out acceptedFd, out errorCode) && !socketHandle.IsNonBlocking)
-                {
-                    if (!SocketPal.Poll(fd, Interop.libc.PollFlags.POLLIN, -1, out errorCode))
-                    {
-                        break;
-                    }
-                }
+                socketHandle.AsyncContext.Accept(socketAddress, ref socketAddressLen, -1, out acceptedFd);
 
                 var res = new InnerSafeCloseSocket();
                 res.SetHandle((IntPtr)acceptedFd);
