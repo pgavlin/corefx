@@ -95,6 +95,7 @@ namespace System.Net.Sockets
                     return true;
                 }
 
+                var spinWait = new SpinWait();
                 for (;;)
                 {
                     int state = Interlocked.CompareExchange(ref _state, (int)State.Cancelled, (int)State.Waiting);
@@ -102,6 +103,7 @@ namespace System.Net.Sockets
                     {
                         case State.Running:
                             // A completion attempt is in progress. Keep busy-waiting.
+                            spinWait.SpinOnce();
                             break;
 
                         case State.Complete:

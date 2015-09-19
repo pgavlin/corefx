@@ -38,12 +38,14 @@ namespace System.Net.Sockets
                         if (_engine == null)
                         {
                             var engine = new SocketAsyncEngine(SocketAsyncEngineBackend.Create());
-                            Task.Factory.StartNew(o => {
+                            Task.Factory.StartNew(o =>
+                            {
+                                SocketAsyncEngineBackend backend = ((SocketAsyncEngine)o)._backend;
                                 for (;;)
                                 {
                                     try
                                     {
-                                        ((SocketAsyncEngine)o)._backend.EventLoop();
+                                        backend.EventLoop();
                                     }
                                     catch (Exception e)
                                     {
