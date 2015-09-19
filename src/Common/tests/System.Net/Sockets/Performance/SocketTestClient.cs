@@ -178,7 +178,7 @@ namespace System.Net.Sockets.Performance.Tests
             _recvBufferIndex = 0;
 
             // Expect echo server.
-            if (memcmp(_sendBuffer, _recvBuffer, _sendBuffer.Length) != 0)
+            if (!Compare(_sendBuffer, _recvBuffer))
             {
                 _log.WriteLine("Received different data from echo server");
             }
@@ -238,9 +238,23 @@ namespace System.Net.Sockets.Performance.Tests
         }
 
         protected abstract string ImplementationName();
-        
-        //TODO: Either find a different fast way to compare or extract this in Interop.
-        [DllImport("msvcrt.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int memcmp(byte[] b1, byte[] b2, long count);
+
+        private static bool Compare(byte[] b1, byte[] b2)
+        {
+            if (b1.Length != b2.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < b1.Length; i++)
+            {
+                if (b1[i] != b2[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
 }
