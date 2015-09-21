@@ -72,9 +72,23 @@ namespace System.Net.Sockets
 
                 for (int i = 0; i < numEvents; i++)
                 {
+                    uint evts = events[i].events;
+
+                    // epoll does not play well with disconnected connection-oriented sockets, frequently
+                    // reporting spurious EPOLLHUP events. Fortunately, EPOLLHUP may be handled as an
+                    // EPOLLIN | EPOLLOUT event: the usual processing for these events will recognize and
+                    // handle the HUP condition.
+                    if ((evts & Interop.libc.EPOLLHUP) != 0)
+                    {
+                        evts = (evts & ~Interop.libc.EPOLLHUP) | Interop.libc.EPOLLIN | Interop.libc.EPOLLOUT;
+                    }
+
                     var handle = (GCHandle)events[i].data;
                     var context = (SocketAsyncContext)handle.Target;
-                    context.HandleEvents(GetSocketAsyncEvents(events[i].events));
+                    if (context != null)
+                    {
+                        context.HandleEvents(GetSocketAsyncEvents(evts));
+                    }
                 }
             }
         }

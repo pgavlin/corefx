@@ -473,9 +473,44 @@ namespace System.Net.Sockets
             }
         }
 
+        private static unsafe int AlignControlMessageSize(int size)
+        {
+            return (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
+        }
+
+        private static unsafe Interop.libc.cmsghdr* GetNextControlMessage(byte* cmsgBuffer, int cmsgBufferLen, Interop.libc.cmsghdr* cmsg)
+        {
+            if ((int)cmsg->cmsg_len < sizeof(Interop.libc.cmsghdr))
+            {
+                return null;
+            }
+
+            // Calculate the size of the current control message aligned out to the closest
+            // word boundary.
+            int cmsgSize = AlignControlMessageSize((int)cmsg->cmsg_len);
+
+            // Move to the next control message. If its boundaries lie outside the message
+            // buffer, ignore it.
+            cmsg = (Interop.libc.cmsghdr*)((byte*)cmsg + cmsgSize);
+
+            byte* lastByte = cmsgBuffer + cmsgBufferLen;
+            if ((byte*)cmsg + 1 > lastByte)
+            {
+                return null;
+            }
+
+            cmsgSize = AlignControlMessageSize((int)cmsg->cmsg_len);
+            if ((byte*)cmsg + cmsgSize > lastByte)
+            {
+                return null;
+            }
+
+            return cmsg;
+        }
+
         public static unsafe IPPacketInformation GetIPPacketInformation(byte* cmsgBuffer, int cmsgBufferLen, bool isIPv4, bool isIPv6)
         {
-            if ((!isIPv4 && !isIPv6) || cmsgBufferLen < Interop.libc.cmsghdr.Size)
+            if ((!isIPv4 && !isIPv6) || cmsgBufferLen < sizeof(Interop.libc.cmsghdr))
             {
                 return default(IPPacketInformation);
             }
@@ -483,28 +518,45 @@ namespace System.Net.Sockets
             var cmsghdr = (Interop.libc.cmsghdr*)cmsgBuffer;
             if (isIPv4)
             {
-                if ((int)cmsghdr->cmsg_len < sizeof(Interop.libc.in_pktinfo) ||
-                    cmsghdr->cmsg_level != Interop.libc.IPPROTO_IP ||
-                    cmsghdr->cmsg_type != Interop.libc.IP_PKTINFO)
+                // Look for an appropriate message.
+                while (cmsghdr->cmsg_level != Interop.libc.IPPROTO_IP || cmsghdr->cmsg_type != Interop.libc.IP_PKTINFO)
+                {
+                    cmsghdr = GetNextControlMessage(cmsgBuffer, cmsgBufferLen, cmsghdr);
+                    if (cmsghdr == null)
+                    {
+                        return default(IPPacketInformation);
+                    }
+                }
+
+                if ((int)cmsghdr->cmsg_len < sizeof(Interop.libc.in_pktinfo))
                 {
                     return default(IPPacketInformation);
                 }
 
-                var in_pktinfo = (Interop.libc.in_pktinfo*)&cmsghdr->cmsg_data;
+                var in_pktinfo = (Interop.libc.in_pktinfo*)&cmsghdr[1];
                 return new IPPacketInformation(new IPAddress((long)in_pktinfo->ipi_addr.s_addr), in_pktinfo->ipi_ifindex);
             }
             else
             {
                 Debug.Assert(isIPv6);
 
-                if ((int)cmsghdr->cmsg_len < sizeof(Interop.libc.in6_pktinfo) ||
-                    cmsghdr->cmsg_level != Interop.libc.IPPROTO_IPV6 ||
-                    cmsghdr->cmsg_type != Interop.libc.IPV6_RECVPKTINFO)
+                // Look for an appropriate message.
+                while (cmsghdr->cmsg_level != Interop.libc.IPPROTO_IPV6 || cmsghdr->cmsg_type != Interop.libc.IPV6_PKTINFO)
+                {
+                    cmsghdr = GetNextControlMessage(cmsgBuffer, cmsgBufferLen, cmsghdr);
+                    if (cmsghdr == null)
+                    {
+                        return default(IPPacketInformation);
+                    }
+                }
+
+
+                if ((int)cmsghdr->cmsg_len < sizeof(Interop.libc.in6_pktinfo))
                 {
                     return default(IPPacketInformation);
                 }
 
-                var in6_pktinfo = (Interop.libc.in6_pktinfo*)&cmsghdr->cmsg_data;
+                var in6_pktinfo = (Interop.libc.in6_pktinfo*)&cmsghdr[1];
 
                 var address = new byte[sizeof(Interop.libc.in6_addr)];
                 for (int i = 0; i < address.Length; i++)
@@ -790,8 +842,9 @@ namespace System.Net.Sockets
         {
             Debug.Assert(socketAddress != null);
 
-            var pktinfoLen = isIPv4 ? sizeof(Interop.libc.in_pktinfo) : isIPv6 ? sizeof(Interop.libc.in6_pktinfo) : 0;
-            var cmsgBufferLen = Interop.libc.cmsghdr.Size + pktinfoLen;
+            int cmsgBufferLen =
+                (isIPv4 ? AlignControlMessageSize(sizeof(Interop.libc.cmsghdr) + sizeof(Interop.libc.in_pktinfo)) : 0) +
+                (isIPv6 ? AlignControlMessageSize(sizeof(Interop.libc.cmsghdr) + sizeof(Interop.libc.in6_pktinfo)) : 0);
             var cmsgBuffer = stackalloc byte[cmsgBufferLen];
 
             var sockAddrLen = (uint)socketAddressLen;

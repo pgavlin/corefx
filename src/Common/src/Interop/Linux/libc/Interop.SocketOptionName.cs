@@ -40,6 +40,7 @@ internal static partial class Interop
 
         public const int IPV6_V6ONLY = 26;
         public const int IPV6_RECVPKTINFO = 49;
+        public const int IPV6_PKTINFO = 50;
 
         public const int TCP_NODELAY = 1;
     }
