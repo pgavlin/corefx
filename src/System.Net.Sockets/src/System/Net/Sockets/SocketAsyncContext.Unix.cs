@@ -283,7 +283,6 @@ namespace System.Net.Sockets
             {
                 get
                 {
-                    Debug.Assert(!IsStopped);
                     return (TOperation)_tail;
                 }
             }
@@ -354,6 +353,7 @@ namespace System.Net.Sockets
 
             if (_registeredEvents == SocketAsyncEvents.None)
             {
+                Debug.Assert(!_handle.IsAllocated);
                 _handle = GCHandle.Alloc(this, GCHandleType.Normal);
             }
 
@@ -375,20 +375,26 @@ namespace System.Net.Sockets
         private void UnregisterRead()
         {
             Debug.Assert(Monitor.IsEntered(_queueLock));
-            Debug.Assert(_registeredEvents == (SocketAsyncEvents.Read | SocketAsyncEvents.Write));
+            Debug.Assert((_registeredEvents & SocketAsyncEvents.Read) != SocketAsyncEvents.None);
 
             SocketAsyncEvents events = _registeredEvents & ~SocketAsyncEvents.Read;
-
-            Interop.Error errorCode;
-            bool unregistered = _engine.TryRegister(_fileDescriptor, _registeredEvents, events, _handle, out errorCode);
-
-            if (unregistered || errorCode == Interop.Error.EBADF)
+            if (events == SocketAsyncEvents.None)
             {
-                _registeredEvents = events;
+                Unregister();
             }
             else
             {
-                Debug.Fail(string.Format("UnregisterRead failed: {0}", errorCode));
+                Interop.Error errorCode;
+                bool unregistered = _engine.TryRegister(_fileDescriptor, _registeredEvents, events, _handle, out errorCode);
+
+                if (unregistered)
+                {
+                    _registeredEvents = events;
+                }
+                else
+                {
+                    Debug.Fail(string.Format("UnregisterRead failed: {0}", errorCode));
+                }
             }
         }
 
@@ -406,7 +412,13 @@ namespace System.Net.Sockets
             bool unregistered = _engine.TryRegister(_fileDescriptor, _registeredEvents, SocketAsyncEvents.None, _handle, out errorCode);
             _registeredEvents = (SocketAsyncEvents)(-1);
 
-            if (unregistered || errorCode == Interop.Error.EBADF)
+            // We may receive any of the errors below if _fileDescriptor has already been closed.
+            unregistered = unregistered ||
+                errorCode == Interop.Error.EBADF ||
+                errorCode == Interop.Error.ENOENT ||
+                errorCode == Interop.Error.EPERM;
+
+            if (unregistered)
             {
                 _registeredEvents = SocketAsyncEvents.None;
                 _handle.Free();
@@ -417,7 +429,7 @@ namespace System.Net.Sockets
             }
         }
 
-        private void ProcessClose()
+        private void CloseInner()
         {
             Debug.Assert(Monitor.IsEntered(_closeLock) && !Monitor.IsEntered(_queueLock));
 
@@ -438,37 +450,35 @@ namespace System.Net.Sockets
                 // TODO: assert that queues are all empty if _registeredEvents was SocketAsyncEvents.None?
             }
 
-            if (!acceptOrConnectQueue.IsStopped)
+            // TODO: the error codes on these operations may need to be changed to account for
+            //       the close. I think Winsock returns OperationAborted in the case that
+            //       the socket for an outstanding operation is closed.
+
+            Debug.Assert(!acceptOrConnectQueue.IsStopped || acceptOrConnectQueue.IsEmpty);
+            while (!acceptOrConnectQueue.IsEmpty)
             {
-                while (!acceptOrConnectQueue.IsEmpty)
-                {
-                    AcceptOrConnectOperation op = acceptOrConnectQueue.Head;
-                    bool completed = op.TryCompleteAsync(_fileDescriptor);
-                    Debug.Assert(completed);
-                    acceptOrConnectQueue.Dequeue();
-                }
+                AcceptOrConnectOperation op = acceptOrConnectQueue.Head;
+                bool completed = op.TryCompleteAsync(_fileDescriptor);
+                Debug.Assert(completed);
+                acceptOrConnectQueue.Dequeue();
             }
 
-            if (!sendQueue.IsStopped)
+            Debug.Assert(!sendQueue.IsStopped || sendQueue.IsEmpty);
+            while (!sendQueue.IsEmpty)
             {
-                while (!sendQueue.IsEmpty)
-                {
-                    SendReceiveOperation op = sendQueue.Head;
-                    bool completed = op.TryCompleteAsync(_fileDescriptor);
-                    Debug.Assert(completed);
-                    sendQueue.Dequeue();
-                }
+                SendReceiveOperation op = sendQueue.Head;
+                bool completed = op.TryCompleteAsync(_fileDescriptor);
+                Debug.Assert(completed);
+                sendQueue.Dequeue();
             }
 
-            if (!receiveQueue.IsStopped)
+            Debug.Assert(!receiveQueue.IsStopped || receiveQueue.IsEmpty);
+            while (!receiveQueue.IsEmpty)
             {
-                while (!receiveQueue.IsEmpty)
-                {
-                    TransferOperation op = receiveQueue.Head;
-                    bool completed = op.TryCompleteAsync(_fileDescriptor);
-                    Debug.Assert(completed);
-                    receiveQueue.Dequeue();
-                }
+                TransferOperation op = receiveQueue.Head;
+                bool completed = op.TryCompleteAsync(_fileDescriptor);
+                Debug.Assert(completed);
+                receiveQueue.Dequeue();
             }
         }
 
@@ -478,7 +488,7 @@ namespace System.Net.Sockets
 
             lock (_closeLock)
             {
-                ProcessClose();
+                CloseInner();
             }
         }
 
@@ -1287,7 +1297,7 @@ namespace System.Net.Sockets
                 if ((events & SocketAsyncEvents.Close) != 0)
                 {
                     // Drain queues and unregister this fd, then return.
-                    ProcessClose();
+                    CloseInner();
                     return;
                 }
 
