@@ -71,7 +71,7 @@ namespace System.Net.Sockets.Tests
             }
 
             var endPoint = new IPEndPoint(address, Port);
-            using (SocketTestServer.ServerFactory(endPoint))
+            using (SocketTestServer.SocketTestServerFactory(endPoint))
             {
                 var completed = new AutoResetEvent(false);
 
@@ -87,7 +87,7 @@ namespace System.Net.Sockets.Tests
                 Assert.True(completed.WaitOne(5000), "Timed out while waiting for connection");
                 Assert.Equal<SocketError>(SocketError.Success, args.SocketError);
 
-                Assert.Throws<PlatformNotSupportedException>(client.Disconnect(true));
+                Assert.Throws<PlatformNotSupportedException>(() => client.Disconnect(true));
 
                 client.Dispose();
             }
