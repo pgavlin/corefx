@@ -114,6 +114,8 @@ namespace System.Net.Sockets
             _socketType = socketType;
             _protocolType = protocolType;
 
+            Debug.Assert(addressFamily != AddressFamily.InterNetworkV6 || !DualMode);
+
             if (s_LoggingEnabled) Logging.Exit(Logging.Sockets, this, "Socket", null);
         }
 
