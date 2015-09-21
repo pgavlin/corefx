@@ -52,6 +52,49 @@ namespace System.Net.Sockets.Tests
             }
         }
 
+        [Fact]
+        [PlatformSpecific(PlatformID.AnyUnix)]
+        public void DisconnectAsync_Throws_PlatformNotSupported()
+        {
+            const int Port = TestPortBase + 2;
+
+            IPAddress address = null;
+            if (Socket.OSSupportsIPv4)
+            {
+                address = IPAddress.Loopback;
+            }
+            else if (Socket.OSSupportsIPv6)
+            {
+                address = IPAddress.IPv6Loopback;
+            }
+            else
+            {
+                return;
+            }
+
+            var endPoint = new IPEndPoint(address, Port);
+            using (SocketTestServer.ServerFactory(endPoint))
+            {
+                var completed = new AutoResetEvent(false);
+
+                var args = new SocketAsyncEventArgs {
+                    UserToken = completed,
+                    RemoteEndPoint = endPoint,
+                    DisconnectReuseSocket = true
+                };
+                args.Completed += OnCompleted;
+
+                var client = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                Assert.True(client.ConnectAsync(args));
+                Assert.True(completed.WaitOne(5000), "Timed out while waiting for connection");
+                Assert.Equal<SocketError>(SocketError.Success, args.SocketError);
+
+                Assert.Throws<PlatformNotSupportedException>(client.DisconnectAsync(args));
+
+                client.Dispose();
+            }
+        }
+
         #region GC Finalizer test
         // This test assumes sequential execution of tests and that it is going to be executed after other tests
         // that used Sockets. 

@@ -11,6 +11,10 @@ namespace System.Net.Sockets.Tests
     [Trait("IPv6", "true")]
     public class DualMode
     {
+        // TODO: This is a stand-in for an issue that will need to be filed when this code is
+        //       merged into corefx.
+        private const int DummySendToThrowsIssue = 123456;
+
         private const int TestPortBase = 8200;  // to 8300
         private readonly ITestOutputHelper _log;
 
@@ -95,7 +99,7 @@ namespace System.Net.Sockets.Tests
 
         private void DualModeConnectAsync_IPEndPointToHost_Helper(IPAddress connectTo, IPAddress listenOn, bool dualModeServer, int port)
         {
-            using (Socket socket = new Socket(SocketType.Stream, ProtocolType.Tcp))
+            Socket socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             using (SocketServer server = new SocketServer(_log, listenOn, dualModeServer, port))
             {
                 ManualResetEvent waitHandle = new ManualResetEvent(false);
@@ -111,7 +115,6 @@ namespace System.Net.Sockets.Tests
                 {
                     throw new SocketException((int)args.SocketError);
                 }
-                Assert.True(server.WaitHandle.WaitOne(5000), "Timed out while waiting for accept");
                 Assert.True(socket.Connected);
             }
         }
@@ -152,7 +155,6 @@ namespace System.Net.Sockets.Tests
                 socket.ConnectAsync(args);
 
                 waitHandle.WaitOne();
-                Assert.True(server.WaitHandle.WaitOne(5000), "Timed out while waiting for accept");
                 if (args.SocketError != SocketError.Success)
                 {
                     throw new SocketException((int)args.SocketError);
@@ -349,6 +351,7 @@ namespace System.Net.Sockets.Tests
         #region SendTo Async/Event
 
         [Fact] // Base case
+        [ActiveIssue(DummySendToThrowsIssue, PlatformID.AnyUnix)]
         public void Socket_SendToAsyncV4IPEndPointToV4Host_Throws()
         {
             Socket socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
@@ -357,7 +360,7 @@ namespace System.Net.Sockets.Tests
             args.SetBuffer(new byte[1], 0, 1);
             bool async = socket.SendToAsync(args);
             Assert.False(async);
-			Assert.NotEqual(SocketError.Success, args.SocketError);
+            Assert.Equal(SocketError.Fault, args.SocketError);
         }
 
         [Fact] // Base case
@@ -591,7 +594,6 @@ namespace System.Net.Sockets.Tests
         {
             private readonly ITestOutputHelper _output;
             private Socket server;
-            private Socket accepted;
             private EventWaitHandle waitHandle = new AutoResetEvent(false);
 
             public EventWaitHandle WaitHandle
@@ -629,7 +631,6 @@ namespace System.Net.Sockets.Tests
                     "Accepted: " + e.GetHashCode() + " SocketAsyncEventArgs with manual event " +
                     handle.GetHashCode() + " error: " + e.SocketError);
 
-                accepted = e.AcceptSocket;
                 handle.Set();
             }
 
@@ -638,10 +639,6 @@ namespace System.Net.Sockets.Tests
                 try
                 {
                     server.Dispose();
-                    if (accepted != null)
-                    {
-                        accepted.Dispose();
-                    }
                 }
                 catch (Exception) { }
             }

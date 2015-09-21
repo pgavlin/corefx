@@ -7,7 +7,6 @@ namespace System.Net.Sockets.Tests
         #region Buffer
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void NullBufferCtor_Throws()
         {
             Assert.Throws<ArgumentNullException>(() => {
@@ -16,7 +15,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void NullBufferCtorWithOffset_Throws()
         {
             Assert.Throws<ArgumentNullException>(() => {
@@ -25,7 +23,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void NullBufferCtorWithEndOfPacket_Throws()
         {
             Assert.Throws<ArgumentNullException>(() => {
@@ -35,7 +32,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void EmptyBufferCtor_Success()
         {
             // Elements with empty Buffers are ignored on Send
@@ -49,7 +45,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void BufferCtorNormal_Success()
         {
             SendPacketsElement element = new SendPacketsElement(new byte[10]);
@@ -62,7 +57,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void BufferCtorNegOffset_ArgumentOutOfRangeException()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => {
@@ -71,7 +65,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void BufferCtorNegCount_ArgumentOutOfRangeException()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => {
@@ -80,7 +73,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void BufferCtorLargeOffset_ArgumentOutOfRangeException()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => {
@@ -89,7 +81,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void BufferCtorLargeCount_ArgumentOutOfRangeException()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => {
@@ -98,7 +89,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void BufferCtorEndOfBufferTrue_Success()
         {
             SendPacketsElement element = new SendPacketsElement(new byte[10], 2, 8, true);
@@ -111,7 +101,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void BufferCtorEndOfBufferFalse_Success()
         {
             SendPacketsElement element = new SendPacketsElement(new byte[10], 6, 4, false);
@@ -124,7 +113,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void BufferCtorZeroCount_Success()
         {
             // Elements with empty Buffers are ignored on Send
@@ -142,7 +130,6 @@ namespace System.Net.Sockets.Tests
         #region File
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void FileCtorNull_Throws()
         {
             Assert.Throws<ArgumentNullException>(() => {
@@ -151,7 +138,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void FileCtorEmpty_Success()
         {
             // An exception will happen on send if this file doesn't exist
@@ -164,7 +150,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void FileCtorWhiteSpace_Success()
         {
             // An exception will happen on send if this file doesn't exist
@@ -177,7 +162,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void FileCtorNormal_Success()
         {
             // An exception will happen on send if this file doesn't exist
@@ -190,7 +174,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void FileCtorZeroCountLength_Success()
         {
             // An exception will happen on send if this file doesn't exist
@@ -203,7 +186,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void FileCtorNegOffset_ArgumentOutOfRangeException()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => {
@@ -212,7 +194,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void FileCtorNegCount_ArgumentOutOfRangeException()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => {
@@ -223,7 +204,6 @@ namespace System.Net.Sockets.Tests
         // File lengths are validated on send
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void FileCtorEndOfBufferTrue_Success()
         {
             SendPacketsElement element = new SendPacketsElement("SomeFileName", 2, 8, true);
@@ -235,7 +215,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [PlatformSpecific(PlatformID.Windows)]
         public void FileCtorEndOfBufferFalse_Success()
         {
             SendPacketsElement element = new SendPacketsElement("SomeFileName", 6, 4, false);

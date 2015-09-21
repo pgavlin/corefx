@@ -8,8 +8,10 @@ namespace System.Net.Sockets.Tests
 {
     public class DualMode
     {
-        private const int DummyDualModeV6Issue = 8000;
-        private const int DummyErrorMismatchIssue = 8001;
+        // TODO: These constants are fill-ins for issues that need to be opened
+        //       once this code is merged into corefx/master.
+        private const int DummyDualModeV6Issue = 123456;
+        private const int DummyErrorMismatchIssue = 123457;
 
         private const int TestPortBase = 8200;  // to 8300
         private readonly ITestOutputHelper _log;

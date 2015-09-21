@@ -6,7 +6,7 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{7340F160-F482-468D-AA09-2B6882BCDAD9}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <UnsupportedPlatforms>Linux;OSX;FreeBSD</UnsupportedPlatforms>
+    <UnsupportedPlatforms>FreeBSD</UnsupportedPlatforms>
   </PropertyGroup>
   <!-- Help VS understand available configurations -->
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' " />
@@ -56,6 +56,18 @@
     </Compile>
     <Compile Include="$(CommonTestPath)\System.Net\Capability.Sockets.cs">
       <Link>Common\System.Net\Capability.Sockets.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetsWindows)' == 'true' ">
+    <Compile Include="$(CommonTestPath)\System.Net\Sockets\Performance\SocketTestMemcmp.Windows.cs">
+      <Link>SocketCommon\SocketTestMemcmp.Windows.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetsUnix)' == 'true' ">
+    <Compile Include="$(CommonTestPath)\System.Net\Sockets\Performance\SocketTestMemcmp.Unix.cs">
+      <Link>SocketCommon\SocketTestMemcmp.Unix.cs</Link>
     </Compile>
   </ItemGroup>
   
