@@ -27,6 +27,13 @@ namespace System.Net.Sockets
     //     - It might make sense to change _closeLock to a ReaderWriterLockSlim that is
     //       acquired for read by all public methods before attempting a completion and
     //       acquired for write by Close() and HandlEvents()
+    // - Audit event-related code for the possibility of GCHandle recycling issues
+    //     - There is a potential issue with handle recycling in event loop processing
+    //       if the processing of an event races with the close of a GCHandle
+    //     - It may be necessary for the event loop thread to do all file descriptor
+    //       unregistration in order to avoid this. If so, this would probably happen
+    //       by adding a flag that indicates that the event loop is processing events and
+    //       a queue of contexts to unregister once processing completes.
     internal sealed class SocketAsyncContext
     {
         private abstract class AsyncOperation
