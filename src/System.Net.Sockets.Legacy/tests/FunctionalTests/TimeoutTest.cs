@@ -6,8 +6,6 @@ namespace System.Net.Sockets.Tests
     {
         private const int TestPortBase = 8110;
 
-        private const int ServerPort = TestPortBase;
-
         [Fact]
         public void GetAndSet_Success()
         {
@@ -33,11 +31,11 @@ namespace System.Net.Sockets.Tests
             {
                 using (Socket remoteSocket = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp))
                 {
-                    localSocket.Bind(new IPEndPoint(IPAddress.IPv6Loopback, ServerPort));
+                    localSocket.Bind(new IPEndPoint(IPAddress.IPv6Loopback, TestPortBase));
                     localSocket.Listen(1);
                     IAsyncResult localAsync = localSocket.BeginAccept(null, null);
 
-                    remoteSocket.Connect(IPAddress.IPv6Loopback, ServerPort);
+                    remoteSocket.Connect(IPAddress.IPv6Loopback, TestPortBase);
 
                     Socket acceptedSocket = localSocket.EndAccept(localAsync);
                     acceptedSocket.ReceiveTimeout = 100;
@@ -59,11 +57,11 @@ namespace System.Net.Sockets.Tests
             {
                 using (Socket remoteSocket = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp))
                 {
-                    localSocket.Bind(new IPEndPoint(IPAddress.IPv6Loopback, ServerPort));
+                    localSocket.Bind(new IPEndPoint(IPAddress.IPv6Loopback, TestPortBase + 1));
                     localSocket.Listen(1);
                     IAsyncResult localAsync = localSocket.BeginAccept(null, null);
 
-                    remoteSocket.Connect(IPAddress.IPv6Loopback, ServerPort);
+                    remoteSocket.Connect(IPAddress.IPv6Loopback, TestPortBase + 1);
 
                     Socket acceptedSocket = localSocket.EndAccept(localAsync);
                     acceptedSocket.SendTimeout = 100;

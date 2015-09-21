@@ -7,13 +7,15 @@ namespace System.Net.Sockets.Tests
 {
     public class DnsEndPointTest
     {
+        private const int TestPortBase = 8080;
+
         [Fact]
         public void Socket_ConnectDnsEndPoint_Success()
         {
-            SocketTestServer server = SocketTestServer.SocketTestServerFactory(new IPEndPoint(IPAddress.Loopback, 8080));
+            SocketTestServer server = SocketTestServer.SocketTestServerFactory(new IPEndPoint(IPAddress.Loopback, TestPortBase));
 
             Socket sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            sock.Connect(new DnsEndPoint("localhost", 8080));
+            sock.Connect(new DnsEndPoint("localhost", TestPortBase));
 
             sock.Dispose();
             server.Dispose();
@@ -26,7 +28,7 @@ namespace System.Net.Sockets.Tests
             {
                 // TODO: Behavior difference from .Net Desktop. This will actually throw InternalSocketException.
                 SocketException ex = Assert.ThrowsAny<SocketException>(() => {
-                    sock.Connect(new DnsEndPoint("notahostname.invalid.corp.microsoft.com", 8080));
+                    sock.Connect(new DnsEndPoint("notahostname.invalid.corp.microsoft.com", TestPortBase + 1));
                 });
 
                 SocketError errorCode = ex.SocketErrorCode;
@@ -35,7 +37,7 @@ namespace System.Net.Sockets.Tests
 
                 // TODO: Behavior difference from .Net Desktop. This will actually throw InternalSocketException.
                 ex = Assert.ThrowsAny<SocketException>(() => {
-                    sock.Connect(new DnsEndPoint("localhost", 8081));
+                    sock.Connect(new DnsEndPoint("localhost", TestPortBase + 2));
                 });
 
                 Assert.Equal(SocketError.ConnectionRefused, ex.SocketErrorCode);
@@ -48,7 +50,7 @@ namespace System.Net.Sockets.Tests
             using (Socket sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
             {
                 Assert.Throws<ArgumentException>(() => {
-                    sock.SendTo(new byte[10], new DnsEndPoint("localhost", 8080));
+                    sock.SendTo(new byte[10], new DnsEndPoint("localhost", TestPortBase + 3));
                 });
             }
         }
@@ -58,8 +60,8 @@ namespace System.Net.Sockets.Tests
         {
             using (Socket sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
             {
-                sock.Bind(new IPEndPoint(IPAddress.Loopback, 8080));
-                EndPoint endpoint = new DnsEndPoint("localhost", 8080);
+                sock.Bind(new IPEndPoint(IPAddress.Loopback, TestPortBase + 4));
+                EndPoint endpoint = new DnsEndPoint("localhost", TestPortBase + 4);
 
                 Assert.Throws<ArgumentException>(() => {
                     sock.ReceiveFrom(new byte[10], ref endpoint);
@@ -70,10 +72,10 @@ namespace System.Net.Sockets.Tests
         [Fact]
         public void Socket_BeginConnectDnsEndPoint_Success()
         {
-            SocketTestServer server = SocketTestServer.SocketTestServerFactory(new IPEndPoint(IPAddress.Loopback, 8080));
+            SocketTestServer server = SocketTestServer.SocketTestServerFactory(new IPEndPoint(IPAddress.Loopback, TestPortBase + 5));
 
             Socket sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            IAsyncResult result = sock.BeginConnect(new DnsEndPoint("localhost", 8080), null, null);
+            IAsyncResult result = sock.BeginConnect(new DnsEndPoint("localhost", TestPortBase + 5), null, null);
             sock.EndConnect(result);
 
             sock.Dispose();
@@ -87,7 +89,7 @@ namespace System.Net.Sockets.Tests
             {
                 // TODO: Behavior difference from .Net Desktop. This will actually throw InternalSocketException.
                 SocketException ex = Assert.ThrowsAny<SocketException>(() => {
-                    IAsyncResult result = sock.BeginConnect(new DnsEndPoint("notahostname.invalid.corp.microsoft.com", 8080), null, null);
+                    IAsyncResult result = sock.BeginConnect(new DnsEndPoint("notahostname.invalid.corp.microsoft.com", TestPortBase + 6), null, null);
                     sock.EndConnect(result);
                 });
 
@@ -97,7 +99,7 @@ namespace System.Net.Sockets.Tests
 
                 // TODO: Behavior difference from .Net Desktop. This will actually throw InternalSocketException.
                 ex = Assert.ThrowsAny<SocketException>(() => {
-                    IAsyncResult result = sock.BeginConnect(new DnsEndPoint("localhost", 8080), null, null);
+                    IAsyncResult result = sock.BeginConnect(new DnsEndPoint("localhost", TestPortBase + 6), null, null);
                     sock.EndConnect(result);
                 });
 
@@ -111,7 +113,7 @@ namespace System.Net.Sockets.Tests
             using (Socket sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
             {
                 Assert.Throws<ArgumentException>(() => {
-                    sock.BeginSendTo(new byte[10], 0, 0, SocketFlags.None, new DnsEndPoint("localhost", 8080), null, null);
+                    sock.BeginSendTo(new byte[10], 0, 0, SocketFlags.None, new DnsEndPoint("localhost", TestPortBase + 7), null, null);
                 });
             }
         }
@@ -125,10 +127,10 @@ namespace System.Net.Sockets.Tests
         [Fact]
         public void Socket_ConnectAsyncDnsEndPoint_Success()
         {
-            SocketTestServer server = SocketTestServer.SocketTestServerFactory(new IPEndPoint(IPAddress.Loopback, 8080));
+            SocketTestServer server = SocketTestServer.SocketTestServerFactory(new IPEndPoint(IPAddress.Loopback, TestPortBase + 8));
 
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            args.RemoteEndPoint = new DnsEndPoint("localhost", 8080);
+            args.RemoteEndPoint = new DnsEndPoint("localhost", TestPortBase + 8);
             args.Completed += OnConnectAsyncCompleted;
             
             ManualResetEvent complete = new ManualResetEvent(false);
@@ -151,7 +153,7 @@ namespace System.Net.Sockets.Tests
         public void Socket_ConnectAsyncDnsEndPoint_HostNotFound()
         {
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            args.RemoteEndPoint = new DnsEndPoint("notahostname.invalid.corp.microsoft.com", 8080);
+            args.RemoteEndPoint = new DnsEndPoint("notahostname.invalid.corp.microsoft.com", TestPortBase + 9);
             args.Completed += OnConnectAsyncCompleted;
 
             ManualResetEvent complete = new ManualResetEvent(false);
@@ -172,7 +174,7 @@ namespace System.Net.Sockets.Tests
         public void Socket_ConnectAsyncDnsEndPoint_ConnectionRefused()
         {
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            args.RemoteEndPoint = new DnsEndPoint("localhost", 8080);
+            args.RemoteEndPoint = new DnsEndPoint("localhost", TestPortBase + 10);
             args.Completed += OnConnectAsyncCompleted;
 
             ManualResetEvent complete = new ManualResetEvent(false);
@@ -197,11 +199,11 @@ namespace System.Net.Sockets.Tests
 
             Assert.True(Capability.IPv6Support() && Capability.IPv4Support());
 
-            SocketTestServer server4 = SocketTestServer.SocketTestServerFactory(new IPEndPoint(IPAddress.Loopback, 8080));
-            SocketTestServer server6 = SocketTestServer.SocketTestServerFactory(new IPEndPoint(IPAddress.IPv6Loopback, 8081));
+            SocketTestServer server4 = SocketTestServer.SocketTestServerFactory(new IPEndPoint(IPAddress.Loopback, TestPortBase + 11));
+            SocketTestServer server6 = SocketTestServer.SocketTestServerFactory(new IPEndPoint(IPAddress.IPv6Loopback, TestPortBase + 12));
 
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            args.RemoteEndPoint = new DnsEndPoint("localhost", 8080);
+            args.RemoteEndPoint = new DnsEndPoint("localhost", TestPortBase + 11);
             args.Completed += OnConnectAsyncCompleted;
 
             ManualResetEvent complete = new ManualResetEvent(false);
@@ -219,7 +221,7 @@ namespace System.Net.Sockets.Tests
 
             args.ConnectSocket.Dispose();
 
-            args.RemoteEndPoint = new DnsEndPoint("localhost", 8081);
+            args.RemoteEndPoint = new DnsEndPoint("localhost", TestPortBase + 12);
             complete.Reset();
 
             Assert.True(Socket.ConnectAsync(SocketType.Stream, ProtocolType.Tcp, args));
@@ -242,7 +244,7 @@ namespace System.Net.Sockets.Tests
         public void Socket_StaticConnectAsync_HostNotFound()
         {
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            args.RemoteEndPoint = new DnsEndPoint("notahostname.invalid.corp.microsoft.com", 8080);
+            args.RemoteEndPoint = new DnsEndPoint("notahostname.invalid.corp.microsoft.com", TestPortBase + 13);
             args.Completed += OnConnectAsyncCompleted;
 
             ManualResetEvent complete = new ManualResetEvent(false);
@@ -263,7 +265,7 @@ namespace System.Net.Sockets.Tests
         public void Socket_StaticConnectAsync_ConnectionRefused()
         {
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            args.RemoteEndPoint = new DnsEndPoint("localhost", 8080);
+            args.RemoteEndPoint = new DnsEndPoint("localhost", TestPortBase + 14);
             args.Completed += OnConnectAsyncCompleted;
 
             ManualResetEvent complete = new ManualResetEvent(false);
@@ -292,7 +294,7 @@ namespace System.Net.Sockets.Tests
             Assert.True(Capability.IPv6Support()); // IPv6 required because we use AF.InterNetworkV6
 
             SocketAsyncEventArgs args = new SocketAsyncEventArgs();
-            args.RemoteEndPoint = new DnsEndPoint("127.0.0.1", 8080, AddressFamily.InterNetworkV6);
+            args.RemoteEndPoint = new DnsEndPoint("127.0.0.1", TestPortBase + 15, AddressFamily.InterNetworkV6);
             args.Completed += CallbackThatShouldNotBeCalled;
 
             Assert.False(Socket.ConnectAsync(SocketType.Stream, ProtocolType.Tcp, args));

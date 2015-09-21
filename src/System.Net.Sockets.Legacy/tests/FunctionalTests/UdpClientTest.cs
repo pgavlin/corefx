@@ -9,7 +9,7 @@ namespace NCLTest.Sockets
 {
     public class UDPClientTest
     {
-        private const int TestPortBase = 8400;
+        private const int TestPortBase = 8600;
         private ManualResetEvent _waitHandle = new ManualResetEvent(false);
 
         [Fact]
