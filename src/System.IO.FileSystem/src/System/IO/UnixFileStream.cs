@@ -96,8 +96,8 @@ namespace System.IO
             // and not atomic with file opening, it's better than nothing.
             try
             {
-                Interop.libc.LockOperations lockOperation = (share == FileShare.None) ? Interop.libc.LockOperations.LOCK_EX : Interop.libc.LockOperations.LOCK_SH;
-                SysCall<Interop.libc.LockOperations, int>((fd, op, _) => Interop.libc.flock(fd, op), lockOperation | Interop.libc.LockOperations.LOCK_NB);
+                Interop.Sys.LockOperations lockOperation = (share == FileShare.None) ? Interop.Sys.LockOperations.LOCK_EX : Interop.Sys.LockOperations.LOCK_SH;
+                SysCall<Interop.Sys.LockOperations, int>((fd, op, _) => Interop.Sys.FLock(fd, op), lockOperation | Interop.Sys.LockOperations.LOCK_NB);
             }
             catch
             {
@@ -105,8 +105,19 @@ namespace System.IO
                 throw;
             }
 
-            // Perform additional configurations on the stream based on the provided FileOptions
-            PostOpenConfigureStreamFromOptions();
+            // These provide hints around how the file will be accessed.
+            Interop.Sys.FileAdvice fadv =
+                _options == FileOptions.RandomAccess ? Interop.Sys.FileAdvice.POSIX_FADV_RANDOM :
+                _options == FileOptions.SequentialScan ? Interop.Sys.FileAdvice.POSIX_FADV_SEQUENTIAL :
+                0;
+
+            if (fadv != 0)
+            {
+                SysCall<Interop.Sys.FileAdvice, int>(
+                    (fd, advice, _) => Interop.Sys.PosixFAdvise(fd, 0, 0, advice),
+                    fadv,
+                    ignoreNotSupported: true); // just a hint.
+            }
 
             // Jump to the end of the file if opened as Append.
             if (_mode == FileMode.Append)
@@ -114,9 +125,6 @@ namespace System.IO
                 _appendStart = SeekCore(0, SeekOrigin.End);
             }
         }
-
-        /// <summary>Performs additional configuration of the opened stream based on provided options.</summary>
-        partial void PostOpenConfigureStreamFromOptions();
 
         /// <summary>Initializes a stream from an already open file handle (file descriptor).</summary>
         /// <param name="handle">The handle to the file.</param>
@@ -252,7 +260,7 @@ namespace System.IO
                 if (!_canSeek.HasValue)
                 {
                     // Lazily-initialize whether we're able to seek, tested by seeking to our current location.
-                    _canSeek = SysCall<int, int>((fd, _, __) => Interop.libc.lseek(fd, 0, Interop.libc.SeekWhence.SEEK_CUR), throwOnError: false) >= 0;
+                    _canSeek = SysCall<int, int>((fd, _, __) => Interop.Sys.LSeek(fd, 0, Interop.Sys.SeekWhence.SEEK_CUR), throwOnError: false) >= 0;
                 }
                 return _canSeek.Value;
             }
@@ -455,7 +463,7 @@ namespace System.IO
         /// <summary>Flushes the OS buffer.  This does not flush the internal read/write buffer.</summary>
         private void FlushOSBuffer()
         {
-            SysCall<int, int>((fd, _, __) => Interop.libc.fsync(fd));
+            SysCall<int, int>((fd, _, __) => Interop.Sys.FSync(fd));
         }
 
         /// <summary>
@@ -578,7 +586,7 @@ namespace System.IO
                 SeekCore(value, SeekOrigin.Begin);
             }
 
-            SysCall<long, int>((fd, length, _) => Interop.libc.ftruncate(fd, length), value);
+            SysCall<long, int>((fd, length, _) => Interop.Sys.FTruncate(fd, length), value);
 
             // Return file pointer to where it was before setting length
             if (origPos != value)
@@ -618,6 +626,7 @@ namespace System.IO
             // we can just go directly into the user's buffer, if they asked
             // for more data than we'd otherwise buffer.
             int numBytesAvailable = _readLength - _readPos;
+            bool readFromOS = false;
             if (numBytesAvailable == 0)
             {
                 // If we're not able to seek, then we're not able to rewind the stream (i.e. flushing
@@ -626,9 +635,8 @@ namespace System.IO
                 if (!_parent.CanSeek || (count >= _bufferLength))
                 {
                     // Read directly into the user's buffer
-                    int bytesRead = ReadCore(array, offset, count);
-                    _readPos = _readLength = 0; // reset after the read just in case read experiences an exception
-                    return bytesRead;
+                    _readPos = _readLength = 0;
+                    return ReadCore(array, offset, count);
                 }
                 else
                 {
@@ -639,16 +647,36 @@ namespace System.IO
                     {
                         return 0;
                     }
+
+                    // Note that we did an OS read as part of this Read, so that later
+                    // we don't try to do one again if what's in the buffer doesn't
+                    // meet the user's request.
+                    readFromOS = true;
                 }
             }
 
-            // Now that we know there's data in the buffer, read from it into
-            // the user's buffer.
-            int bytesToRead = Math.Min(numBytesAvailable, count);
-            Buffer.BlockCopy(GetBuffer(), _readPos, array, offset, bytesToRead);
-            _readPos += bytesToRead;
+            // Now that we know there's data in the buffer, read from it into the user's buffer.
+            Debug.Assert(numBytesAvailable > 0, "Data must be in the buffer to be here");
+            int bytesRead = Math.Min(numBytesAvailable, count);
+            Buffer.BlockCopy(GetBuffer(), _readPos, array, offset, bytesRead);
+            _readPos += bytesRead;
 
-            return bytesToRead;
+            // We may not have had enough data in the buffer to completely satisfy the user's request.
+            // While Read doesn't require that we return as much data as the user requested (any amount
+            // up to the requested count is fine), FileStream on Windows tries to do so by doing a 
+            // subsequent read from the file if we tried to satisfy the request with what was in the 
+            // buffer but the buffer contained less than the requested count. To be consistent with that 
+            // behavior, we do the same thing here on Unix.  Note that we may still get less the requested 
+            // amount, as the OS may give us back fewer than we request, either due to reaching the end of 
+            // file, or due to its own whims.
+            if (!readFromOS && bytesRead < count)
+            {
+                Debug.Assert(_readPos == _readLength, "bytesToRead should only be < count if numBytesAvailable < count");
+                _readPos = _readLength = 0; // no data left in the read buffer
+                bytesRead += ReadCore(array, offset + bytesRead, count - bytesRead);
+            }
+
+            return bytesRead;
         }
 
         /// <summary>Unbuffered, reads a block of bytes from the stream and writes the data in a given buffer.</summary>
@@ -673,7 +701,7 @@ namespace System.IO
             {
                 bytesRead = (int)SysCall((fd, ptr, len) =>
                 {
-                    long result = (long)Interop.libc.read(fd, (byte*)ptr, (IntPtr)len);
+                    int result = Interop.Sys.Read(fd, (byte*)ptr, len);
                     Debug.Assert(result <= len);
                     return result;
                 }, (IntPtr)(bufPtr + offset), count);
@@ -816,7 +844,7 @@ namespace System.IO
                 {
                     int bytesWritten = (int)SysCall((fd, ptr, len) =>
                     {
-                        long result = (long)Interop.libc.write(fd, (byte*)ptr, (IntPtr)len);
+                        int result = Interop.Sys.Write(fd, (byte*)ptr, len);
                         Debug.Assert(result <= len);
                         return result;
                     }, (IntPtr)(bufPtr + offset), count);
@@ -989,7 +1017,7 @@ namespace System.IO
             Debug.Assert(!_fileHandle.IsClosed && CanSeek);
             Debug.Assert(origin >= SeekOrigin.Begin && origin <= SeekOrigin.End);
 
-            long pos = SysCall((fd, off, or) => Interop.libc.lseek(fd, off, or), offset, (Interop.libc.SeekWhence)(int)origin); // SeekOrigin values are the same as Interop.libc.SeekWhence values
+            long pos = SysCall((fd, off, or) => Interop.Sys.LSeek(fd, off, or), offset, (Interop.Sys.SeekWhence)(int)origin); // SeekOrigin values are the same as Interop.libc.SeekWhence values
             _filePosition = pos;
             return pos;
         }
@@ -1014,7 +1042,8 @@ namespace System.IO
         private long SysCall<TArg1, TArg2>(
             Func<int, TArg1, TArg2, long> sysCall,
             TArg1 arg1 = default(TArg1), TArg2 arg2 = default(TArg2),
-            bool throwOnError = true)
+            bool throwOnError = true,
+            bool ignoreNotSupported = false)
         {
             SafeFileHandle handle = _fileHandle;
 
@@ -1042,7 +1071,7 @@ namespace System.IO
                         {
                             continue;
                         }
-                        else if (throwOnError)
+                        else if (throwOnError && !(ignoreNotSupported && errorInfo.Error == Interop.Error.ENOTSUP))
                         {
                             throw Interop.GetExceptionForIoErrno(errorInfo, _path, isDirectory: false);
                         }

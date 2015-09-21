@@ -1,6 +1,11 @@
-﻿/// <summary>
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+/// <summary>
 /// Task APM helper based on http://blogs.msdn.com/b/pfxteam/archive/2011/06/27/10179452.aspx
 /// </summary>
+
+// TODO: #3144 - Remove this class and rewrite tests to work directly with TPL.
 
 namespace System.Threading.Tasks
 {
@@ -34,8 +39,10 @@ namespace System.Threading.Tasks
                     tcs.TrySetResult(false);
                 }
 
-                if (callback != null) callback(tcs.Task);
-
+                if (callback != null)
+                {
+                    callback(tcs.Task);
+                }
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
             return tcs.Task;
         }
@@ -49,6 +56,7 @@ namespace System.Threading.Tasks
                     task.ContinueWith(delegate { callback(task); },
                         CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
                 }
+
                 return task;
             }
 

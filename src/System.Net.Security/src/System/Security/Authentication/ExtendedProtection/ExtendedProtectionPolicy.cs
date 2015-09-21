@@ -17,10 +17,10 @@ namespace System.Security.Authentication.ExtendedProtection
         private const string customServiceNamesName = "customServiceNames";
         private const string customChannelBindingName = "customChannelBinding";
 
-        private ServiceNameCollection customServiceNames;
-        private PolicyEnforcement policyEnforcement;
-        private ProtectionScenario protectionScenario;
-        private ChannelBinding customChannelBinding;
+        private ServiceNameCollection _customServiceNames;
+        private PolicyEnforcement _policyEnforcement;
+        private ProtectionScenario _protectionScenario;
+        private ChannelBinding _customChannelBinding;
 
         public ExtendedProtectionPolicy(PolicyEnforcement policyEnforcement,
                                         ProtectionScenario protectionScenario,
@@ -30,14 +30,15 @@ namespace System.Security.Authentication.ExtendedProtection
             {
                 throw new ArgumentException(SR.security_ExtendedProtectionPolicy_UseDifferentConstructorForNever, "policyEnforcement");
             }
+
             if (customServiceNames != null && customServiceNames.Count == 0)
             {
                 throw new ArgumentException(SR.security_ExtendedProtectionPolicy_NoEmptyServiceNameCollection, "customServiceNames");
             }
 
-            this.policyEnforcement = policyEnforcement;
-            this.protectionScenario = protectionScenario;
-            this.customServiceNames = customServiceNames;
+            _policyEnforcement = policyEnforcement;
+            _protectionScenario = protectionScenario;
+            _customServiceNames = customServiceNames;
         }
 
         public ExtendedProtectionPolicy(PolicyEnforcement policyEnforcement,
@@ -55,70 +56,71 @@ namespace System.Security.Authentication.ExtendedProtection
             {
                 throw new ArgumentException(SR.security_ExtendedProtectionPolicy_UseDifferentConstructorForNever, "policyEnforcement");
             }
+
             if (customChannelBinding == null)
             {
                 throw new ArgumentNullException("customChannelBinding");
             }
 
-            this.policyEnforcement = policyEnforcement;
-            this.protectionScenario = ProtectionScenario.TransportSelected;
-            this.customChannelBinding = customChannelBinding;
+            _policyEnforcement = policyEnforcement;
+            _protectionScenario = ProtectionScenario.TransportSelected;
+            _customChannelBinding = customChannelBinding;
         }
 
         public ExtendedProtectionPolicy(PolicyEnforcement policyEnforcement)
         {
-            // this is the only constructor which allows PolicyEnforcement.Never.
-            this.policyEnforcement = policyEnforcement;
-            this.protectionScenario = ProtectionScenario.TransportSelected;
+            // This is the only constructor which allows PolicyEnforcement.Never.
+            _policyEnforcement = policyEnforcement;
+            _protectionScenario = ProtectionScenario.TransportSelected;
         }
 
         public ServiceNameCollection CustomServiceNames
         {
-            get { return customServiceNames; }
+            get { return _customServiceNames; }
         }
 
         public PolicyEnforcement PolicyEnforcement
         {
-            get { return policyEnforcement; }
+            get { return _policyEnforcement; }
         }
 
         public ProtectionScenario ProtectionScenario
         {
-            get { return protectionScenario; }
+            get { return _protectionScenario; }
         }
 
         public ChannelBinding CustomChannelBinding
         {
-            get { return customChannelBinding; }
+            get { return _customChannelBinding; }
         }
 
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();
             sb.Append("ProtectionScenario=");
-            sb.Append(protectionScenario.ToString());
+            sb.Append(_protectionScenario.ToString());
             sb.Append("; PolicyEnforcement=");
-            sb.Append(policyEnforcement.ToString());
+            sb.Append(_policyEnforcement.ToString());
 
             sb.Append("; CustomChannelBinding=");
-            if (customChannelBinding == null)
+            if (_customChannelBinding == null)
             {
                 sb.Append("<null>");
             }
             else
             {
-                sb.Append(customChannelBinding.ToString());
+                sb.Append(_customChannelBinding.ToString());
             }
 
             sb.Append("; ServiceNames=");
-            if (customServiceNames == null)
+            if (_customServiceNames == null)
             {
                 sb.Append("<null>");
             }
             else
             {
                 bool first = true;
-                foreach (string serviceName in customServiceNames)
+                foreach (string serviceName in _customServiceNames)
                 {
                     if (first)
                     {
@@ -140,7 +142,7 @@ namespace System.Security.Authentication.ExtendedProtection
         {
             get
             {
-                // ProjectK is supported only on Win7+ where ExtendedProtection is supported.
+                // CoreFX is supported only on Win7+ where ExtendedProtection is supported.
                 return true;
             }
         }

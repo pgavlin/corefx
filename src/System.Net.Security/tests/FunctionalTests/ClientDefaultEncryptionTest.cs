@@ -1,4 +1,7 @@
-﻿using System.IO;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using System.IO;
 using System.Net.Sockets;
 using System.Net.Test.Common;
 using System.Security.Authentication;
@@ -17,7 +20,7 @@ namespace System.Net.Security.Tests
         {
             _log = TestLogging.GetInstance();
         }
-        
+
         // The following method is invoked by the RemoteCertificateValidationDelegate.
         public bool AllowAnyServerCertificate(
               object sender,
@@ -52,7 +55,6 @@ namespace System.Net.Security.Tests
         [Fact]
         public void ClientDefaultEncryption_ServerAllowNoEncryption_ConnectWithEncryption()
         {
-
             using (var serverAllowNoEncryption = new DummyTcpServer(
                 new IPEndPoint(IPAddress.Loopback, 0), EncryptionPolicy.AllowNoEncryption))
             using (var client = new TcpClient())
@@ -82,7 +84,8 @@ namespace System.Net.Security.Tests
 
                 using (var sslStream = new SslStream(client.GetStream(), false, AllowAnyServerCertificate, null))
                 {
-                    Assert.Throws<IOException>(() => {
+                    Assert.Throws<IOException>(() =>
+                    {
                         sslStream.AuthenticateAsClient("localhost", null, TestConfiguration.DefaultSslProtocols, false);
                     });
                 }

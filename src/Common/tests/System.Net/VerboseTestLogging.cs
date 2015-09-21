@@ -1,4 +1,7 @@
-﻿using System.Diagnostics.Tracing;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using System.Diagnostics.Tracing;
 using System.Text;
 using Xunit.Abstractions;
 
@@ -6,7 +9,7 @@ namespace System.Net.Test.Common
 {
     public class VerboseTestLogging : ITestOutputHelper
     {
-        private static VerboseTestLogging _instance = new VerboseTestLogging();
+        private static VerboseTestLogging s_instance = new VerboseTestLogging();
 
         private VerboseTestLogging()
         {
@@ -14,7 +17,7 @@ namespace System.Net.Test.Common
 
         public static VerboseTestLogging GetInstance()
         {
-            return _instance;
+            return s_instance;
         }
 
         public void WriteLine(string message)

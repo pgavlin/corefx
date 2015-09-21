@@ -5,11 +5,11 @@ using System.IO;
 
 namespace System.Net.Security
 {
-    // A public contact for a base abstract authenticated stream.
+    // A public contract for a base abstract authenticated stream.
     public abstract class AuthenticatedStream : Stream
     {
-        private Stream _InnerStream;
-        private bool _LeaveStreamOpen;
+        private Stream _innerStream;
+        private bool _leaveStreamOpen;
 
         protected AuthenticatedStream(Stream innerStream, bool leaveInnerStreamOpen)
         {
@@ -23,15 +23,15 @@ namespace System.Net.Security
                 throw new ArgumentException(SR.net_io_must_be_rw_stream, "innerStream");
             }
 
-            _InnerStream = innerStream;
-            _LeaveStreamOpen = leaveInnerStreamOpen;
+            _innerStream = innerStream;
+            _leaveStreamOpen = leaveInnerStreamOpen;
         }
 
         public bool LeaveInnerStreamOpen
         {
             get
             {
-                return _LeaveStreamOpen;
+                return _leaveStreamOpen;
             }
         }
 
@@ -39,7 +39,7 @@ namespace System.Net.Security
         {
             get
             {
-                return _InnerStream;
+                return _innerStream;
             }
         }
 
@@ -49,24 +49,24 @@ namespace System.Net.Security
             using (GlobalLog.SetThreadKind(ThreadKinds.User))
             {
 #endif
-            try
-            {
-                if (disposing)
+                try
                 {
-                    if (_LeaveStreamOpen)
+                    if (disposing)
                     {
-                        _InnerStream.Flush();
-                    }
-                    else
-                    {
-                        _InnerStream.Dispose();
+                        if (_leaveStreamOpen)
+                        {
+                            _innerStream.Flush();
+                        }
+                        else
+                        {
+                            _innerStream.Dispose();
+                        }
                     }
                 }
-            }
-            finally
-            {
-                base.Dispose(disposing);
-            }
+                finally
+                {
+                    base.Dispose(disposing);
+                }
 #if DEBUG
             }
 #endif

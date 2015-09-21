@@ -1,9 +1,9 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Runtime.InteropServices;
 using System.Globalization;
 using System.Net.Security;
+using System.Runtime.InteropServices;
 
 namespace System.Net
 {
@@ -42,17 +42,17 @@ namespace System.Net
     // For SSL connections:
     internal class SSPISecureChannelType : SSPIInterface
     {
-        private static volatile SecurityPackageInfoClass[] m_SecurityPackages;
+        private static volatile SecurityPackageInfoClass[] s_securityPackages;
 
         public SecurityPackageInfoClass[] SecurityPackages
         {
             get
             {
-                return m_SecurityPackages;
+                return s_securityPackages;
             }
             set
             {
-                m_SecurityPackages = value;
+                s_securityPackages = value;
             }
         }
 
@@ -104,61 +104,31 @@ namespace System.Net
 
         public int EncryptMessage(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)Interop.SecurityStatus.InvalidHandle;
-            bool b = false;
-
             try
             {
-                context.DangerousAddRef(ref b);
-            }
-            catch (Exception e)
-            {
-                if (b)
-                {
-                    context.DangerousRelease();
-                    b = false;
-                }
-                if (!(e is ObjectDisposedException))
-                    throw;
+                bool ignore = false;
+                context.DangerousAddRef(ref ignore);
+                return Interop.Secur32.EncryptMessage(ref context._handle, 0, inputOutput, sequenceNumber);
             }
             finally
             {
-                if (b)
-                {
-                    status = Interop.Secur32.EncryptMessage(ref context._handle, 0, inputOutput, sequenceNumber);
-                    context.DangerousRelease();
-                }
+                context.DangerousRelease();
             }
-            return status;
         }
 
-        public unsafe int DecryptMessage(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
+        public unsafe int DecryptMessage(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput,
+            uint sequenceNumber)
         {
-            int status = (int)Interop.SecurityStatus.InvalidHandle;
-            bool b = false;
             try
             {
-                context.DangerousAddRef(ref b);
-            }
-            catch (Exception e)
-            {
-                if (b)
-                {
-                    context.DangerousRelease();
-                    b = false;
-                }
-                if (!(e is ObjectDisposedException))
-                    throw;
+                bool ignore = false;
+                context.DangerousAddRef(ref ignore);
+                return Interop.Secur32.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, null);
             }
             finally
             {
-                if (b)
-                {
-                    status = Interop.Secur32.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, null);
-                    context.DangerousRelease();
-                }
+                context.DangerousRelease();
             }
-            return status;
         }
 
         public int MakeSignature(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
@@ -175,7 +145,7 @@ namespace System.Net
         {
             refHandle = SafeFreeContextBufferChannelBinding.CreateEmptyHandle();
 
-            // bindings is on the stack, so there's no need for a fixed block
+            // Bindings is on the stack, so there's no need for a fixed block.
             Bindings bindings = new Bindings();
             return SafeFreeContextBufferChannelBinding.QueryContextChannelBinding(phContext, attribute, &bindings, refHandle);
         }
@@ -224,17 +194,17 @@ namespace System.Net
     // For Authentication (Kerberos, NTLM, Negotiate and WDigest):
     internal class SSPIAuthType : SSPIInterface
     {
-        private static volatile SecurityPackageInfoClass[] m_SecurityPackages;
+        private static volatile SecurityPackageInfoClass[] s_securityPackages;
 
         public SecurityPackageInfoClass[] SecurityPackages
         {
             get
             {
-                return m_SecurityPackages;
+                return s_securityPackages;
             }
             set
             {
-                m_SecurityPackages = value;
+                s_securityPackages = value;
             }
         }
 
@@ -287,65 +257,37 @@ namespace System.Net
 
         public int EncryptMessage(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)Interop.SecurityStatus.InvalidHandle;
-            bool b = false;
-
             try
             {
-                context.DangerousAddRef(ref b);
-            }
-            catch (Exception e)
-            {
-                if (b)
-                {
-                    context.DangerousRelease();
-                    b = false;
-                }
-                if (!(e is ObjectDisposedException))
-                    throw;
+                bool ignore = false;
+
+                context.DangerousAddRef(ref ignore);
+                return Interop.Secur32.EncryptMessage(ref context._handle, 0, inputOutput, sequenceNumber);
             }
             finally
             {
-                if (b)
-                {
-                    status = Interop.Secur32.EncryptMessage(ref context._handle, 0, inputOutput, sequenceNumber);
-                    context.DangerousRelease();
-                }
+                context.DangerousRelease();
             }
-            return status;
         }
 
         public unsafe int DecryptMessage(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
             int status = (int)Interop.SecurityStatus.InvalidHandle;
-            bool b = false;
             uint qop = 0;
 
             try
             {
-                context.DangerousAddRef(ref b);
-            }
-            catch (Exception e)
-            {
-                if (b)
-                {
-                    context.DangerousRelease();
-                    b = false;
-                }
-                if (!(e is ObjectDisposedException))
-                    throw;
+                bool ignore = false;
+                context.DangerousAddRef(ref ignore);
+                status = Interop.Secur32.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, &qop);
             }
             finally
             {
-                if (b)
-                {
-                    status = Interop.Secur32.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, &qop);
-                    context.DangerousRelease();
-                }
+                context.DangerousRelease();
             }
 
-            const uint SECQOP_WRAP_NO_ENCRYPT = 0x80000001;
-            if (status == 0 && qop == SECQOP_WRAP_NO_ENCRYPT)
+            
+            if (status == 0 && qop == Interop.Secur32.SECQOP_WRAP_NO_ENCRYPT)
             {
                 GlobalLog.Assert("Secur32.DecryptMessage", "Expected qop = 0, returned value = " + qop.ToString("x", CultureInfo.InvariantCulture));
                 throw new InvalidOperationException(SR.net_auth_message_not_encrypted);
@@ -357,65 +299,34 @@ namespace System.Net
 
         public int MakeSignature(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)Interop.SecurityStatus.InvalidHandle;
-            bool b = false;
-
             try
             {
-                context.DangerousAddRef(ref b);
-            }
-            catch (Exception e)
-            {
-                if (b)
-                {
-                    context.DangerousRelease();
-                    b = false;
-                }
-                if (!(e is ObjectDisposedException))
-                    throw;
+                bool ignore = false;
+
+                context.DangerousAddRef(ref ignore);
+                
+                return Interop.Secur32.EncryptMessage(ref context._handle, Interop.Secur32.SECQOP_WRAP_NO_ENCRYPT, inputOutput, sequenceNumber);
             }
             finally
             {
-                if (b)
-                {
-                    const uint SECQOP_WRAP_NO_ENCRYPT = 0x80000001;
-                    status = Interop.Secur32.EncryptMessage(ref context._handle, SECQOP_WRAP_NO_ENCRYPT, inputOutput, sequenceNumber);
-                    context.DangerousRelease();
-                }
+                context.DangerousRelease();
             }
-            return status;
         }
 
         public unsafe int VerifySignature(SafeDeleteContext context, Interop.Secur32.SecurityBufferDescriptor inputOutput, uint sequenceNumber)
         {
-            int status = (int)Interop.SecurityStatus.InvalidHandle;
-            bool b = false;
-
-            uint qop = 0;
             try
             {
-                context.DangerousAddRef(ref b);
-            }
-            catch (Exception e)
-            {
-                if (b)
-                {
-                    context.DangerousRelease();
-                    b = false;
-                }
-                if (!(e is ObjectDisposedException))
-                    throw;
+                bool ignore = false;
+                uint qop = 0;
+
+                context.DangerousAddRef(ref ignore);
+                return Interop.Secur32.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, &qop);
             }
             finally
             {
-                if (b)
-                {
-                    status = Interop.Secur32.DecryptMessage(ref context._handle, inputOutput, sequenceNumber, &qop);
-                    context.DangerousRelease();
-                }
+                context.DangerousRelease();
             }
-
-            return status;
         }
 
         public int QueryContextChannelBinding(SafeDeleteContext context, Interop.Secur32.ContextAttribute attribute, out SafeFreeContextBufferChannelBinding binding)
@@ -467,34 +378,18 @@ namespace System.Net
 
         private static int GetSecurityContextToken(SafeDeleteContext phContext, out SecurityContextTokenHandle safeHandle)
         {
-            int status = (int)Interop.SecurityStatus.InvalidHandle;
-            bool b = false;
             safeHandle = null;
 
             try
             {
-                phContext.DangerousAddRef(ref b);
-            }
-            catch (Exception e)
-            {
-                if (b)
-                {
-                    phContext.DangerousRelease();
-                    b = false;
-                }
-                if (!(e is ObjectDisposedException))
-                    throw;
+                bool ignore = false;
+                phContext.DangerousAddRef(ref ignore);
+                return Interop.Secur32.QuerySecurityContextToken(ref phContext._handle, out safeHandle);
             }
             finally
             {
-                if (b)
-                {
-                    status = Interop.Secur32.QuerySecurityContextToken(ref phContext._handle, out safeHandle);
-                    phContext.DangerousRelease();
-                }
+                phContext.DangerousRelease();
             }
-
-            return status;
         }
     }
 }

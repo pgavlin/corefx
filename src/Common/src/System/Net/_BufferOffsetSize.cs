@@ -4,14 +4,11 @@
 namespace System.Net
 {
     //
-    // this class is used by the BeginMultipleSend() API
-    // to allow a user to send multiple buffers on a socket
+    // This class is used by the BeginMultipleSend() API
+    // to allow a user to send multiple buffers on a socket.
     //
     internal class BufferOffsetSize
     {
-        //
-        // internal members
-        //
         internal byte[] Buffer;
         internal int Offset;
         internal int Size;
@@ -39,25 +36,11 @@ namespace System.Net
             GlobalLog.Print("BufferOffsetSize#" + Logging.HashString(this) + "::.ctor() copyBuffer:" + copyBuffer.ToString() + " this:[" + ToString() + "]");
         }
 
-        /*
-        // Consider removing.
-        internal BufferOffsetSize(byte[] buffer, int offset, bool copyBuffer)
-            : this(buffer, offset, buffer.Length - offset, copyBuffer) {
-        }
-        */
-
-        /*
-        // Consider removing.
-        internal BufferOffsetSize(int size, byte[] buffer, bool copyBuffer)
-            : this(buffer, 0, size, copyBuffer) {
-        }
-        */
-
         internal BufferOffsetSize(byte[] buffer, bool copyBuffer)
             : this(buffer, 0, buffer.Length, copyBuffer)
         {
         }
-#if TRAVE
+#if TRACE_VERBOSE
         public override string ToString()
         {
             return "BufferOffsetSize#" + Logging.HashString(this) + " Buffer#" + Logging.HashString(Buffer) + " Offset:" + Offset.ToString() + " Size:" + Size.ToString();

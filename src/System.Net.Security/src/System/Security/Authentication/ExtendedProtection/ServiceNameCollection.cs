@@ -17,7 +17,7 @@ namespace System.Security.Authentication.ExtendedProtection
                 throw new ArgumentNullException("items");
             }
 
-            // Normalize and filter for duplicates
+            // Normalize and filter for duplicates.
             foreach (string serviceName in items)
             {
                 AddIfNew(InnerList, serviceName);
@@ -26,7 +26,7 @@ namespace System.Security.Authentication.ExtendedProtection
 
         public ServiceNameCollection Merge(string serviceName)
         {
-            ArrayList newServiceNames = new ArrayList(); // be compatible with .Net 1.x; no generics
+            ArrayList newServiceNames = new ArrayList();
             newServiceNames.AddRange(this.InnerList);
 
             AddIfNew(newServiceNames, serviceName);
@@ -37,11 +37,11 @@ namespace System.Security.Authentication.ExtendedProtection
 
         public ServiceNameCollection Merge(IEnumerable serviceNames)
         {
-            ArrayList newServiceNames = new ArrayList(); // be compatible with .Net 1.x; no generics
+            ArrayList newServiceNames = new ArrayList();
             newServiceNames.AddRange(this.InnerList);
 
-            // we have a pretty bad performance here: O(n^2), but since service name lists should 
-            // be small (<<50) and Merge() should not be called frequently, this shouldn't be an issue
+            // We have a pretty bad performance here: O(n^2), but since service name lists should 
+            // be small (<<50) and Merge() should not be called frequently, this shouldn't be an issue.
             foreach (object item in serviceNames)
             {
                 AddIfNew(newServiceNames, item as string);
@@ -51,7 +51,7 @@ namespace System.Security.Authentication.ExtendedProtection
             return newCollection;
         }
 
-        // Normalize, check for duplicates, and add if the value is unique
+        // Normalize, check for duplicates, and add if the value is unique.
         private static void AddIfNew(ArrayList newServiceNames, string serviceName)
         {
             if (String.IsNullOrEmpty(serviceName))
@@ -67,7 +67,7 @@ namespace System.Security.Authentication.ExtendedProtection
             }
         }
 
-        // Assumes searchServiceName and serviceNames have already been normalized
+        // Assumes searchServiceName and serviceNames have already been normalized.
         internal static bool Contains(string searchServiceName, ICollection serviceNames)
         {
             Debug.Assert(serviceNames != null);
@@ -106,13 +106,14 @@ namespace System.Security.Authentication.ExtendedProtection
             }
 
             // Separate out the prefix
-            int shashIndex = inputServiceName.IndexOf('/');
-            if (shashIndex < 0)
+            int slashIndex = inputServiceName.IndexOf('/');
+            if (slashIndex < 0)
             {
                 return inputServiceName;
             }
-            string prefix = inputServiceName.Substring(0, shashIndex + 1); // Includes slash
-            string hostPortAndDistinguisher = inputServiceName.Substring(shashIndex + 1); // Excludes slash
+
+            string prefix = inputServiceName.Substring(0, slashIndex + 1); // Includes slash
+            string hostPortAndDistinguisher = inputServiceName.Substring(slashIndex + 1); // Excludes slash
 
             if (string.IsNullOrWhiteSpace(hostPortAndDistinguisher))
             {
@@ -129,7 +130,7 @@ namespace System.Security.Authentication.ExtendedProtection
             {
                 string hostAndPort = hostPortAndDistinguisher;
 
-                // Check for distinguisher
+                // Check for distinguisher.
                 int nextSlashIndex = hostPortAndDistinguisher.IndexOf('/');
                 if (nextSlashIndex >= 0)
                 {
@@ -137,18 +138,18 @@ namespace System.Security.Authentication.ExtendedProtection
                     hostAndPort = hostPortAndDistinguisher.Substring(0, nextSlashIndex); // Excludes Slash
                     distinguisher = hostPortAndDistinguisher.Substring(nextSlashIndex); // Includes Slash
                     host = hostAndPort; // We don't know if there is a port yet.
-                    // No need to validate the distinguisher
+                    // No need to validate the distinguisher.
                 }
 
-                // Check for port
-                int colonIndex = hostAndPort.LastIndexOf(':'); // Allow IPv6 addresses
+                // Check for port.
+                int colonIndex = hostAndPort.LastIndexOf(':'); // Allow IPv6 addresses.
                 if (colonIndex >= 0)
                 {
                     // host:port
                     host = hostAndPort.Substring(0, colonIndex); // Excludes colon 
                     port = hostAndPort.Substring(colonIndex + 1); // Excludes colon 
 
-                    // Loosely validate the port just to make sure it was a port and not something else
+                    // Loosely validate the port just to make sure it was a port and not something else.
                     UInt16 portValue;
                     if (!UInt16.TryParse(port, NumberStyles.Integer, CultureInfo.InvariantCulture, out portValue))
                     {
@@ -159,7 +160,7 @@ namespace System.Security.Authentication.ExtendedProtection
                     port = hostAndPort.Substring(colonIndex);
                 }
 
-                hostType = Uri.CheckHostName(host); // Revaidate the host
+                hostType = Uri.CheckHostName(host); // Re-validate the host.
             }
 
             if (hostType != UriHostNameType.Dns)
@@ -174,7 +175,8 @@ namespace System.Security.Authentication.ExtendedProtection
             // Now we have a valid DNS host, normalize it.
 
             Uri constructedUri;
-            // This shouldn't fail, but we need to avoid any unexpected exceptions on this code path.
+
+            // We need to avoid any unexpected exceptions on this code path.
             if (!Uri.TryCreate(UriScheme.Http + UriScheme.SchemeDelimiter + host, UriKind.Absolute, out constructedUri))
             {
                 return inputServiceName;
@@ -195,7 +197,7 @@ namespace System.Security.Authentication.ExtendedProtection
             return normalizedServiceName;
         }
 
-        // Assumes already normalized
+        // Assumes already normalized.
         internal static bool Match(string serviceName1, string serviceName2)
         {
             return (String.Compare(serviceName1, serviceName2, StringComparison.OrdinalIgnoreCase) == 0);

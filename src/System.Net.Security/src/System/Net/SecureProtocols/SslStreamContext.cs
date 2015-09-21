@@ -11,14 +11,14 @@ namespace System.Net
         internal SslStreamContext(SslStream sslStream)
         {
             GlobalLog.Assert(sslStream != null, "SslStreamContext..ctor(): Not expecting a null sslStream!");
-            this.sslStream = sslStream;
+            _sslStream = sslStream;
         }
 
         public override ChannelBinding GetChannelBinding(ChannelBindingKind kind)
         {
-            return sslStream.GetChannelBinding(kind);
+            return _sslStream.GetChannelBinding(kind);
         }
 
-        private SslStream sslStream;
+        private readonly SslStream _sslStream;
     }
 }

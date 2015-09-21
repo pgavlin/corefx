@@ -9,47 +9,52 @@ internal static partial class Interop
 {
     internal static partial class Secur32
     {
+        // TODO (Issue #3114): Throughout the entire file: replace with OS names from <sspi.h> and <schannel.h>
+        internal const uint SECQOP_WRAP_NO_ENCRYPT = 0x80000001;
+
+        internal const int SEC_I_RENEGOTIATE = 0x90321;
+
+        internal const int SECPKG_NEGOTIATION_COMPLETE = 0;
+        internal const int SECPKG_NEGOTIATION_OPTIMISTIC = 1;
+
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         internal struct SSPIHandle
         {
-            private IntPtr HandleHi;
-            private IntPtr HandleLo;
-    
+            private IntPtr _handleHi;
+            private IntPtr _handleLo;
+
             public bool IsZero
             {
-                get { return HandleHi == IntPtr.Zero && HandleLo1 == IntPtr.Zero; }
+                get { return _handleHi == IntPtr.Zero && HandleLo1 == IntPtr.Zero; }
             }
 
             public IntPtr HandleLo1
             {
                 get
                 {
-                    return HandleLo;
+                    return _handleLo;
                 }
 
                 set
                 {
-                    HandleLo = value;
+                    _handleLo = value;
                 }
             }
 
             internal void SetToInvalid()
             {
-                HandleHi = IntPtr.Zero;
+                _handleHi = IntPtr.Zero;
                 HandleLo1 = IntPtr.Zero;
             }
-    
+
             public override string ToString()
             {
-                { return HandleHi.ToString("x") + ":" + HandleLo1.ToString("x"); }
+                { return _handleHi.ToString("x") + ":" + HandleLo1.ToString("x"); }
             }
         }
 
         internal enum ContextAttribute
         {
-            //
-            // look into <sspi.h> and <schannel.h>
-            //
             Sizes = 0x00,
             Names = 0x01,
             Lifespan = 0x02,
@@ -235,15 +240,6 @@ internal static partial class Interop
             // IntPtr                pApplicationUsage;
         }
 
-        // CRYPTOAPI_BLOB
-        //[StructLayout(LayoutKind.Sequential)]
-        //unsafe struct CryptoBlob {
-        //    // public uint cbData;
-        //    // public byte* pbData;
-        //    public uint dataSize;
-        //    public byte* dataBlob;
-        //}
-
         // SecPkgContext_IssuerListInfoEx
         [StructLayout(LayoutKind.Sequential)]
         internal unsafe struct IssuerListInfoEx
@@ -256,7 +252,7 @@ internal static partial class Interop
                 aIssuers = handle;
                 fixed (byte* voidPtr = nativeBuffer)
                 {
-                    // if this breaks on 64 bit, do the sizeof(IntPtr) trick
+                    // TODO (Issue #3114): Properly marshal the struct instead of assuming no padding.
                     cIssuers = *((uint*)(voidPtr + IntPtr.Size));
                 }
             }

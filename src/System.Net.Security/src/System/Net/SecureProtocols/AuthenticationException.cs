@@ -4,11 +4,9 @@
 namespace System.Security.Authentication
 {
     /// <summary>
-    /// <para>
     /// This exception can be thrown from Authenticate() method of Ssl and Negotiate classes.
     /// The authentication process can be retried with different parameters subject to
-    /// remote party willingess of accepting that.
-    /// </para>
+    /// remote party willingness of accepting that.
     /// </summary>
     public class AuthenticationException : Exception
     {

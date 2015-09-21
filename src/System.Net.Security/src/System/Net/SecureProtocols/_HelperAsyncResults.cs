@@ -6,10 +6,8 @@ using System.Threading;
 namespace System.Net
 {
     //
-    // Simply said whenever we want to wrap a user IO request we need
+    // Used when we want to wrap a user IO request and we need
     // to preserve the original request buffer & sizes.
-    //
-    // Usually we would return this class as IAsyncResult to application
     //
     internal class BufferAsyncResult : LazyAsyncResult
     {
@@ -48,14 +46,11 @@ namespace System.Net
 
     //
     // The class mimics LazyAsyncResult although it does not need to be thread safe nor it does need an Event.
-    // Usually we would use this class to implement iterative protocol logic
-    //
-    // The beauty is that
+    // We use this to implement iterative protocol logic:
     // 1) it can be reused for handshake-like or multi-IO request protocols
-    // 2) it is proven to not block async IO since there is NO event handler exposed
+    // 2) it won't block async IO since there is NO event handler exposed
     //
     // UserAsyncResult property is a link into original user IO request (could be a BufferAsyncResult).
-    // When underlined protocol is done this guy gets completed
     //
     internal class AsyncProtocolRequest
     {
@@ -66,42 +61,39 @@ namespace System.Net
         private AsyncProtocolCallback _Callback;
         private int _CompletionStatus;
 
-        const int StatusNotStarted = 0;
-        const int StatusCompleted = 1;
-        const int StatusCheckedOnSyncCompletion = 2;
+        private const int StatusNotStarted = 0;
+        private const int StatusCompleted = 1;
+        private const int StatusCheckedOnSyncCompletion = 2;
 
 
         public LazyAsyncResult UserAsyncResult;
-        public int Result;            // it's always about read bytes or alike
-        public object AsyncState;        // sometime it's needed to communicate additional info.
-                                         // Note that AsyncObject is just a link to UserAsyncResult.AsyncObject
+        public int Result;
+        public object AsyncState;
 
-        public byte[] Buffer;                     // temp buffer reused by a protocol.
-        public int Offset;                     // ditto
-        public int Count;                      // ditto
+        public byte[] Buffer;                  // temp buffer reused by a protocol.
+        public int Offset;
+        public int Count;
 
-        //
-        //
         public AsyncProtocolRequest(LazyAsyncResult userAsyncResult)
         {
             GlobalLog.Assert(userAsyncResult != null, "AsyncProtocolRequest()|userAsyncResult == null");
             GlobalLog.Assert(!userAsyncResult.InternalPeekCompleted, "AsyncProtocolRequest()|userAsyncResult is already completed.");
             UserAsyncResult = userAsyncResult;
         }
-        //
-        //
+
         public void SetNextRequest(byte[] buffer, int offset, int count, AsyncProtocolCallback callback)
         {
             if (_CompletionStatus != StatusNotStarted)
+            {
                 throw new InternalException(); // pending op is in progress
+            }
 
             Buffer = buffer;
             Offset = offset;
             Count = count;
             _Callback = callback;
         }
-        //
-        //
+
         internal object AsyncObject
         {
             get
@@ -109,6 +101,7 @@ namespace System.Net
                 return UserAsyncResult.AsyncObject;
             }
         }
+
         //
         // Notify protocol so a next stage could be started
         //
@@ -117,7 +110,9 @@ namespace System.Net
             Result = result;
             int status = Interlocked.Exchange(ref _CompletionStatus, StatusCompleted);
             if (status == StatusCompleted)
+            {
                 throw new InternalException(); // only allow one call
+            }
 
             if (status == StatusCheckedOnSyncCompletion)
             {
@@ -125,14 +120,17 @@ namespace System.Net
                 _Callback(this);
             }
         }
-        //
+
         public bool MustCompleteSynchronously
         {
             get
             {
                 int status = Interlocked.Exchange(ref _CompletionStatus, StatusCheckedOnSyncCompletion);
                 if (status == StatusCheckedOnSyncCompletion)
+                {
                     throw new InternalException(); // only allow one call
+                }
+
                 if (status == StatusCompleted)
                 {
                     _CompletionStatus = StatusNotStarted;
@@ -141,24 +139,25 @@ namespace System.Net
                 return false;
             }
         }
+
         //
-        // NB: This will abandon _Callback and directly notify UserAsyncResult.
+        // Important: This will abandon _Callback and directly notify UserAsyncResult.
         //
         internal void CompleteWithError(Exception e)
         {
             UserAsyncResult.InvokeCallback(e);
         }
-        //
+
         internal void CompleteUser()
         {
             UserAsyncResult.InvokeCallback();
         }
-        //
+
         internal void CompleteUser(object userResult)
         {
             UserAsyncResult.InvokeCallback(userResult);
         }
-        //
+
         internal bool IsUserCompleted
         {
             get { return UserAsyncResult.InternalPeekCompleted; }

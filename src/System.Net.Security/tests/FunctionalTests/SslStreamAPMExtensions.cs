@@ -1,12 +1,17 @@
-﻿/// <summary>
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+/// <summary>
 /// Extensions that add the legacy APM Pattern (Begin/End) for generic Streams
 /// </summary>
+
+
+using System.Threading.Tasks;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
+
 namespace System.Net.Security
 {
-    using System.Threading.Tasks;
-    using System.Security.Authentication;
-    using System.Security.Cryptography.X509Certificates;
-        
     public static class SslStreamAPMExtensions
     {
         public static IAsyncResult BeginAuthenticateAsClient(

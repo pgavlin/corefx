@@ -1,4 +1,7 @@
-﻿using System.ComponentModel;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using System.ComponentModel;
 using System.IO;
 using System.Net.Sockets;
 using System.Net.Test.Common;
@@ -9,7 +12,7 @@ using Xunit;
 using Xunit.Abstractions;
 
 namespace System.Net.Security.Tests
-{   
+{
     public class ClientAsyncAuthenticateTest
     {
         private readonly ITestOutputHelper _log;
@@ -21,12 +24,12 @@ namespace System.Net.Security.Tests
             | SslProtocols.Tls11
             | SslProtocols.Tls12;
 
-        private static readonly SslProtocols[] EachSslProtocol = new SslProtocols[] 
-        { 
+        private static readonly SslProtocols[] s_eachSslProtocol = new SslProtocols[]
+        {
             SslProtocols.Ssl2,
-            SslProtocols.Ssl3, 
-            SslProtocols.Tls, 
-            SslProtocols.Tls11, 
+            SslProtocols.Ssl3,
+            SslProtocols.Tls,
+            SslProtocols.Tls11,
             SslProtocols.Tls12,
         };
 
@@ -44,7 +47,8 @@ namespace System.Net.Security.Tests
         [Fact]
         public void ClientAsyncAuthenticate_ServerNoEncryption_NoConnect()
         {
-            Assert.Throws<IOException>( () => {
+            Assert.Throws<IOException>(() =>
+            {
                 ClientAsyncSslHelper(EncryptionPolicy.NoEncryption);
             });
         }
@@ -52,7 +56,7 @@ namespace System.Net.Security.Tests
         [Fact]
         public void ClientAsyncAuthenticate_EachProtocol_Success()
         {
-            foreach (SslProtocols protocol in EachSslProtocol)
+            foreach (SslProtocols protocol in s_eachSslProtocol)
             {
                 ClientAsyncSslHelper(protocol, protocol);
             }
@@ -61,9 +65,9 @@ namespace System.Net.Security.Tests
         [Fact]
         public void ClientAsyncAuthenticate_MismatchProtocols_Fails()
         {
-            foreach (SslProtocols serverProtocol in EachSslProtocol)
+            foreach (SslProtocols serverProtocol in s_eachSslProtocol)
             {
-                foreach (SslProtocols clientProtocol in EachSslProtocol)
+                foreach (SslProtocols clientProtocol in s_eachSslProtocol)
                 {
                     if (serverProtocol != clientProtocol)
                     {
@@ -76,13 +80,14 @@ namespace System.Net.Security.Tests
                         catch (IOException) { }
                     }
                 }
-            }            
+            }
         }
 
         [Fact]
         public void ClientAsyncAuthenticate_Ssl2Tls12ServerSsl2Client_Fails()
         {
-            Assert.Throws<Win32Exception>(() => {
+            Assert.Throws<Win32Exception>(() =>
+            {
                 // Ssl2 and Tls 1.2 are mutually exclusive.
                 ClientAsyncSslHelper(SslProtocols.Ssl2 | SslProtocols.Tls12, SslProtocols.Ssl2);
             });
@@ -91,7 +96,8 @@ namespace System.Net.Security.Tests
         [Fact]
         public void ClientAsyncAuthenticate_Ssl2Tls12ServerTls12Client_Fails()
         {
-            Assert.Throws<Win32Exception>(() => {
+            Assert.Throws<Win32Exception>(() =>
+            {
                 // Ssl2 and Tls 1.2 are mutually exclusive.
                 ClientAsyncSslHelper(SslProtocols.Ssl2 | SslProtocols.Tls12, SslProtocols.Tls12);
             });
@@ -120,7 +126,7 @@ namespace System.Net.Security.Tests
         [Fact]
         public void ClientAsyncAuthenticate_AllServerVsIndividualClientProtocols_Success()
         {
-            foreach (SslProtocols clientProtocol in EachSslProtocol)
+            foreach (SslProtocols clientProtocol in s_eachSslProtocol)
             {
                 if (clientProtocol != SslProtocols.Ssl2) // Incompatible with Tls 1.2
                 {
@@ -133,14 +139,13 @@ namespace System.Net.Security.Tests
         public void ClientAsyncAuthenticate_IndividualServerVsAllClientProtocols_Success()
         {
             SslProtocols clientProtocols = AllSslProtocols & ~SslProtocols.Ssl2; // Incompatible with Tls 1.2
-            foreach (SslProtocols serverProtocol in EachSslProtocol)
+            foreach (SslProtocols serverProtocol in s_eachSslProtocol)
             {
                 if (serverProtocol != SslProtocols.Ssl2) // Incompatible with Tls 1.2
                 {
                     ClientAsyncSslHelper(clientProtocols, serverProtocol);
                     // Cached Tls creds fail when used against Tls servers of higher versions.
                     // Servers are not expected to dynamically change versions.
-                    // Not available in ProjectK / N: FlushSslSessionCache();
                 }
             }
         }
@@ -157,11 +162,11 @@ namespace System.Net.Security.Tests
             ClientAsyncSslHelper(EncryptionPolicy.RequireEncryption, clientSslProtocols, serverSslProtocols);
         }
 
-        private void ClientAsyncSslHelper(EncryptionPolicy encryptionPolicy, SslProtocols clientSslProtocols, 
+        private void ClientAsyncSslHelper(EncryptionPolicy encryptionPolicy, SslProtocols clientSslProtocols,
             SslProtocols serverSslProtocols)
         {
             _log.WriteLine("Server: " + serverSslProtocols + "; Client: " + clientSslProtocols);
-            
+
             IPEndPoint endPoint = new IPEndPoint(IPAddress.IPv6Loopback, 0);
 
             using (var server = new DummyTcpServer(endPoint, encryptionPolicy))
@@ -171,7 +176,6 @@ namespace System.Net.Security.Tests
                 client.Connect(server.RemoteEndPoint);
                 using (SslStream sslStream = new SslStream(client.GetStream(), false, AllowAnyServerCertificate, null))
                 {
-
                     IAsyncResult async = sslStream.BeginAuthenticateAsClient("localhost", null, clientSslProtocols, false, null, null);
                     Assert.True(async.AsyncWaitHandle.WaitOne(10000), "Timed Out");
                     sslStream.EndAuthenticateAsClient(async);
@@ -184,7 +188,7 @@ namespace System.Net.Security.Tests
                 }
             }
         }
-        
+
         // The following method is invoked by the RemoteCertificateValidationDelegate.
         public bool AllowAnyServerCertificate(
               object sender,

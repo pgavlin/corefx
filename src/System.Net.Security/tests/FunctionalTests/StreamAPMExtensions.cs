@@ -1,10 +1,15 @@
-﻿/// <summary>
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using System.Threading.Tasks;
+
+/// <summary>
 /// Extensions that add the legacy APM Pattern (Begin/End) for generic Streams
 /// </summary>
+
+
 namespace System.IO
 {
-    using System.Threading.Tasks;
-        
     public static class StreamAPMExtensions
     {
         public static IAsyncResult BeginRead(this Stream s, byte[] buffer, int offset, int count, AsyncCallback callback, object state)

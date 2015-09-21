@@ -9,12 +9,16 @@ internal partial class Interop
 {
     internal partial class mincore
     {
+        /// <summary>
+        /// WARNING: This method does not implicitly handle long paths. Use CreateDirectory.
+        /// </summary>
         [DllImport(Libraries.CoreFile_L1, EntryPoint = "CreateDirectoryW", SetLastError = true, CharSet = CharSet.Unicode, BestFitMapping = false)]
         private static extern bool CreateDirectoryPrivate(string path, ref SECURITY_ATTRIBUTES lpSecurityAttributes);
 
         internal static bool CreateDirectory(string path, ref SECURITY_ATTRIBUTES lpSecurityAttributes)
         {
-            path = PathInternal.AddExtendedPathPrefixForLongPaths(path);
+            // We always want to add for CreateDirectory to get around the legacy 248 character limitation
+            path = PathInternal.EnsureExtendedPrefix(path);
             return CreateDirectoryPrivate(path, ref lpSecurityAttributes);
         }
     }

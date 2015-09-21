@@ -1,4 +1,7 @@
-﻿using System.IO;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using System.IO;
 using System.Net.Sockets;
 using System.Net.Test.Common;
 using System.Security.Authentication;
@@ -7,30 +10,30 @@ using System.Security.Cryptography.X509Certificates;
 using Xunit;
 
 namespace System.Net.Security.Tests
-{ 
+{
     // Callback method that is called when the server receives data from a connected client.  
     // The callback method should return a byte array and the number of bytes to send from that array.
     public delegate void DummyTcpServerReceiveCallback(byte[] bufferReceived, int bytesReceived, Stream stream);
 
     // Provides a dummy TCP/IP server that accepts connections and supports SSL/TLS.
-    // It normally echos data received but can be configured to write a byte array 
+    // It normally echoes data received but can be configured to write a byte array 
     // specified by a callback method.
     public class DummyTcpServer : IDisposable
     {
         private VerboseTestLogging _log;
-        private TcpListener listener;
-        private bool useSsl;
-        private SslProtocols sslProtocols = SslProtocols.Tls12 | SslProtocols.Tls11 | SslProtocols.Tls;
-        private EncryptionPolicy sslEncryptionPolicy;
-        private IPEndPoint remoteEndPoint;
-        private DummyTcpServerReceiveCallback receiveCallback;
+        private TcpListener _listener;
+        private bool _useSsl;
+        private SslProtocols _sslProtocols = SslProtocols.Tls12 | SslProtocols.Tls11 | SslProtocols.Tls;
+        private EncryptionPolicy _sslEncryptionPolicy;
+        private IPEndPoint _remoteEndPoint;
+        private DummyTcpServerReceiveCallback _receiveCallback;
 
         private void StartListener(IPEndPoint endPoint)
         {
-            listener = new TcpListener(endPoint);
-            listener.Start(5);
+            _listener = new TcpListener(endPoint);
+            _listener.Start(5);
             _log.WriteLine("Server {0} listening", endPoint.Address.ToString());
-            listener.BeginAcceptTcpClient(OnAccept, null);
+            _listener.BeginAcceptTcpClient(OnAccept, null);
         }
 
         public DummyTcpServer(IPEndPoint endPoint) : this(endPoint, null)
@@ -43,9 +46,9 @@ namespace System.Net.Security.Tests
 
             if (sslEncryptionPolicy != null)
             {
-                this.remoteEndPoint = endPoint;
-                this.useSsl = true;
-                this.sslEncryptionPolicy = (EncryptionPolicy)sslEncryptionPolicy;
+                _remoteEndPoint = endPoint;
+                _useSsl = true;
+                _sslEncryptionPolicy = (EncryptionPolicy)sslEncryptionPolicy;
             }
 
             StartListener(endPoint);
@@ -53,19 +56,19 @@ namespace System.Net.Security.Tests
 
         public IPEndPoint RemoteEndPoint
         {
-            get { return (IPEndPoint)listener.LocalEndpoint; }
+            get { return (IPEndPoint)_listener.LocalEndpoint; }
         }
 
         public SslProtocols SslProtocols
         {
-            get { return sslProtocols; }
-            set { sslProtocols = value; }
+            get { return _sslProtocols; }
+            set { _sslProtocols = value; }
         }
 
         protected DummyTcpServerReceiveCallback ReceiveCallback
         {
-            get { return receiveCallback; }
-            set { receiveCallback = value; }
+            get { return _receiveCallback; }
+            set { _receiveCallback = value; }
         }
 
         public void Dispose()
@@ -77,7 +80,7 @@ namespace System.Net.Security.Tests
         {
             if (disposing)
             {
-                listener.Stop();
+                _listener.Stop();
             }
         }
 
@@ -94,17 +97,17 @@ namespace System.Net.Security.Tests
             {
                 sslStream.EndAuthenticateAsServer(result);
                 _log.WriteLine("Server({0}) authenticated to client({1}) with encryption cipher: {2} {3}-bit strength",
-                    state.TcpClient.Client.LocalEndPoint, state.TcpClient.Client.RemoteEndPoint, 
+                    state.TcpClient.Client.LocalEndPoint, state.TcpClient.Client.RemoteEndPoint,
                     sslStream.CipherAlgorithm, sslStream.CipherStrength);
 
-                // Start listening for data from the client connection
+                // Start listening for data from the client connection.
                 sslStream.BeginRead(state.ReceiveBuffer, 0, state.ReceiveBuffer.Length, OnReceive, state);
             }
             catch (AuthenticationException authEx)
             {
                 _log.WriteLine(
                     "Server({0}) disconnecting from client({1}) during authentication.  No shared SSL/TLS algorithm. ({2})",
-                    state.TcpClient.Client.LocalEndPoint, 
+                    state.TcpClient.Client.LocalEndPoint,
                     state.TcpClient.Client.RemoteEndPoint,
                     authEx);
             }
@@ -126,7 +129,7 @@ namespace System.Net.Security.Tests
             // Accept current connection
             try
             {
-                client = listener.EndAcceptTcpClient(result);
+                client = _listener.EndAcceptTcpClient(result);
             }
             catch
             {
@@ -140,35 +143,21 @@ namespace System.Net.Security.Tests
                 ClientState state;
 
                 // Start authentication for SSL?
-                if (useSsl)
+                if (_useSsl)
                 {
-                    state = new ClientState(client, sslEncryptionPolicy);
+                    state = new ClientState(client, _sslEncryptionPolicy);
                     _log.WriteLine("Server: starting SSL authentication.");
 
 
                     SslStream sslStream = null;
-                    X509Certificate2 certificate = null;
-
-                    var certCollection = new X509Certificate2Collection();
-                    certCollection.Import(Path.Combine("TestData", "DummyTcpServer.pfx"));
-                    
-                    foreach (X509Certificate2 c in certCollection)
-                    {
-                        if (c.HasPrivateKey)
-                        {
-                            certificate = c;
-                            break;
-                        }
-                    }
-
-                    Assert.NotNull(certificate);
+                    X509Certificate2 certificate = TestConfiguration.GetServerCertificate();
 
                     try
                     {
                         sslStream = (SslStream)state.Stream;
 
                         _log.WriteLine("Server: attempting to open SslStream.");
-                        sslStream.BeginAuthenticateAsServer(certificate, false, sslProtocols, false, OnAuthenticate, state);
+                        sslStream.BeginAuthenticateAsServer(certificate, false, _sslProtocols, false, OnAuthenticate, state);
                     }
                     catch (Exception ex)
                     {
@@ -195,7 +184,7 @@ namespace System.Net.Security.Tests
             // Listen for more client connections
             try
             {
-                listener.BeginAcceptTcpClient(OnAccept, null);
+                _listener.BeginAcceptTcpClient(OnAccept, null);
             }
             catch
             {
@@ -215,9 +204,9 @@ namespace System.Net.Security.Tests
                     return;
                 }
 
-                if (receiveCallback != null)
+                if (_receiveCallback != null)
                 {
-                    receiveCallback(state.ReceiveBuffer, bytesReceived, state.Stream);
+                    _receiveCallback(state.ReceiveBuffer, bytesReceived, state.Stream);
                 }
                 else
                 {
@@ -253,73 +242,74 @@ namespace System.Net.Security.Tests
 
         private class ClientState
         {
-            private TcpClient tcpClient;
-            private byte[] receiveBuffer;
-            private bool useSsl;
-            private SslStream sslStream;
-            private bool closed;
+            private TcpClient _tcpClient;
+            private byte[] _receiveBuffer;
+            private bool _useSsl;
+            private SslStream _sslStream;
+            private bool _closed;
 
             public ClientState(TcpClient client)
             {
-                this.tcpClient = client;
-                this.receiveBuffer = new byte[1024];
-                this.useSsl = false;
-                closed = false;
+                _tcpClient = client;
+                _receiveBuffer = new byte[1024];
+                _useSsl = false;
+                _closed = false;
             }
 
             public ClientState(TcpClient client, EncryptionPolicy sslEncryptionPolicy)
             {
-                this.tcpClient = client;
-                this.receiveBuffer = new byte[1024];
-                this.useSsl = true;
-                sslStream = new SslStream(client.GetStream(), false, AlwaysValidServerCertificate, null, sslEncryptionPolicy);
-                closed = false;
+                _tcpClient = client;
+                _receiveBuffer = new byte[1024];
+                _useSsl = true;
+                _sslStream = new SslStream(client.GetStream(), false, AlwaysValidServerCertificate, null, sslEncryptionPolicy);
+                _closed = false;
             }
 
             public void Dispose()
             {
-                if (!closed)
+                if (!_closed)
                 {
-                    if (useSsl)
+                    if (_useSsl)
                     {
-                        sslStream.Dispose();
+                        _sslStream.Dispose();
                     }
-                    tcpClient.Dispose();
-                    closed = true;
+
+                    _tcpClient.Dispose();
+                    _closed = true;
                 }
             }
 
             public TcpClient TcpClient
             {
-                get { return tcpClient; }
+                get { return _tcpClient; }
             }
 
             public byte[] ReceiveBuffer
             {
-                get { return receiveBuffer; }
+                get { return _receiveBuffer; }
             }
 
             public bool UseSsl
             {
-                get { return useSsl; }
+                get { return _useSsl; }
             }
 
             public bool Closed
             {
-                get { return closed; }
+                get { return _closed; }
             }
 
             public Stream Stream
             {
                 get
                 {
-                    if (useSsl)
+                    if (_useSsl)
                     {
-                        return sslStream;
+                        return _sslStream;
                     }
                     else
                     {
-                        return tcpClient.GetStream();
+                        return _tcpClient.GetStream();
                     }
                 }
             }

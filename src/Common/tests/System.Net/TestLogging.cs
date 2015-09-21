@@ -1,4 +1,7 @@
-﻿using System.Diagnostics.Tracing;
+﻿// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using System.Diagnostics.Tracing;
 using System.Text;
 using Xunit.Abstractions;
 
@@ -6,7 +9,7 @@ namespace System.Net.Test.Common
 {
     public class TestLogging : ITestOutputHelper
     {
-        private static TestLogging _instance = new TestLogging();
+        private static TestLogging s_instance = new TestLogging();
 
         private TestLogging()
         {
@@ -14,7 +17,7 @@ namespace System.Net.Test.Common
 
         public static TestLogging GetInstance()
         {
-            return _instance;
+            return s_instance;
         }
 
         public void WriteLine(string message)
