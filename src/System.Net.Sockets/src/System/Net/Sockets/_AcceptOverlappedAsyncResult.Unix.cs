@@ -32,12 +32,15 @@ namespace System.Net.Sockets
             _buffer = null;
             _localBytesTransferred = 0;
 
-            Internals.SocketAddress remoteSocketAddress = IPEndPointExtensions.Serialize(_listenSocket.m_RightEndPoint);
-            System.Buffer.BlockCopy(socketAddress, 0, remoteSocketAddress.Buffer, 0, socketAddressLen);
+			if (errorCode == SocketError.Success)
+			{
+				Internals.SocketAddress remoteSocketAddress = IPEndPointExtensions.Serialize(_listenSocket.m_RightEndPoint);
+				System.Buffer.BlockCopy(socketAddress, 0, remoteSocketAddress.Buffer, 0, socketAddressLen);
 
-            _acceptedSocket = _listenSocket.CreateAcceptSocket(
-                SafeCloseSocket.CreateSocket(acceptedFileDescriptor),
-                _listenSocket.m_RightEndPoint.Create(remoteSocketAddress));
+				_acceptedSocket = _listenSocket.CreateAcceptSocket(
+					SafeCloseSocket.CreateSocket(acceptedFileDescriptor),
+					_listenSocket.m_RightEndPoint.Create(remoteSocketAddress));
+			}
 
             base.CompletionCallback(0, errorCode);
         }

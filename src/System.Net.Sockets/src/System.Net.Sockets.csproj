@@ -300,6 +300,9 @@
     <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.listen.cs">
       <Link>Interop\Unix\libc\Interop.listen.cs</Link>
     </Compile>
+    <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.poll.cs">
+      <Link>Interop\Unix\libc\Interop.poll.cs</Link>
+    </Compile>
     <Compile Include="$(CommonPath)\Interop\Unix\libc\Interop.recv.cs">
       <Link>Interop\Unix\libc\Interop.recv.cs</Link>
     </Compile>

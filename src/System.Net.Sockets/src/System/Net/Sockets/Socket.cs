@@ -1280,8 +1280,6 @@ namespace System.Net.Sockets
             //make sure we don't let the app mess up the buffer array enough to cause
             //corruption.
 
-            errorCode = SocketError.Success;
-
             int bytesTransferred;
             errorCode = SocketPal.Send(_handle, buffers, socketFlags, out bytesTransferred);
 
@@ -1368,17 +1366,17 @@ namespace System.Net.Sockets
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Send() SRC:" + Logging.ObjectToString(LocalEndPoint) + " DST:" + Logging.ObjectToString(RemoteEndPoint) + " size:" + size);
 
             // This can throw ObjectDisposedException.
-            int bytesTransferred = SocketPal.Send(_handle, buffer, offset, size, socketFlags);
+            int bytesTransferred;
+            errorCode = SocketPal.Send(_handle, buffer, offset, size, socketFlags, out bytesTransferred);
 
             //
             // if the native call fails we'll throw a SocketException
             //
-            if ((SocketError)bytesTransferred == SocketError.SocketError)
+            if (errorCode != SocketError.Success)
             {
                 //
                 // update our internal state after this socket error and throw
                 //
-                errorCode = SocketPal.GetLastSocketError();
                 UpdateStatusAfterSocketError(errorCode);
                 if (s_LoggingEnabled)
                 {
@@ -1448,17 +1446,18 @@ namespace System.Net.Sockets
             Internals.SocketAddress socketAddress = CheckCacheRemote(ref endPointSnapshot, false);
 
             // This can throw ObjectDisposedException.
-            int bytesTransferred = SocketPal.SendTo(_handle, buffer, offset, size, socketFlags, socketAddress.Buffer, socketAddress.Size);
+            int bytesTransferred;
+            SocketError errorCode = SocketPal.SendTo(_handle, buffer, offset, size, socketFlags, socketAddress.Buffer, socketAddress.Size, out bytesTransferred);
 
             //
             // if the native call fails we'll throw a SocketException
             //
-            if ((SocketError)bytesTransferred == SocketError.SocketError)
+            if (errorCode != SocketError.Success)
             {
                 //
                 // update our internal state after this socket error and throw
                 //
-                SocketException socketException = new SocketException((int)SocketPal.GetLastSocketError());
+                SocketException socketException = new SocketException((int)errorCode);
                 UpdateStatusAfterSocketError(socketException);
                 if (s_LoggingEnabled) Logging.Exception(Logging.Sockets, this, "SendTo", socketException);
                 throw socketException;
@@ -1584,17 +1583,14 @@ namespace System.Net.Sockets
             ValidateBlockingMode();
             GlobalLog.Print("Socket#" + Logging.HashString(this) + "::Receive() SRC:" + Logging.ObjectToString(LocalEndPoint) + " DST:" + Logging.ObjectToString(RemoteEndPoint) + " size:" + size);
 
-            // This can throw ObjectDisposedException.
-            errorCode = SocketError.Success;
+            int bytesTransferred;
+            errorCode = SocketPal.Receive(_handle, buffer, offset, size, socketFlags, out bytesTransferred);
 
-            int bytesTransferred = SocketPal.Receive(_handle, buffer, offset, size, socketFlags);
-
-            if ((SocketError)bytesTransferred == SocketError.SocketError)
+            if (errorCode != SocketError.Success)
             {
                 //
                 // update our internal state after this socket error and throw
                 //
-                errorCode = SocketPal.GetLastSocketError();
                 UpdateStatusAfterSocketError(errorCode);
                 if (s_LoggingEnabled)
                 {
@@ -1879,14 +1875,15 @@ namespace System.Net.Sockets
             Internals.SocketAddress socketAddressOriginal = IPEndPointExtensions.Serialize(endPointSnapshot);
 
             // This can throw ObjectDisposedException.
-            int bytesTransferred = SocketPal.ReceiveFrom(_handle, buffer, offset, size, socketFlags, socketAddress.Buffer, ref socketAddress.InternalSize);
+            int bytesTransferred;
+            SocketError errorCode = SocketPal.ReceiveFrom(_handle, buffer, offset, size, socketFlags, socketAddress.Buffer, ref socketAddress.InternalSize, out bytesTransferred);
 
             // If the native call fails we'll throw a SocketException.
             // Must do this immediately after the native call so that the SocketException() constructor can pick up the error code.
             SocketException socketException = null;
-            if ((SocketError)bytesTransferred == SocketError.SocketError)
+            if (errorCode != SocketError.Success)
             {
-                socketException = new SocketException((int)SocketPal.GetLastSocketError());
+                socketException = new SocketException((int)errorCode);
                 UpdateStatusAfterSocketError(socketException);
                 if (s_LoggingEnabled) Logging.Exception(Logging.Sockets, this, "ReceiveFrom", socketException);
 
@@ -2208,35 +2205,33 @@ namespace System.Net.Sockets
             {
                 return getIPv6MulticastOpt(optionName);
             }
-            else
+
+            int optionValue = 0;
+
+            // This can throw ObjectDisposedException.
+            SocketError errorCode = SocketPal.GetSockOpt(
+                _handle,
+                optionLevel,
+                optionName,
+                out optionValue);
+
+            GlobalLog.Print("Socket#" + Logging.HashString(this) + "::GetSocketOption() Interop.Winsock.getsockopt returns errorCode:" + errorCode);
+
+            //
+            // if the native call fails we'll throw a SocketException
+            //
+            if (errorCode != SocketError.Success)
             {
-                int optionValue = 0;
-
-                // This can throw ObjectDisposedException.
-                SocketError errorCode = SocketPal.GetSockOpt(
-                    _handle,
-                    optionLevel,
-                    optionName,
-                    out optionValue);
-
-                GlobalLog.Print("Socket#" + Logging.HashString(this) + "::GetSocketOption() Interop.Winsock.getsockopt returns errorCode:" + errorCode);
-
                 //
-                // if the native call fails we'll throw a SocketException
+                // update our internal state after this socket error and throw
                 //
-                if (errorCode != SocketError.Success)
-                {
-                    //
-                    // update our internal state after this socket error and throw
-                    //
-                    SocketException socketException = new SocketException((int)errorCode);
-                    UpdateStatusAfterSocketError(socketException);
-                    if (s_LoggingEnabled) Logging.Exception(Logging.Sockets, this, "GetSocketOption", socketException);
-                    throw socketException;
-                }
-
-                return optionValue;
+                SocketException socketException = new SocketException((int)errorCode);
+                UpdateStatusAfterSocketError(socketException);
+                if (s_LoggingEnabled) Logging.Exception(Logging.Sockets, this, "GetSocketOption", socketException);
+                throw socketException;
             }
+
+            return optionValue;
         }
 
         /// <devdoc>
@@ -5581,7 +5576,8 @@ namespace System.Net.Sockets
                         }
                         else
                         {
-                            errorCode = (SocketError)SocketPal.Receive(_handle, null, 0, 0, SocketFlags.None);
+                            int unused;
+                            errorCode = SocketPal.Receive(_handle, null, 0, 0, SocketFlags.None, out unused);
                             GlobalLog.Print("SafeCloseSocket::Dispose(handle:" + _handle.DangerousGetHandle().ToString("x") + ") recv():" + errorCode.ToString());
 
                             if (errorCode != (SocketError)0)

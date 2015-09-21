@@ -38,8 +38,20 @@ namespace System.Net.Sockets
                         if (_engine == null)
                         {
                             var engine = new SocketAsyncEngine(SocketAsyncEngineBackend.Create());
-                            Task.Factory.StartNew(o => {
-                                ((SocketAsyncEngine)o)._backend.EventLoop();
+                            Task.Factory.StartNew(o =>
+                            {
+                                SocketAsyncEngineBackend backend = ((SocketAsyncEngine)o)._backend;
+                                for (;;)
+                                {
+                                    try
+                                    {
+                                        backend.EventLoop();
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        Debug.Fail(string.Format("Exception thrown from event loop: {0}", e.Message));
+                                    }
+                                }
                             }, engine, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
                             Volatile.Write(ref _engine, engine);
