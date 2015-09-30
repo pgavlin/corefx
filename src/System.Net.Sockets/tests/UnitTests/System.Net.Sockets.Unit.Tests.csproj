@@ -1,0 +1,265 @@
+﻿<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), dir.props))\dir.props" />
+  <PropertyGroup>
+    <AssemblyName>System.Net.Sockets</AssemblyName>
+    <AssemblyVersion>4.0.10.0</AssemblyVersion>
+    <OutputType>Library</OutputType>
+    <ProjectGuid>{43311AFB-D7C4-4E5A-B1DE-855407F90D1B}</ProjectGuid>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>$(DefineConstants);FEATURE_CORECLR</DefineConstants>
+  </PropertyGroup>
+  <!-- Help VS understand available configurations -->
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Linux_Debug|AnyCPU' " />
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Linux_Release|AnyCPU' " />
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'OSX_Debug|AnyCPU' " />
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'OSX_Release|AnyCPU' " />
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Windows_Debug|AnyCPU' " />
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Windows_Release|AnyCPU' " />
+
+  <PropertyGroup>
+    <!-- SYSTEM_NET_SOCKETS_DLL is required to allow source-level code sharing for types defined within the 
+         System.Net.Internals namespace. -->
+    <DefineConstants>$(DefineConstants);SYSTEM_NET_SOCKETS_DLL</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Mock\_AcceptOverlappedAsyncResult.cs" />
+    <Compile Include="Mock\_BaseOverlappedAsyncResult.cs" />
+    <Compile Include="Mock\_ConnectOverlappedAsyncResult.cs" />
+    <Compile Include="Mock\_OverlappedAsyncResult.cs" />
+    <Compile Include="Mock\_DynamicWinsockMethods.cs" />
+    <Compile Include="Mock\_ReceiveMessageOverlappedAsyncResult.cs" />
+    <Compile Include="Mock\SafeCloseSocket.cs" />
+    <Compile Include="Mock\SendPacketsElementFlags.cs" />
+    <Compile Include="Mock\Socket.cs" />
+    <Compile Include="Mock\SocketAsyncEventArgs.cs" />
+    <Compile Include="Mock\SocketPal.cs" />
+
+    <Compile Include="$(CommonPath)\System\Net\SocketAddressPal.Windows.cs">
+      <Link>Common\System\Net\SocketAddressPal.Windows.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\SocketProtocolSupportPal.Windows.cs">
+      <Link>Common\System\Net\SocketProtocolSupportPal.Windows</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Production code -->
+    <Compile Include="..\..\src\System\Net\DnsAPMExtensions.cs">
+      <Link>ProductionCode\System\Net\DnsAPMExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\StartIPOptions.cs">
+      <Link>ProductionCode\System\Net\StartIPOptions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\SocketPerfCounters.cs">
+      <Link>ProductionCode\System\Net\SocketPerfCounters.cs</Link>
+    </Compile>
+
+    <Compile Include="..\..\src\System\Net\Sockets\IOControlCode.cs">
+      <Link>ProductionCode\System\Net\Sockets\IOControlCode.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\IPPacketInformation.cs">
+      <Link>ProductionCode\System\Net\Sockets\IPPacketInformation.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\IPProtectionLevel.cs">
+      <Link>ProductionCode\System\Net\Sockets\IPProtectionLevel.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\LingerOption.cs">
+      <Link>ProductionCode\System\Net\Sockets\LingerOption.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\MulticastOption.cs">
+      <Link>ProductionCode\System\Net\Sockets\MulticastOption.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\NetworkStream.cs">
+      <Link>ProductionCode\System\Net\Sockets\NetworkStream.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\ProtocolType.cs">
+      <Link>ProductionCode\System\Net\Sockets\ProtocolType.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\SelectMode.cs">
+      <Link>ProductionCode\System\Net\Sockets\SelectMode.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\SendPacketsElement.cs">
+      <Link>ProductionCode\System\Net\Sockets\SendPacketsElement.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\Socket.cs">
+      <Link>ProductionCode\System\Net\Sockets\Socket.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\SocketAsyncEventArgs.cs">
+      <Link>ProductionCode\System\Net\Sockets\SocketAsyncEventArgs.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\SocketAsyncOperation.cs">
+      <Link>ProductionCode\System\Net\Sockets\SocketAsyncOperation.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\SocketFlags.cs">
+      <Link>ProductionCode\System\Net\Sockets\SocketFlags.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\SocketInformation.cs">
+      <Link>ProductionCode\System\Net\Sockets\SocketInformation.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\SocketInformationOptions.cs">
+      <Link>ProductionCode\System\Net\Sockets\SocketInformationOptions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\SocketOptionLevel.cs">
+      <Link>ProductionCode\System\Net\Sockets\SocketOptionLevel.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\SocketOptionName.cs">
+      <Link>ProductionCode\System\Net\Sockets\SocketOptionName.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\SocketShutdown.cs">
+      <Link>ProductionCode\System\Net\Sockets\SocketShutdown.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\TCPClient.cs">
+      <Link>ProductionCode\System\Net\Sockets\TCPClient.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\TCPListener.cs">
+      <Link>ProductionCode\System\Net\Sockets\TCPListener.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\TransmitFileFlags.cs">
+      <Link>ProductionCode\System\Net\Sockets\TransmitFileFlags.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\UDPClient.cs">
+      <Link>ProductionCode\System\Net\Sockets\UDPClient.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\UdpReceiveResult.cs">
+      <Link>ProductionCode\System\Net\Sockets\UdpReceiveResult.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\_AcceptOverlappedAsyncResult.cs">
+      <Link>ProductionCode\System\Net\Sockets\_AcceptOverlappedAsyncResult.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\_BaseOverlappedAsyncResult.cs">
+      <Link>ProductionCode\System\Net\Sockets\_BaseOverlappedAsyncResult.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\_ConnectOverlappedAsyncResult.cs">
+      <Link>ProductionCode\System\Net\Sockets\_ConnectOverlappedAsyncResult.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\_DisconnectOverlappedAsyncResult.cs">
+      <Link>ProductionCode\System\Net\Sockets\_DisconnectOverlappedAsyncResult.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\_MultipleConnectAsync.cs">
+      <Link>ProductionCode\System\Net\Sockets\_MultipleConnectAsync.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\_OverlappedAsyncResult.cs">
+      <Link>ProductionCode\System\Net\Sockets\_OverlappedAsyncResult.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\_ReceiveMessageOverlappedAsyncResult.cs">
+      <Link>ProductionCode\System\Net\Sockets\_ReceiveMessageOverlappedAsyncResult.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\System\Net\Sockets\TransportType.cs">
+      <Link>ProductionCode\System\Net\Sockets\TransportType.cs</Link>
+    </Compile>
+    
+    <!-- Logging -->
+    <Compile Include="$(CommonPath)\System\Net\Shims\TraceSource.cs">
+      <Link>Common\System\Net\Shims\TraceSource.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\Logging\Logging.cs">
+      <Link>Common\System\Net\Logging\Logging.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\Logging\GlobalLog.cs">
+      <Link>Common\System\Net\Logging\GlobalLog.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\Logging\EventSourceLogging.cs">
+      <Link>Common\System\Net\Logging\EventSourceLogging.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\InternalException.cs">
+      <Link>Common\System\Net\InternalException.cs</Link>
+    </Compile>
+
+    <!-- Debug only --> 
+    <Compile Include="$(CommonPath)\System\Net\DebugSafeHandle.cs">
+      <Link>Common\System\Net\DebugSafeHandle.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\DebugSafeHandleMinusOneIsInvalid.cs">
+      <Link>Common\System\Net\DebugSafeHandleMinusOneIsInvalid.cs</Link>
+    </Compile>
+
+    <!-- System.Net common -->
+    <Compile Include="$(CommonPath)\System\Net\_ContextAwareResult.cs">
+      <Link>Common\System\Net\_ContextAwareResult.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\_LazyAsyncResult.cs">
+      <Link>Common\System\Net\_LazyAsyncResult.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\Shims\ExecutionContext.cs">
+      <Link>Common\System\Net\Shims\ExecutionContext.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\Shims\DBNull.cs">
+      <Link>Common\System\Net\Shims\DBNull.cs</Link>
+    </Compile>
+    
+    <Compile Include="$(CommonPath)\System\Net\_BufferOffsetSize.cs">
+      <Link>Common\System\Net\_BufferOffsetSize.cs</Link>
+    </Compile>
+
+    <Compile Include="$(CommonPath)\System\Net\ByteOrder.cs">
+      <Link>Common\System\Net\ByteOrder.cs</Link>
+    </Compile>
+
+    <Compile Include="$(CommonPath)\System\Net\IPEndPointStatics.cs">
+      <Link>Common\System\Net\IPEndPointStatics.cs</Link>
+    </Compile>
+
+    <Compile Include="$(CommonPath)\System\Net\IPAddressParserStatics.cs" >
+      <Link>Common\System\Net\IPAddressParserStatics.cs</Link>
+    </Compile>
+
+    <Compile Include="$(CommonPath)\System\Net\ExceptionCheck.cs">
+      <Link>Common\System\Net\ExceptionCheck.cs</Link>
+    </Compile>
+
+    <Compile Include="$(CommonPath)\System\Net\RangeValidationHelpers.cs">
+      <Link>Common\System\Net\RangeValidationHelpers.cs</Link>
+    </Compile>
+
+    <Compile Include="$(CommonPath)\System\Net\SafeCloseSocket.cs">
+      <Link>Common\System\Net\SafeCloseSocket.cs</Link>
+    </Compile>
+
+    <Compile Include="$(CommonPath)\System\Net\SocketAddress.cs">
+      <Link>Common\System\Net\SocketAddress.cs</Link>
+    </Compile>
+
+    <Compile Include="$(CommonPath)\System\Net\TcpValidationHelpers.cs">
+      <Link>Common\System\Net\TcpValidationHelpers.cs</Link>
+    </Compile>
+
+    <Compile Include="$(CommonPath)\System\Net\_Win32.cs">
+      <Link>Common\System\Net\_Win32.cs</Link>
+    </Compile>
+    
+    <!-- System.Net.Internals -->
+    <Compile Include="$(CommonPath)\System\Net\Internals\IPEndPointExtensions.cs">
+      <Link>Common\System\Net\Internals\IPEndPointExtensions.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\Internals\IPAddressExtensions.cs">
+      <Link>Common\System\Net\Internals\IPAddressExtensions.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\System\Net\Internals\SocketExceptionFactory.cs">
+      <Link>Common\System\Net\Internals\SocketExceptionFactory.cs</Link>
+    </Compile>
+
+    <!-- TODO: move this into sockets from interop -->
+    <Compile Include="$(CommonPath)\Interop\Windows\Winsock\SocketType.cs">
+      <Link>Interop\Windows\Winsock\SocketType.cs</Link>
+    </Compile>    
+
+    <!-- Common -->
+    <Compile Include="$(CommonPath)\Microsoft\Win32\SafeHandles\SafeHandleZeroOrMinusOneIsInvalid.cs">
+      <Link>Common\Microsoft\Win32\SafeHandles\SafeHandleZeroOrMinusOneIsInvalid.cs</Link>
+    </Compile>
+    <Compile Include="$(CommonPath)\Microsoft\Win32\SafeHandles\SafeHandleMinusOneIsInvalid.cs">
+      <Link>Common\Microsoft\Win32\SafeHandles\SafeHandleMinusOneIsInvalid.cs</Link>
+    </Compile>
+    
+    <Compile Include="$(CommonPath)\System\Threading\Tasks\TaskToApm.cs">
+      <Link>Common\System\Threading\Tasks\TaskToApm.cs</Link>
+    </Compile>
+  </ItemGroup>
+   
+  <ItemGroup>
+    <None Include="project.json" />
+  </ItemGroup>
+  <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), dir.targets))\dir.targets" />  
+</Project>
+
