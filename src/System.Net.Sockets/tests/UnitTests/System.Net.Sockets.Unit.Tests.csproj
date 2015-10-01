@@ -1,13 +1,16 @@
 ﻿<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), dir.props))\dir.props" />
   <PropertyGroup>
-    <AssemblyName>System.Net.Sockets</AssemblyName>
+    <AssemblyName>System.Net.Sockets.Unit.Tests</AssemblyName>
     <AssemblyVersion>4.0.10.0</AssemblyVersion>
     <OutputType>Library</OutputType>
-    <ProjectGuid>{43311AFB-D7C4-4E5A-B1DE-855407F90D1B}</ProjectGuid>
+    <ProjectGuid>{EADFCACF-BD09-49D5-AFF8-2779D07DACE4}</ProjectGuid>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DefineConstants>$(DefineConstants);FEATURE_CORECLR</DefineConstants>
+    <NoWarn>169,414,649</NoWarn>
+    <StringResourcesPath>..\..\src\Resources\Strings.resx</StringResourcesPath>
   </PropertyGroup>
+
   <!-- Help VS understand available configurations -->
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Linux_Debug|AnyCPU' " />
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Linux_Release|AnyCPU' " />
@@ -27,20 +30,14 @@
     <Compile Include="Mock\_BaseOverlappedAsyncResult.cs" />
     <Compile Include="Mock\_ConnectOverlappedAsyncResult.cs" />
     <Compile Include="Mock\_OverlappedAsyncResult.cs" />
-    <Compile Include="Mock\_DynamicWinsockMethods.cs" />
     <Compile Include="Mock\_ReceiveMessageOverlappedAsyncResult.cs" />
     <Compile Include="Mock\SafeCloseSocket.cs" />
     <Compile Include="Mock\SendPacketsElementFlags.cs" />
     <Compile Include="Mock\Socket.cs" />
     <Compile Include="Mock\SocketAsyncEventArgs.cs" />
     <Compile Include="Mock\SocketPal.cs" />
-
-    <Compile Include="$(CommonPath)\System\Net\SocketAddressPal.Windows.cs">
-      <Link>Common\System\Net\SocketAddressPal.Windows.cs</Link>
-    </Compile>
-    <Compile Include="$(CommonPath)\System\Net\SocketProtocolSupportPal.Windows.cs">
-      <Link>Common\System\Net\SocketProtocolSupportPal.Windows</Link>
-    </Compile>
+    <Compile Include="Mock\SocketAddressPal.cs" />
+    <Compile Include="Mock\SocketProtocolSupportPal.cs" />
   </ItemGroup>
 
   <ItemGroup>
