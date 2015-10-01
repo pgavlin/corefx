@@ -21,7 +21,7 @@ namespace System.Net.Sockets
 
         public static SafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
         {
-            throw new NotImplementedException();
+            return SafeCloseSocket.CreateSocket(addressFamily, socketType, protocolType);
         }
 
         public static unsafe SafeCloseSocket CreateSocket(SocketInformation socketInformation, out AddressFamily addressFamily, out SocketType socketType, out ProtocolType protocolType)

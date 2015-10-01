@@ -25,6 +25,12 @@
     <DefineConstants>$(DefineConstants);SYSTEM_NET_SOCKETS_DLL</DefineConstants>
   </PropertyGroup>
 
+  <!-- Tests -->
+  <ItemGroup>
+    <Compile Include="CreateSocketTests.cs" />
+  </ItemGroup>
+
+  <!-- Mocks -->
   <ItemGroup>
     <Compile Include="Mock\_AcceptOverlappedAsyncResult.cs" />
     <Compile Include="Mock\_BaseOverlappedAsyncResult.cs" />
@@ -32,6 +38,10 @@
     <Compile Include="Mock\_OverlappedAsyncResult.cs" />
     <Compile Include="Mock\_ReceiveMessageOverlappedAsyncResult.cs" />
     <Compile Include="Mock\HandleTable.cs" />
+    <Compile Include="Mock\MockIpSocket.cs" />
+    <Compile Include="Mock\MockSocketBase.cs" />
+    <Compile Include="Mock\MockTcpSocket.cs" />
+    <Compile Include="Mock\MockUdpSocket.cs" />
     <Compile Include="Mock\SafeCloseSocket.cs" />
     <Compile Include="Mock\SendPacketsElementFlags.cs" />
     <Compile Include="Mock\Socket.cs" />

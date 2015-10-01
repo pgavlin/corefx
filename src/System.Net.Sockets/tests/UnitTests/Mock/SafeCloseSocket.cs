@@ -16,9 +16,9 @@ namespace System.Net.Sockets
         SafeHandleMinusOneIsInvalid
 #endif
     {
-        public unsafe static SafeCloseSocket CreateSocket(int fileDescriptor)
+        public unsafe static SafeCloseSocket CreateSocket(int handleId)
         {
-            return CreateSocket(InnerSafeCloseSocket.CreateSocket(fileDescriptor));
+            return CreateSocket(InnerSafeCloseSocket.CreateSocket(handleId));
         }
 
         public unsafe static SafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
@@ -42,16 +42,20 @@ namespace System.Net.Sockets
                 throw new NotImplementedException();
             }
 
-            public static InnerSafeCloseSocket CreateSocket(int fileDescriptor)
+            public static InnerSafeCloseSocket CreateSocket(int handleId)
             {
                 var res = new InnerSafeCloseSocket();
-                res.SetHandle((IntPtr)fileDescriptor);
+                res.SetHandle((IntPtr)handleId);
                 return res;
             }
 
             public static unsafe InnerSafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
             {
-                throw new NotImplementedException();
+                int handleId = MockSocketBase.CreateSocket(addressFamily, socketType, protocolType);
+
+                var res = new InnerSafeCloseSocket();
+                res.SetHandle((IntPtr)handleId);
+                return res;
             }
 
             public static unsafe InnerSafeCloseSocket Accept(SafeCloseSocket socketHandle, byte[] socketAddress, ref int socketAddressLen)

@@ -8,7 +8,7 @@ using System.Threading;
 
 namespace System.Net.Sockets
 {
-    internal struct HandleTable<TValue>
+    internal struct HandleTable<TValue, TFactoryArg>
     {
         private const int MaxSize = 65536;
 
@@ -16,21 +16,18 @@ namespace System.Net.Sockets
         private int _allocatedHandleCount;
         private int[] _allocatedHandleBitmap;
         private ConcurrentDictionary<int, TValue> _allocatedHandles;
-        private Func<TValue> _factory;
 
-        public bool IsValid { get { return _factory != null; } }
+        public bool IsValid { get { return _allocatedHandles != null; } }
 
-        public HandleTable(int size, Func<TValue> factory)
+        public HandleTable(int size)
         {
             Debug.Assert(size > 0);
             Debug.Assert(size <= MaxSize);
-            Debug.Assert(factory != null);
 
             _tableSize = size;
             _allocatedHandleCount = 0;
             _allocatedHandleBitmap = new int[(size / sizeof(int)) + ((size % sizeof(int)) == 0 ? 0 : 1)];
             _allocatedHandles = new ConcurrentDictionary<int, TValue>();
-            _factory = factory;
         }
 
         private int AllocateHandleId()
@@ -106,16 +103,17 @@ namespace System.Net.Sockets
             return _allocatedHandles.TryGetValue(handleId, out value);
         }
 
-        public int AllocateHandle(out TValue value)
+        public int AllocateHandle(Func<TFactoryArg, TValue> factory, TFactoryArg arg)
         {
+            Debug.Assert(factory != null);
+
             int handleId = AllocateHandleId();
             if (handleId == -1)
             {
-                value = default(TValue);
                 return handleId;
             }
 
-            value = _factory();
+            TValue value = factory(arg);
             bool added = _allocatedHandles.TryAdd(handleId, value);
             Debug.Assert(added);
 
