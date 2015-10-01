@@ -36,7 +36,6 @@
     <Compile Include="Mock\Socket.cs" />
     <Compile Include="Mock\SocketAsyncEventArgs.cs" />
     <Compile Include="Mock\SocketPal.cs" />
-    <Compile Include="Mock\SocketAddressPal.cs" />
     <Compile Include="Mock\SocketProtocolSupportPal.cs" />
   </ItemGroup>
 
@@ -251,6 +250,34 @@
     
     <Compile Include="$(CommonPath)\System\Threading\Tasks\TaskToApm.cs">
       <Link>Common\System\Threading\Tasks\TaskToApm.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetsWindows)' == 'true' ">
+    <Compile Include="$(CommonPath)\System\Net\SocketAddressPal.Windows.cs">
+      <Link>Common\System\Net\SocketAddressPal.Windows.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetsUnix)' == 'true' ">
+    <Compile Include="$(CommonPath)\System\Net\SocketAddressPal.Unix.cs">
+      <Link>Common\System\Net\SocketAddressPal.Unix.cs</Link>
+    </Compile>
+
+    <Compile Include="$(CommonPath)\Interop\Interop.CheckedAccess.cs" >
+      <Link>Common\Interop\Interop.CheckedAccess.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetsLinux)' == 'true' ">
+    <Compile Include="$(CommonPath)\Interop\Linux\libc\Interop.sockaddr.cs">
+      <Link>Interop\Linux\libc\Interop.sockaddr.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetsOSX)' == 'true' ">
+    <Compile Include="$(CommonPath)\Interop\OSX\libc\Interop.sockaddr.cs">
+      <Link>Interop\OSX\libc\Interop.sockaddr.cs</Link>
     </Compile>
   </ItemGroup>
    
