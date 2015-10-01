@@ -31,6 +31,7 @@
     <Compile Include="Mock\_ConnectOverlappedAsyncResult.cs" />
     <Compile Include="Mock\_OverlappedAsyncResult.cs" />
     <Compile Include="Mock\_ReceiveMessageOverlappedAsyncResult.cs" />
+    <Compile Include="Mock\HandleTable.cs" />
     <Compile Include="Mock\SafeCloseSocket.cs" />
     <Compile Include="Mock\SendPacketsElementFlags.cs" />
     <Compile Include="Mock\Socket.cs" />
