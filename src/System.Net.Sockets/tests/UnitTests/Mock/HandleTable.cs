@@ -56,7 +56,7 @@ namespace System.Net.Sockets
                         int bitMask = 1 << bit;
                         do
                         {
-                            if (Interlocked.CompareExchange(ref _allocatedHandleBitmap[i], entry, entry | bitMask) == entry)
+                            if (Interlocked.CompareExchange(ref _allocatedHandleBitmap[i], entry | bitMask, entry) == entry)
                             {
                                 // We've claimed this handle; return the actual ID.
                                 Interlocked.Increment(ref _allocatedHandleCount);
@@ -93,7 +93,7 @@ namespace System.Net.Sockets
             {
                 entry = _allocatedHandleBitmap[block];
                 Debug.Assert((entry & ~bitMask) == 1);
-            } while (Interlocked.CompareExchange(ref _allocatedHandleBitmap[block], entry, entry & bitMask) != entry);
+            } while (Interlocked.CompareExchange(ref _allocatedHandleBitmap[block], entry & bitMask, entry) != entry);
 
             Interlocked.Decrement(ref _allocatedHandleCount);
         }
