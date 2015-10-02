@@ -18,7 +18,7 @@ namespace System.Net.Sockets
         public static SocketError LastSocketError
         {
             get { return s_lastSocketError; }
-            protected set { LastSocketError = value; }
+            protected set { s_lastSocketError = value; }
         }
 
         public abstract AddressFamily AddressFamily { get; }
