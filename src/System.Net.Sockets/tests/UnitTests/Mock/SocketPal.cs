@@ -16,7 +16,7 @@ namespace System.Net.Sockets
 
         public static SocketError GetLastSocketError()
         {
-            throw new NotImplementedException();
+            return MockSocketBase.LastSocketError;
         }
 
         public static SafeCloseSocket CreateSocket(AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType)
@@ -126,12 +126,21 @@ namespace System.Net.Sockets
 
         public static unsafe SocketError SetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, int optionValue)
         {
-            throw new NotImplementedException();
+            var buffer = new byte[sizeof(int)] {
+                (byte)optionValue,
+                (byte)(optionValue >> 8),
+                (byte)(optionValue >> 16),
+                (byte)(optionValue >> 24)
+            };
+
+            int err = MockSocketBase.SetSockOpt(handle.HandleId, optionLevel, optionName, buffer);
+            return err == -1 ? GetLastSocketError() : SocketError.Success;
         }
 
         public static unsafe SocketError SetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, byte[] optionValue)
         {
-            throw new NotImplementedException();
+            int err = MockSocketBase.SetSockOpt(handle.HandleId, optionLevel, optionName, optionValue);
+            return err == -1 ? GetLastSocketError() : SocketError.Success;
         }
 
         public static void SetReceivingDualModeIPv4PacketInformation(Socket socket)
@@ -156,12 +165,18 @@ namespace System.Net.Sockets
 
         public static unsafe SocketError GetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, out int optionValue)
         {
-            throw new NotImplementedException();
+            int optionLen = sizeof(int);
+            var buffer = new byte[optionLen];
+            int err = MockSocketBase.GetSockOpt(handle.HandleId, optionLevel, optionName, buffer, ref optionLen);
+
+            optionValue = (int)buffer[0] | (int)buffer[1] << 8 | (int)buffer[2] << 16 | (int)buffer[3] << 24;
+            return err == -1 ? GetLastSocketError() : SocketError.Success;
         }
 
         public static unsafe SocketError GetSockOpt(SafeCloseSocket handle, SocketOptionLevel optionLevel, SocketOptionName optionName, byte[] optionValue, ref int optionLength)
         {
-            throw new NotImplementedException();
+            int err = MockSocketBase.GetSockOpt(handle.HandleId, optionLevel, optionName, optionValue, ref optionLength);
+            return err == -1 ? GetLastSocketError() : SocketError.Success;
         }
 
         public static unsafe SocketError GetMulticastOption(SafeCloseSocket handle, SocketOptionName optionName, out MulticastOption optionValue)

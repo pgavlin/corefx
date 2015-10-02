@@ -16,6 +16,14 @@ namespace System.Net.Sockets
         SafeHandleMinusOneIsInvalid
 #endif
     {
+        public int HandleId
+        {
+            get
+            {
+                return (int)handle;
+            }
+        }
+
         public unsafe static SafeCloseSocket CreateSocket(int handleId)
         {
             return CreateSocket(InnerSafeCloseSocket.CreateSocket(handleId));
@@ -39,7 +47,8 @@ namespace System.Net.Sockets
         {
             private unsafe SocketError InnerReleaseHandle()
             {
-                throw new NotImplementedException();
+                int err = MockSocketBase.CloseSocket((int)handle);
+                return err == -1 ? SocketPal.GetLastSocketError() : SocketError.Success;
             }
 
             public static InnerSafeCloseSocket CreateSocket(int handleId)

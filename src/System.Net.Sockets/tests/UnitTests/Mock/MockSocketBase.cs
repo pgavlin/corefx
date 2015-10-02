@@ -15,27 +15,113 @@ namespace System.Net.Sockets
 
         private readonly static HandleTable<MockSocketBase, AddressFamily> s_socketTable = new HandleTable<MockSocketBase, AddressFamily>(MaxSockets);
 
+        public static SocketError LastSocketError
+        {
+            get { return s_lastSocketError; }
+            protected set { LastSocketError = value; }
+        }
+
         public abstract AddressFamily AddressFamily { get; }
         public abstract SocketType SocketType { get; }
         public abstract ProtocolType ProtocolType { get; }
+
+        public virtual int GetSockOpt(SocketOptionLevel optionLevel, SocketOptionName optionName, byte[] buffer, ref int optionLen)
+        {
+            if (optionLevel != SocketOptionLevel.Socket)
+            {
+                optionLen = 0;
+                LastSocketError = SocketError.InvalidArgument;
+                return -1;
+            }
+
+            // TODO: support options
+            switch (optionName)
+            {
+                case SocketOptionName.Debug:
+                case SocketOptionName.AcceptConnection:
+                case SocketOptionName.ReuseAddress:
+                case SocketOptionName.KeepAlive:
+                case SocketOptionName.DontRoute:
+                case SocketOptionName.Broadcast:
+                case SocketOptionName.UseLoopback:
+                case SocketOptionName.Linger:
+                case SocketOptionName.OutOfBandInline:
+                case SocketOptionName.DontLinger:
+                case SocketOptionName.ExclusiveAddressUse:
+                case SocketOptionName.SendBuffer:
+                case SocketOptionName.ReceiveBuffer:
+                case SocketOptionName.SendLowWater:
+                case SocketOptionName.ReceiveLowWater:
+                case SocketOptionName.SendTimeout:
+                case SocketOptionName.ReceiveTimeout:
+                case SocketOptionName.Error:
+                case SocketOptionName.Type:
+                case SocketOptionName.MaxConnections:
+                    optionLen = 0;
+                    LastSocketError = SocketError.Success;
+                    return 0;
+            }
+
+            LastSocketError = SocketError.ProtocolOption;
+            return -1;
+        }
+
+        public virtual int SetSockOpt(SocketOptionLevel optionLevel, SocketOptionName optionName, byte[] buffer)
+        {
+            if (optionLevel != SocketOptionLevel.Socket)
+            {
+                LastSocketError = SocketError.InvalidArgument;
+                return -1;
+            }
+
+            // TODO: support options
+            switch (optionName)
+            {
+                case SocketOptionName.Debug:
+                case SocketOptionName.AcceptConnection:
+                case SocketOptionName.ReuseAddress:
+                case SocketOptionName.KeepAlive:
+                case SocketOptionName.DontRoute:
+                case SocketOptionName.Broadcast:
+                case SocketOptionName.UseLoopback:
+                case SocketOptionName.Linger:
+                case SocketOptionName.OutOfBandInline:
+                case SocketOptionName.DontLinger:
+                case SocketOptionName.ExclusiveAddressUse:
+                case SocketOptionName.SendBuffer:
+                case SocketOptionName.ReceiveBuffer:
+                case SocketOptionName.SendLowWater:
+                case SocketOptionName.ReceiveLowWater:
+                case SocketOptionName.SendTimeout:
+                case SocketOptionName.ReceiveTimeout:
+                case SocketOptionName.Error:
+                case SocketOptionName.Type:
+                case SocketOptionName.MaxConnections:
+                    LastSocketError = SocketError.Success;
+                    return 0;
+            }
+
+            LastSocketError = SocketError.ProtocolOption;
+            return -1;
+        }
 
         private static int CreateTcpSocket(AddressFamily addressFamily, SocketType socketType)
         {
             if (socketType != SocketType.Stream)
             {
                 // TODO: validate this error
-                s_lastSocketError = SocketError.InvalidArgument;
+                LastSocketError = SocketError.InvalidArgument;
                 return -1;
             }
 
             int handleId = s_socketTable.AllocateHandle(af => new MockTcpSocket(af), addressFamily);
             if (handleId == -1)
             {
-                s_lastSocketError = SocketError.TooManyOpenSockets;
+                LastSocketError = SocketError.TooManyOpenSockets;
                 return -1;
             }
 
-            s_lastSocketError = SocketError.Success;
+            LastSocketError = SocketError.Success;
             return handleId;
         }
 
@@ -44,18 +130,18 @@ namespace System.Net.Sockets
             if (socketType != SocketType.Dgram)
             {
                 // TODO: validate this error
-                s_lastSocketError = SocketError.InvalidArgument;
+                LastSocketError = SocketError.InvalidArgument;
                 return -1;
             }
 
             int handleId = s_socketTable.AllocateHandle(af => new MockUdpSocket(af), addressFamily);
             if (handleId == -1)
             {
-                s_lastSocketError = SocketError.TooManyOpenSockets;
+                LastSocketError = SocketError.TooManyOpenSockets;
                 return -1;
             }
 
-            s_lastSocketError = SocketError.Success;
+            LastSocketError = SocketError.Success;
             return handleId;
         }
 
@@ -68,7 +154,7 @@ namespace System.Net.Sockets
         {
             if (addressFamily != AddressFamily.InterNetwork && addressFamily != AddressFamily.InterNetworkV6)
             {
-                s_lastSocketError = SocketError.AddressFamilyNotSupported;
+                LastSocketError = SocketError.AddressFamilyNotSupported;
                 return -1;
             }
 
@@ -81,9 +167,46 @@ namespace System.Net.Sockets
                     return CreateUdpSocket(addressFamily, socketType);
 
                 default:
-                    s_lastSocketError = SocketError.ProtocolFamilyNotSupported;
+                    LastSocketError = SocketError.ProtocolFamilyNotSupported;
                     return -1;
             }
+        }
+
+        public static int CloseSocket(int handleId)
+        {
+            MockSocketBase socket;
+            if (!s_socketTable.TryGetValue(handleId, out socket))
+            {
+                LastSocketError = SocketError.NotSocket;
+                return -1;
+            }
+
+            s_socketTable.FreeHandle(handleId);
+            return 0;
+        }
+
+        public static int GetSockOpt(int handleId, SocketOptionLevel optionLevel, SocketOptionName optionName, byte[] buffer, ref int optionLen)
+        {
+            MockSocketBase socket;
+            if (!s_socketTable.TryGetValue(handleId, out socket))
+            {
+                LastSocketError = SocketError.NotSocket;
+                return -1;
+            }
+
+            return socket.GetSockOpt(optionLevel, optionName, buffer, ref optionLen);
+        }
+
+        public static int SetSockOpt(int handleId, SocketOptionLevel optionLevel, SocketOptionName optionName, byte[] buffer)
+        {
+            MockSocketBase socket;
+            if (!s_socketTable.TryGetValue(handleId, out socket))
+            {
+                LastSocketError = SocketError.NotSocket;
+                return -1;
+            }
+
+            return socket.SetSockOpt(optionLevel, optionName, buffer);
         }
     }
 }
