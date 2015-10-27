@@ -27,6 +27,18 @@ namespace System.Net.Sockets.Tests
             Assert.True(Capability.IPv4Support() && Capability.IPv6Support());
         }
 
+        private static IPAddress GetExpectedReceiveFromAddress(IPAddress connectTo)
+        {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                return connectTo.MapToIPv6();
+            }
+
+            // OS X does not support the reception of IPv4 packet information for dual-mode sockets. The stack instead
+            // returns IPAddress.IPv6None.
+            return connectTo.AddressFamily == AddressFamily.InterNetworkV6 ? connectTo : IPAddress.IPv6None;
+        }
+
         #region Constructor and Property
 
         [Fact]
@@ -524,7 +536,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveFromAsyncV4BoundToAnyV4_Success()
         {
             ReceiveFromAsync_Helper(IPAddress.Any, IPAddress.Loopback);
@@ -605,7 +616,7 @@ namespace System.Net.Sockets.Tests
                 Assert.Equal<Type>(args.RemoteEndPoint.GetType(), typeof(IPEndPoint));
                 IPEndPoint remoteEndPoint = args.RemoteEndPoint as IPEndPoint;
                 Assert.Equal(AddressFamily.InterNetworkV6, remoteEndPoint.AddressFamily);
-                Assert.Equal(connectTo.MapToIPv6(), remoteEndPoint.Address);
+                Assert.Equal(GetExpectedReceiveFromAddress(connectTo), remoteEndPoint.Address);
             }
         }
 

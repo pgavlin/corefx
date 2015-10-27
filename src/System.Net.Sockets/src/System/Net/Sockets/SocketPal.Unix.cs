@@ -164,7 +164,7 @@ namespace System.Net.Sockets
             Interop.Sys.IPPacketInformation nativePacketInfo;
             if (!Interop.Sys.TryGetIPPacketInformation(messageHeader, isIPv4, &nativePacketInfo))
             {
-                return default(IPPacketInformation);
+                return new IPPacketInformation(isIPv4 ? IPAddress.None : IPAddress.IPv6None, 0);
             }
 
             return new IPPacketInformation(nativePacketInfo.Address.GetIPAddress(), nativePacketInfo.InterfaceIndex);

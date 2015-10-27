@@ -17,7 +17,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void Success()
         {
             ManualResetEvent completed = new ManualResetEvent(false);

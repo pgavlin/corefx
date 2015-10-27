@@ -36,6 +36,18 @@ namespace System.Net.Sockets.Tests
             }
         }
 
+        private static IPAddress GetExpectedReceiveFromAddress(IPAddress connectTo, bool isMapped = true)
+        {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                return isMapped ? connectTo.MapToIPv6() : connectTo;
+            }
+
+            // OS X does not support the reception of IPv4 packet information for dual-mode sockets. The stack instead
+            // returns IPAddress.IPv6None.
+            return connectTo.AddressFamily == AddressFamily.InterNetworkV6 ? connectTo : (isMapped ? IPAddress.IPv6None : IPAddress.None);
+        }
+
         #region Constructor and Property
 
         [Fact]
@@ -1536,14 +1548,12 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveFromV4BoundToSpecificV4_Success()
         {
             ReceiveFrom_Helper(IPAddress.Loopback, IPAddress.Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveFromV4BoundToAnyV4_Success()
         {
             ReceiveFrom_Helper(IPAddress.Any, IPAddress.Loopback);
@@ -1629,7 +1639,7 @@ namespace System.Net.Sockets.Tests
 
                 IPEndPoint remoteEndPoint = receivedFrom as IPEndPoint;
                 Assert.Equal(AddressFamily.InterNetworkV6, remoteEndPoint.AddressFamily);
-                Assert.Equal(connectTo.MapToIPv6(), remoteEndPoint.Address);
+                Assert.Equal(GetExpectedReceiveFromAddress(connectTo), remoteEndPoint.Address);
             }
         }
 
@@ -1824,7 +1834,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveFromAsyncV4BoundToAnyV4_Success()
         {
             ReceiveFromAsync_Helper(IPAddress.Any, IPAddress.Loopback);
@@ -1906,7 +1915,7 @@ namespace System.Net.Sockets.Tests
 
                 IPEndPoint remoteEndPoint = args.RemoteEndPoint as IPEndPoint;
                 Assert.Equal(AddressFamily.InterNetworkV6, remoteEndPoint.AddressFamily);
-                Assert.Equal(connectTo.MapToIPv6(), remoteEndPoint.Address);
+                Assert.Equal(GetExpectedReceiveFromAddress(connectTo), remoteEndPoint.Address);
             }
         }
 
@@ -1953,42 +1962,36 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact] // Base case
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromV4BoundToSpecificMappedV4_Success()
         {
             ReceiveMessageFrom_Helper(IPAddress.Loopback.MapToIPv6(), IPAddress.Loopback);
         }
 
         [Fact] // Base case
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromV4BoundToAnyMappedV4_Success()
         {
             ReceiveMessageFrom_Helper(IPAddress.Any.MapToIPv6(), IPAddress.Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromV4BoundToSpecificV4_Success()
         {
             ReceiveMessageFrom_Helper(IPAddress.Loopback, IPAddress.Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromV4BoundToAnyV4_Success()
         {
             ReceiveMessageFrom_Helper(IPAddress.Any, IPAddress.Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromV6BoundToSpecificV6_Success()
         {
             ReceiveMessageFrom_Helper(IPAddress.IPv6Loopback, IPAddress.IPv6Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromV6BoundToAnyV6_Success()
         {
             ReceiveMessageFrom_Helper(IPAddress.IPv6Any, IPAddress.IPv6Loopback);
@@ -2040,7 +2043,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromV4BoundToAnyV6_Success()
         {
             ReceiveMessageFrom_Helper(IPAddress.IPv6Any, IPAddress.Loopback);
@@ -2093,12 +2095,11 @@ namespace System.Net.Sockets.Tests
 
                 IPEndPoint remoteEndPoint = receivedFrom as IPEndPoint;
                 Assert.Equal(AddressFamily.InterNetworkV6, remoteEndPoint.AddressFamily);
-                Assert.Equal(connectTo.MapToIPv6(), remoteEndPoint.Address);
+                Assert.Equal(GetExpectedReceiveFromAddress(connectTo), remoteEndPoint.Address);
 
                 Assert.Equal(SocketFlags.None, socketFlags);
-                Assert.NotNull(ipPacketInformation);
 
-                Assert.Equal(connectTo, ipPacketInformation.Address);
+                Assert.Equal(GetExpectedReceiveFromAddress(connectTo, isMapped: false), ipPacketInformation.Address);
 
                 // TODO: Move to NetworkInformation tests.
                 // Assert.Equal(NetworkInterface.IPv6LoopbackInterfaceIndex, ipPacketInformation.Interface);
@@ -2143,42 +2144,36 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact] // Base case
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void BeginReceiveMessageFromV4BoundToSpecificMappedV4_Success()
         {
             BeginReceiveMessageFrom_Helper(IPAddress.Loopback.MapToIPv6(), IPAddress.Loopback);
         }
 
         [Fact] // Base case
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void BeginReceiveMessageFromV4BoundToAnyMappedV4_Success()
         {
             BeginReceiveMessageFrom_Helper(IPAddress.Any.MapToIPv6(), IPAddress.Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void BeginReceiveMessageFromV4BoundToSpecificV4_Success()
         {
             BeginReceiveMessageFrom_Helper(IPAddress.Loopback, IPAddress.Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void BeginReceiveMessageFromV4BoundToAnyV4_Success()
         {
             BeginReceiveMessageFrom_Helper(IPAddress.Any, IPAddress.Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void BeginReceiveMessageFromV6BoundToSpecificV6_Success()
         {
             BeginReceiveMessageFrom_Helper(IPAddress.IPv6Loopback, IPAddress.IPv6Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void BeginReceiveMessageFromV6BoundToAnyV6_Success()
         {
             BeginReceiveMessageFrom_Helper(IPAddress.IPv6Any, IPAddress.IPv6Loopback);
@@ -2230,7 +2225,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void BeginReceiveMessageFromV4BoundToAnyV6_Success()
         {
             BeginReceiveMessageFrom_Helper(IPAddress.IPv6Any, IPAddress.Loopback);
@@ -2268,11 +2262,10 @@ namespace System.Net.Sockets.Tests
 
                 IPEndPoint remoteEndPoint = receivedFrom as IPEndPoint;
                 Assert.Equal(AddressFamily.InterNetworkV6, remoteEndPoint.AddressFamily);
-                Assert.Equal(connectTo.MapToIPv6(), remoteEndPoint.Address);
+                Assert.Equal(GetExpectedReceiveFromAddress(connectTo), remoteEndPoint.Address);
 
                 Assert.Equal(SocketFlags.None, socketFlags);
-                Assert.NotNull(ipPacketInformation);
-                Assert.Equal(connectTo, ipPacketInformation.Address);
+                Assert.Equal(GetExpectedReceiveFromAddress(connectTo, isMapped: false), ipPacketInformation.Address);
 
                 // TODO: Move to NetworkInformation tests.
                 //Assert.Equal(NetworkInterface.IPv6LoopbackInterfaceIndex, ipPacketInformation.Interface);
@@ -2320,42 +2313,36 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact] // Base case
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromAsyncV4BoundToSpecificMappedV4_Success()
         {
             ReceiveMessageFromAsync_Helper(IPAddress.Loopback.MapToIPv6(), IPAddress.Loopback);
         }
 
         [Fact] // Base case
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromAsyncV4BoundToAnyMappedV4_Success()
         {
             ReceiveMessageFromAsync_Helper(IPAddress.Any.MapToIPv6(), IPAddress.Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromAsyncV4BoundToSpecificV4_Success()
         {
             ReceiveMessageFromAsync_Helper(IPAddress.Loopback, IPAddress.Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromAsyncV4BoundToAnyV4_Success()
         {
             ReceiveMessageFromAsync_Helper(IPAddress.Any, IPAddress.Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromAsyncV6BoundToSpecificV6_Success()
         {
             ReceiveMessageFromAsync_Helper(IPAddress.IPv6Loopback, IPAddress.IPv6Loopback);
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromAsyncV6BoundToAnyV6_Success()
         {
             ReceiveMessageFromAsync_Helper(IPAddress.IPv6Any, IPAddress.IPv6Loopback);
@@ -2407,7 +2394,6 @@ namespace System.Net.Sockets.Tests
         }
 
         [Fact]
-        [ActiveIssue(4004, PlatformID.OSX)]
         public void ReceiveMessageFromAsyncV4BoundToAnyV6_Success()
         {
             ReceiveMessageFromAsync_Helper(IPAddress.IPv6Any, IPAddress.Loopback);
@@ -2442,11 +2428,10 @@ namespace System.Net.Sockets.Tests
 
                 IPEndPoint remoteEndPoint = args.RemoteEndPoint as IPEndPoint;
                 Assert.Equal(AddressFamily.InterNetworkV6, remoteEndPoint.AddressFamily);
-                Assert.Equal(connectTo.MapToIPv6(), remoteEndPoint.Address);
+                Assert.Equal(GetExpectedReceiveFromAddress(connectTo), remoteEndPoint.Address);
 
                 Assert.Equal(SocketFlags.None, args.SocketFlags);
-                Assert.NotNull(args.ReceiveMessageFromPacketInfo);
-                Assert.Equal(connectTo, args.ReceiveMessageFromPacketInfo.Address);
+                Assert.Equal(GetExpectedReceiveFromAddress(connectTo, isMapped: false), args.ReceiveMessageFromPacketInfo.Address);
 
                 // TODO: Move to NetworkInformation tests.
                 // Assert.Equal(NetworkInterface.IPv6LoopbackInterfaceIndex, args.ReceiveMessageFromPacketInfo.Interface);
