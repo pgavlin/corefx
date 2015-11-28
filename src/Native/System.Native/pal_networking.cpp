@@ -78,9 +78,6 @@ static_assert(OffsetOfIOVectorBase == OffsetOfIovecBase, "");
 static_assert(sizeof(decltype(IOVector::Count)) == sizeof(decltype(iovec::iov_len)), "");
 static_assert(OffsetOfIOVectorCount == OffsetOfIovecLen, "");
 
-// We require that FDSET_MAX_FDS is less than or equal to FD_SETSIZE.
-static_assert(PAL_FDSET_MAX_FDS <= FD_SETSIZE, "");
-
 template <typename T>
 constexpr T Min(T left, T right)
 {
@@ -1852,50 +1849,23 @@ extern "C" Error Socket(int32_t addressFamily, int32_t socketType, int32_t proto
     return *createdSocket != -1 ? PAL_SUCCESS : ConvertErrorPlatformToPal(errno);
 }
 
-static void ConvertFdSetPlatformToPal(FdSet& palSet, fd_set& platformSet, int32_t fdCount)
+const int FD_SETSIZE_BYTES = FD_SETSIZE / 8;
+
+#if !HAVE_FDS_BITS && !HAVE_PRIVATE_FDS_BITS
+const int FD_SETSIZE_UINTS = FD_SETSIZE_BYTES / sizeof(uint32_t);
+#endif
+
+static void ConvertFdSetPlatformToPal(uint32_t* palSet, fd_set& platformSet, int32_t fdCount)
 {
     assert(fdCount >= 0);
 
-    memset(&palSet.Bits[0], 0, sizeof(palSet.Bits));
+    memset(palSet, 0, FD_SETSIZE_BYTES);
 
 #if !HAVE_FDS_BITS && !HAVE_PRIVATE_FDS_BITS
     for (int i = 0; i < fdCount; i++)
     {
-        int word = i / static_cast<int>(PAL_FDSET_NFD_BITS);
-        int bit = i % static_cast<int>(PAL_FDSET_NFD_BITS);
-        if ((palSet.Bits[word] & (1 << bit)) == 0)
-        {
-            FD_SET(i, &platformSet);
-        }
-        else
-        {
-            FD_CLR(i, &platformSet);
-        }
-    }
-#else
-
-    size_t bytesToCopy = static_cast<size_t>((fdCount / 8) + ((fdCount % 8) == 0 ? 1 : 0));
-
-    uint8_t* dest;
-#if HAVE_FDS_BITS
-    dest = reinterpret_cast<uint8_t*>(&platformSet.fds_bits[0]);
-#elif HAVE_PRIVATE_FDS_BITS
-    dest = reinterpret_cast<uint8_t*>(&platformSet.__fds_bits[0]);
-#endif
-
-    memcpy(dest, &palSet.Bits[0], bytesToCopy);
-#endif
-}
-
-static void ConvertFdSetPalToPlatform(fd_set& platformSet, FdSet& palSet, int32_t fdCount)
-{
-    assert(fdCount >= 0);
-
-#if !HAVE_FDS_BITS && !HAVE_PRIVATE_FDS_BITS
-    for (int i = 0; i < fdCount; i++)
-    {
-        uint32_t* word = &palSet.Bits[i / static_cast<int>(PAL_FDSET_NFD_BITS)];
-        uint32_t mask = 1 << (i % static_cast<int>(PAL_FDSET_NFD_BITS));
+        uint32_t* word = &palSet[i / FD_SETSIZE_UINTS];
+        uint32_t mask = 1 << (i % FD_SETSIZE_UINTS);
 
         if (FD_ISSET(i, &platformSet))
         {
@@ -1907,7 +1877,7 @@ static void ConvertFdSetPalToPlatform(fd_set& platformSet, FdSet& palSet, int32_
         }
     }
 #else
-    size_t bytesToCopy = static_cast<size_t>((fdCount / 8) + ((fdCount % 8) == 0 ? 1 : 0));
+    size_t bytesToCopy = static_cast<size_t>((fdCount / 8) + ((fdCount % 8) != 0 ? 1 : 0));
 
     uint8_t* source;
 #if HAVE_FDS_BITS
@@ -1916,18 +1886,59 @@ static void ConvertFdSetPalToPlatform(fd_set& platformSet, FdSet& palSet, int32_
     source = reinterpret_cast<uint8_t*>(&platformSet.__fds_bits[0]);
 #endif
 
-    memcpy(&palSet.Bits[0], source, bytesToCopy);
+    memcpy(palSet, source, bytesToCopy);
 #endif
 }
 
-extern "C" Error Select(int32_t fdCount, FdSet* readFdSet, FdSet* writeFdSet, FdSet* errorFdSet, int32_t microseconds, int32_t* selected)
+static void ConvertFdSetPalToPlatform(fd_set& platformSet, uint32_t* palSet, int32_t fdCount)
+{
+    assert(fdCount >= 0);
+
+    memset(&platformSet, 0, sizeof(platformSet));
+
+#if !HAVE_FDS_BITS && !HAVE_PRIVATE_FDS_BITS
+    for (int i = 0; i < fdCount; i++)
+    {
+        int word = i / FD_SETSIZE_UINTS;
+        int bit = i % FD_SETSIZE_UINTS;
+        if ((palSet[word] & (1 << bit)) == 0)
+        {
+            FD_CLR(i, &platformSet);
+        }
+        else
+        {
+            FD_SET(i, &platformSet);
+        }
+    }
+#else
+
+    size_t bytesToCopy = static_cast<size_t>((fdCount / 8) + ((fdCount % 8) != 0 ? 1 : 0));
+
+    uint8_t* dest;
+#if HAVE_FDS_BITS
+    dest = reinterpret_cast<uint8_t*>(&platformSet.fds_bits[0]);
+#elif HAVE_PRIVATE_FDS_BITS
+    dest = reinterpret_cast<uint8_t*>(&platformSet.__fds_bits[0]);
+#endif
+
+    memcpy(dest, palSet, bytesToCopy);
+#endif
+}
+
+extern "C" int32_t FdSetSize()
+{
+    return FD_SETSIZE;
+}
+
+extern "C" Error
+Select(int32_t fdCount, uint32_t* readFdSet, uint32_t* writeFdSet, uint32_t* errorFdSet, int32_t microseconds, int32_t* selected)
 {
     if (selected == nullptr)
     {
         return PAL_EFAULT;
     }
 
-    if (fdCount < 0 || fdCount > PAL_FDSET_MAX_FDS || microseconds < -1)
+    if (fdCount < 0 || fdCount >= FD_SETSIZE || microseconds < -1)
     {
         return PAL_EINVAL;
     }
@@ -1941,19 +1952,19 @@ extern "C" Error Select(int32_t fdCount, FdSet* readFdSet, FdSet* writeFdSet, Fd
     if (readFdSet != nullptr)
     {
         readFds = reinterpret_cast<fd_set*>(alloca(sizeof(fd_set)));
-        ConvertFdSetPalToPlatform(*readFds, *readFdSet, fdCount);
+        ConvertFdSetPalToPlatform(*readFds, readFdSet, fdCount);
     }
 
     if (writeFdSet != nullptr)
     {
         writeFds = reinterpret_cast<fd_set*>(alloca(sizeof(fd_set)));
-        ConvertFdSetPalToPlatform(*writeFds, *writeFdSet, fdCount);
+        ConvertFdSetPalToPlatform(*writeFds, writeFdSet, fdCount);
     }
 
     if (errorFdSet != nullptr)
     {
         errorFds = reinterpret_cast<fd_set*>(alloca(sizeof(fd_set)));
-        ConvertFdSetPalToPlatform(*errorFds, *errorFdSet, fdCount);
+        ConvertFdSetPalToPlatform(*errorFds, errorFdSet, fdCount);
     }
 
     if (microseconds != -1)
@@ -1971,17 +1982,17 @@ extern "C" Error Select(int32_t fdCount, FdSet* readFdSet, FdSet* writeFdSet, Fd
 
     if (readFdSet != nullptr)
     {
-        ConvertFdSetPlatformToPal(*writeFdSet, *writeFds, rv);
+        ConvertFdSetPlatformToPal(readFdSet, *readFds, fdCount);
     }
 
     if (writeFdSet != nullptr)
     {
-        ConvertFdSetPlatformToPal(*writeFdSet, *writeFds, rv);
+        ConvertFdSetPlatformToPal(writeFdSet, *writeFds, fdCount);
     }
 
     if (errorFdSet != nullptr)
     {
-        ConvertFdSetPlatformToPal(*errorFdSet, *errorFds, rv);
+        ConvertFdSetPlatformToPal(errorFdSet, *errorFds, fdCount);
     }
 
     *selected = rv;
